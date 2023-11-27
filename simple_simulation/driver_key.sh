@@ -39,10 +39,14 @@ simulated_eqtl_data_dir=${temp_output_root}"simulated_eqtl_data/"
 # Output directory for simulated expression data
 simulated_expression_data_dir=${temp_output_root}"simulated_expression_data/"
 
+# Output directory containing simulated learned gene models
+simulated_gene_models_dir=${temp_output_root}"simulated_learned_gene_models/"
+
 # Output directory for simulated gwas data
 simulated_gwas_data_dir=${temp_output_root}"simulated_gwas_data/"
 
-
+# Output directory for simulated gwas data
+mediated_h2_results_dir=${temp_output_root}"mediated_h2_results/"
 
 
 
@@ -59,14 +63,16 @@ fi
 
 # RUN SIMULATIONS
 simulation_number="1"
-sh run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gwas_data_dir 
+sh run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
+
 
 
 if false; then
-for simulation_number in $(seq 1 100); do 
-	sh run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gwas_data_dir 
+for simulation_number in $(seq 2 20); do 
+	sh run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
 done
 fi
+
 
 
 

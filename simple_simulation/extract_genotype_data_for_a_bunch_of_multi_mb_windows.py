@@ -164,6 +164,12 @@ for window_name in windows:
 	output_file = processed_genotype_data_dir + 'gwas_genotype_' + str(window_iter) + '.npy'
 	np.save(output_file, window_gwas_genotype)
 
+	# Save variant LD
+	LD = np.corrcoef(np.transpose(window_gwas_genotype))
+	# Save LD genotype
+	output_file = processed_genotype_data_dir + 'gwas_genotype_LD_' + str(window_iter) + '.npy'
+	np.save(output_file, LD)	
+
 	# Iterate through eqtl sample sizes
 	eqtl_sss = [100, 200, 300, 500, 1000, 5000]
 	for eqtl_ss in eqtl_sss:
