@@ -15,7 +15,7 @@ def simulate_gene_expression(genotype, gene_snp_indices, gene_snp_causal_effects
 	ge = np.random.normal(loc=genetic_gene_expression, scale=np.sqrt(1.0-gene_heritability))
 
 
-	return ge
+	return ge, genetic_gene_expression
 
 
 
@@ -40,6 +40,7 @@ genotype = np.load(genotype_file)
 
 # Loop through genes
 simulated_gene_expression = []
+simulated_genetic_gene_expression = []
 
 f = open(simulated_causal_eqtl_effect_file)
 head_count = 0
@@ -56,21 +57,25 @@ for line in f:
 	gene_snp_causal_effects = np.asarray(data[2].split(',')).astype(float)
 
 	# Simulate gene expression
-	gene_expression = simulate_gene_expression(genotype, gene_snp_indices, gene_snp_causal_effects)
+	gene_expression, genetic_gene_expression = simulate_gene_expression(genotype, gene_snp_indices, gene_snp_causal_effects)
 
 	# Standardized gene expression
 	std_gene_expression = (gene_expression - np.mean(gene_expression))/np.std(gene_expression)
 
 	# Append to global array
 	simulated_gene_expression.append(std_gene_expression)
+	simulated_genetic_gene_expression.append(genetic_gene_expression)
 f.close()
 
 # Convert to numpy format
 simulated_gene_expression = np.asarray(simulated_gene_expression)
+simulated_genetic_gene_expression = np.asarray(simulated_genetic_gene_expression)
+
 
 # SAVE TO OUTPUT
 output_expression_file = simulated_expression_data_dir + simulation_name_string + 'eqtl_ss_' + str(eqtl_ss) + '.npy'
 np.save(output_expression_file, simulated_gene_expression)
 
-
+output_genetic_expression_file = simulated_expression_data_dir + simulation_name_string + 'eqtl_ss_' + str(eqtl_ss) + '_genetic_ge.npy'
+np.save(output_genetic_expression_file, simulated_genetic_gene_expression)
 

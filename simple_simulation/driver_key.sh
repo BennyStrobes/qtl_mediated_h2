@@ -56,22 +56,47 @@ mediated_h2_results_dir=${temp_output_root}"mediated_h2_results/"
 # Run analysis
 ############################
 # Prepare genotype data
-if false; then
-sh prepare_ukbb_genotype_data_for_simulation.sh $ukbb_genotype_dir $processed_genotype_data_dir
-fi
+sbatch prepare_ukbb_genotype_data_for_simulation.sh $ukbb_genotype_dir $processed_genotype_data_dir
+
 
 
 # RUN SIMULATIONS
-simulation_number="1"
-sh run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
-
-
-
 if false; then
-for simulation_number in $(seq 2 20); do 
-	sh run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
+for simulation_number in $(seq 1 100); do 
+	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
 done
 fi
+
+if false; then
+for simulation_number in $(seq 2 500); do 
+	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
+done
+fi
+
+if false; then
+for simulation_number in $(seq 1 100); do 
+	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
+done
+fi
+
+if false; then
+for simulation_number in $(seq 101 300); do 
+	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
+done
+fi
+
+if false; then
+for simulation_number in $(seq 101 120); do 
+	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
+done
+fi
+
+if false; then
+for simulation_number in $(seq 101 300); do 
+	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
+done
+fi
+
 
 
 

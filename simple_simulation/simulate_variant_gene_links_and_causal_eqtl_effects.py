@@ -18,7 +18,7 @@ def assign_snps_to_each_gene(n_snps, n_genes, n_snps_per_gene, gene_to_snp_mappi
 	# Loop through genes
 	for gene_iter in range(n_genes):
 		# Randomly select gene position 
-		gene_center = np.random.choice(np.arange(n_snps)[6:-7]) # Subsetting done to avoid weird edge cases
+		gene_center = np.random.choice(np.arange(n_snps)[42:-43]) # Subsetting done to avoid weird edge cases
 		# Assign snps to gene
 		gene_snps = np.arange(gene_center-(n_snps_per_gene/2), gene_center+(n_snps_per_gene/2)).astype(int)
 
@@ -59,6 +59,8 @@ def simulate_causal_eqtl_effect_sizes(gene_to_snp_mapping, simulation_name_strin
 		if gene_iter < n_genes*fraction_genes_cis_h2:
 			counter = counter + 1
 			causal_eqtl_effects[np.random.choice(np.arange(len(snp_indices)), size=5, replace=False)] = np.random.normal(loc=0.0, scale=np.sqrt(ge_h2/n_causal_snps_per_gene),size=n_causal_snps_per_gene)
+		else:
+			print('hi')
 
 		'''
 		gene_cis_h2_boolean = np.random.binomial(n=1, p=fraction_genes_cis_h2, size=1)[0]
@@ -81,7 +83,7 @@ fraction_genes_cis_h2 = float(sys.argv[5])
 ge_h2 = float(sys.argv[6])
 
 # Number of snps assigned to each gene
-n_snps_per_gene=10
+n_snps_per_gene=80
 n_causal_snps_per_gene=5
 
 

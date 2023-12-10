@@ -61,6 +61,7 @@ nm_variant_effect_sizes = simulate_nm_variant_to_trait_effect_sizes(n_snps, n_ca
 
 # Initialize genetic component of gene expression with just non-mediated effects
 genetic_comp = np.dot(gwas_genotype, nm_variant_effect_sizes)
+total_nm_genetic_var = np.var(genetic_comp)
 
 # Now add mediated effects
 # There are 50 heritable genes
@@ -78,6 +79,7 @@ print_gene_causal_effect_sizes(gene_causal_effects, mediated_gene_causal_effect_
 # Now add gene causal effects to genetic component of trait
 simulated_causal_eqtl_effect_summary_file = simulated_eqtl_data_dir + simulation_name_string + 'causal_eqtl_effect_summary.txt'
 f = open(simulated_causal_eqtl_effect_summary_file)
+mediated_genetic_comp = np.copy(genetic_comp)*0.0
 head_count = 0
 gene_counter = 0
 for line in f:
@@ -102,15 +104,26 @@ for line in f:
 	std_pred_ge = (pred_ge - np.mean(pred_ge))/np.std(pred_ge)
 
 	# Add to genetic component of trait
-	genetic_comp = genetic_comp + std_pred_ge*gene_trait_causal_effect
+	gene_effect = std_pred_ge*gene_trait_causal_effect
+	genetic_comp = genetic_comp + gene_effect
+	mediated_genetic_comp = mediated_genetic_comp + gene_effect
 
 	gene_counter = gene_counter + 1
 
 
 f.close()
 
-
+total_mediated_genetic_var = np.var(mediated_genetic_comp)
 total_genetic_var = np.var(genetic_comp)
+
+total_genetic_var_output = simulated_gwas_data_dir + simulation_name_string + 'simulated_genetic_var.npy'
+np.save(total_genetic_var_output, total_genetic_var)
+
+total_nm_genetic_var_output = simulated_gwas_data_dir + simulation_name_string + 'simulated_nm_genetic_var.npy'
+np.save(total_nm_genetic_var_output, total_nm_genetic_var)
+
+total_mediated_genetic_var_output = simulated_gwas_data_dir + simulation_name_string + 'simulated_mediated_genetic_var.npy'
+np.save(total_mediated_genetic_var_output, total_mediated_genetic_var)
 
 
 # Residual variance
@@ -119,16 +132,11 @@ residual_var = 1.0 - total_genetic_var
 # Draw trait values
 trait_values = np.random.normal(loc=(genetic_comp), scale=np.sqrt(residual_var))
 
+
 # Standardize trait values
 standardized_trait_values = (trait_values - np.mean(trait_values))/np.std(trait_values)
 
 # Save to output
 trait_values_output = simulated_gwas_data_dir + simulation_name_string + 'simulated_trait.txt'
 np.savetxt(trait_values_output, standardized_trait_values, fmt="%s", delimiter='\n')
-
-print(trait_values_output)
-
-
-
-
 

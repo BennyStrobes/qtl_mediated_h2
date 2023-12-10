@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-50:00                         # Runtime in D-HH:MM format
+#SBATCH -t 0-13:00                         # Runtime in D-HH:MM format
 #SBATCH -p medium                           # Partition to run in
 #SBATCH --mem=200GB                         # Memory total in MiB (for all cores)
 
@@ -45,29 +45,24 @@ fi
 ###############################
 # extract lists of Individuals for each data set
 ###############################
-n_gwas_individuals="50000"
+n_gwas_individuals="100000"
 gwas_individual_file=${processed_genotype_data_dir}"gwas_individuals.txt"
 eqtl_individual_stem=${processed_genotype_data_dir}"eqtl_individuals_"
-if false; then
 python3 extract_lists_of_simulated_individuals.py ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} $n_gwas_individuals $gwas_individual_file $eqtl_individual_stem
-fi
+
 
 ###############################
 # Filter UKBB genotype data to only include individuals in simulated gwas data set 
 ###############################
-if false; then
 plink2 --bfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${gwas_individual_file} --make-bed --keep-allele-order --threads 1 --out ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num}
-fi
+
 
 ###############################
 # Filter UKBB genotype data to only include individuals in eqtl gwas data set 
 ###############################
-if false; then
 eqtl_sample_size="100"
 plink2 --bfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${eqtl_individual_stem}${eqtl_sample_size}".txt" --make-bed --threads 1 --keep-allele-order --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
 
-eqtl_sample_size="200"
-plink2 --bfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${eqtl_individual_stem}${eqtl_sample_size}".txt" --make-bed --threads 1 --keep-allele-order --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
 
 eqtl_sample_size="300"
 plink2 --bfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${eqtl_individual_stem}${eqtl_sample_size}".txt" --make-bed --threads 1 --keep-allele-order --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
@@ -80,7 +75,7 @@ plink2 --bfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep $
 
 eqtl_sample_size="5000"
 plink2 --bfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${eqtl_individual_stem}${eqtl_sample_size}".txt" --make-bed --threads 1 --keep-allele-order --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
-fi
+
 
 
 ###############################

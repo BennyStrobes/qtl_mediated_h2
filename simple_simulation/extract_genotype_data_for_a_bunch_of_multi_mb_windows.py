@@ -149,6 +149,8 @@ windows = get_windows(bim_file)
 window_iter = 1
 for window_name in windows:
 	print(window_name)
+	if window_iter > 1:
+		continue
 
 	# Extract relevent info from this window
 	window_start = int(window_name.split(':')[0])
@@ -168,16 +170,31 @@ for window_name in windows:
 	LD = np.corrcoef(np.transpose(window_gwas_genotype))
 	# Save LD genotype
 	output_file = processed_genotype_data_dir + 'gwas_genotype_LD_' + str(window_iter) + '.npy'
-	np.save(output_file, LD)	
+	np.save(output_file, LD)
+
+	# LD LD transpose
+	'''
+	ld_ld_t = np.dot(LD, np.transpose(LD))
+	# Save 
+	output_file = processed_genotype_data_dir + 'gwas_genotype_LD_LD_t_' + str(window_iter) + '.npy'
+	np.save(output_file, ld_ld_t)
+	'''
+
 
 	# Iterate through eqtl sample sizes
-	eqtl_sss = [100, 200, 300, 500, 1000, 5000]
+	eqtl_sss = [100, 300, 500, 1000, 5000]
 	for eqtl_ss in eqtl_sss:
+		print(eqtl_ss)
 		eqtl_plink_stem = processed_genotype_data_dir + 'simulated_eqtl_' + str(eqtl_ss) + '_data_' + str(chrom_num)
 		window_eqtl_genotype = extract_variants_in_window(eqtl_plink_stem, window_rsids)
 		# Save eqtl genotype
 		output_file = processed_genotype_data_dir + 'eqtl_' + str(eqtl_ss) + '_genotype_' + str(window_iter) + '.npy'
 		np.save(output_file, window_eqtl_genotype)
+
+		# Save eqtl genotype LD
+		output_file = processed_genotype_data_dir + 'eqtl_' + str(eqtl_ss) + '_genotype_LD_' + str(window_iter) + '.npy'
+		eqtl_LD = np.corrcoef(np.transpose(window_eqtl_genotype))
+		np.save(output_file, eqtl_LD)
 
 
 	window_iter = window_iter + 1
