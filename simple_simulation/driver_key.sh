@@ -48,6 +48,9 @@ simulated_gwas_data_dir=${temp_output_root}"simulated_gwas_data/"
 # Output directory for simulated gwas data
 mediated_h2_results_dir=${temp_output_root}"mediated_h2_results/"
 
+# Output directory for visualizing results
+visualize_med_h2_results_dir=${temp_output_root}"visualize_mediated_h2_results/"
+
 
 
 
@@ -56,8 +59,9 @@ mediated_h2_results_dir=${temp_output_root}"mediated_h2_results/"
 # Run analysis
 ############################
 # Prepare genotype data
-sbatch prepare_ukbb_genotype_data_for_simulation.sh $ukbb_genotype_dir $processed_genotype_data_dir
-
+if false; then
+sh prepare_ukbb_genotype_data_for_simulation.sh $ukbb_genotype_dir $processed_genotype_data_dir
+fi
 
 
 # RUN SIMULATIONS
@@ -95,6 +99,31 @@ if false; then
 for simulation_number in $(seq 101 300); do 
 	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
 done
+fi
+
+if false; then
+for simulation_number in $(seq 1 200); do 
+	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
+done
+fi
+
+
+if false; then
+for simulation_number in $(seq 1 20); do 
+	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
+done
+fi
+
+if false; then
+for simulation_number in $(seq 1 200); do 
+	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
+done
+fi
+simulation_number="1"
+sh run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $simulated_gwas_data_dir $mediated_h2_results_dir
+
+if false; then
+sh organize_and_visualize_simulation_results.sh $mediated_h2_results_dir $visualize_med_h2_results_dir
 fi
 
 

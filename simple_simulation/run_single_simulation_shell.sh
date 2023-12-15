@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-4:30                         # Runtime in D-HH:MM format
+#SBATCH -t 0-7:00                         # Runtime in D-HH:MM format
 #SBATCH -p short                           # Partition to run in
-#SBATCH --mem=35GB                         # Memory total in MiB (for all cores)
+#SBATCH --mem=33GB                         # Memory total in MiB (for all cores)
 
 
 
@@ -34,14 +34,17 @@ echo $simulation_name_string
 ##########################
 # Part 1: Simulate variant-gene links and causal eqtl effects
 ###########################
-python3 simulate_variant_gene_links_and_causal_eqtl_effects.py $simulation_name_string $processed_genotype_data_dir $simulated_eqtl_data_dir $n_genes $fraction_genes_cis_h2 $ge_h2
 
+####**
+if false; then
+python3 simulate_variant_gene_links_and_causal_eqtl_effects.py $simulation_name_string $processed_genotype_data_dir $simulated_eqtl_data_dir $n_genes $fraction_genes_cis_h2 $ge_h2
 
 
 ##########################
 # Part 2: Simulate gene expression
 ###########################
-eqtl_sample_size_arr=( "100" "300" "500" "1000" "5000")
+####**
+eqtl_sample_size_arr=( "100" "300" "1000")
 for eqtl_ss in "${eqtl_sample_size_arr[@]}"
 do
 	echo $eqtl_ss
@@ -57,13 +60,18 @@ done
 # Part 3: Learn gene models
 ###########################
 # NOTE: currently ld pruning has a large effect on estimated h2 (particularly at low eqtl sample sizes..)
-eqtl_sample_size_arr=( "100" "300" "500" "1000" "5000")
+####**
+eqtl_sample_size_arr=( "100" "300" "1000")
 for eqtl_ss in "${eqtl_sample_size_arr[@]}"
 do
 	echo $eqtl_ss
 	python3 learn_gene_models.py $simulation_name_string $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $eqtl_ss
 done
+fi
+eqtl_ss="100"
+python3 learn_gene_models.py $simulation_name_string $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_expression_data_dir $simulated_gene_models_dir $eqtl_ss
 
+if false; then
 
 
 
@@ -71,6 +79,7 @@ done
 ##########################
 # Part 4: simulate gwas data
 ###########################
+####**
 python3 simulate_gwas_data.py $simulation_name_string $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_gwas_data_dir $total_heritability $fraction_expression_mediated_heritability $per_element_heritability
 
 
@@ -78,6 +87,40 @@ python3 simulate_gwas_data.py $simulation_name_string $processed_genotype_data_d
 # Part 5: Compute GWAS summary statistics
 ###########################
 python3 compute_gwas_summary_statistics.py $simulation_name_string $processed_genotype_data_dir $simulated_gwas_data_dir
+
+
+
+
+
+##########################
+# Part 8: Perform mediated heritability ldsc inference 
+###########################
+####**
+fi
+if false; then
+eqtl_sample_size_arr=( "100" "300" "1000")
+for eqtl_ss in "${eqtl_sample_size_arr[@]}"
+do
+	python3 perform_med_h2_ldsc_inference.py $simulation_name_string $simulated_gwas_data_dir $simulated_gene_models_dir $eqtl_ss $mediated_h2_results_dir $processed_genotype_data_dir $simulated_expression_data_dir
+done
+fi
+
+
+
+if false; then
+eqtl_ss="100"
+python3 perform_med_h2_ldsc_inference.py $simulation_name_string $simulated_gwas_data_dir $simulated_gene_models_dir $eqtl_ss $mediated_h2_results_dir $processed_genotype_data_dir $simulated_expression_data_dir
+fi
+
+
+
+
+
+
+
+
+
+
 
 
 ##########################
@@ -92,9 +135,6 @@ fi
 ##########################
 # Part 7: Perform mediated heritability inference with various methods
 ###########################
-
-
-
 if false; then
 eqtl_ss="500"
 python3 perform_med_h2_inference.py $simulation_name_string $simulated_gwas_data_dir $simulated_gene_models_dir $eqtl_ss $mediated_h2_results_dir $processed_genotype_data_dir $simulated_expression_data_dir
@@ -116,12 +156,14 @@ fi
 ##########################
 # Part 8: Perform mediated heritability ldsc inference 
 ###########################
-eqtl_sample_size_arr=( "100" "300" "500" "1000" "5000")
+####**
+eqtl_sample_size_arr=( "100" "300" "1000")
+if false; then
 for eqtl_ss in "${eqtl_sample_size_arr[@]}"
 do
 	python3 perform_med_h2_ldsc_inference.py $simulation_name_string $simulated_gwas_data_dir $simulated_gene_models_dir $eqtl_ss $mediated_h2_results_dir $processed_genotype_data_dir $simulated_expression_data_dir
 done
-
+fi
 
 
 

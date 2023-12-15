@@ -45,6 +45,7 @@ fi
 ###############################
 # extract lists of Individuals for each data set
 ###############################
+if false; then
 n_gwas_individuals="100000"
 gwas_individual_file=${processed_genotype_data_dir}"gwas_individuals.txt"
 eqtl_individual_stem=${processed_genotype_data_dir}"eqtl_individuals_"
@@ -75,7 +76,7 @@ plink2 --bfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep $
 
 eqtl_sample_size="5000"
 plink2 --bfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${eqtl_individual_stem}${eqtl_sample_size}".txt" --make-bed --threads 1 --keep-allele-order --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
-
+fi
 
 
 ###############################

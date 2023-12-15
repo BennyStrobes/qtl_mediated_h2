@@ -61,17 +61,22 @@ def get_windows(bim_file):
 def extract_dictionary_list_of_window_rsids(bim_file, window_start, window_end):
 	dicti = {}
 	f = open(bim_file)
+	snp_counter = 0
 	for line in f:
 		line = line.rstrip()
 		data = line.split('\t')
 		rs_id = data[1]
 		snp_pos = int(data[3])
 		if snp_pos >= window_start and snp_pos < window_end: # in window
+			if np.mod(snp_counter, 3) != 0:
+				snp_counter = snp_counter + 1
+				continue
 			# Quick error check
 			if rs_id in dicti:
 				print('assumption eroror')
 				pdb.set_trace()
 			dicti[rs_id] = 1
+			snp_counter = snp_counter + 1
 	f.close()
 	return dicti
 
@@ -144,60 +149,45 @@ bim_file = processed_genotype_data_dir + 'simulated_gwas_data_' + chrom_num + '.
 
 windows = get_windows(bim_file)
 
+window_start = int(windows[0].split(':')[0])
+window_end = int(windows[-1].split(':')[1])
 
 # Loop through windows
 window_iter = 1
-for window_name in windows:
-	print(window_name)
-	if window_iter > 1:
-		continue
 
-	# Extract relevent info from this window
-	window_start = int(window_name.split(':')[0])
-	window_end = int(window_name.split(':')[1])
-
-	# Extract dictionary list of window rsids
-	window_rsids = extract_dictionary_list_of_window_rsids(bim_file, window_start, window_end)
-
-	# Extract gwas genotype matrix
-	gwas_plink_stem = processed_genotype_data_dir + 'simulated_gwas_data_' + str(chrom_num)  # Genotype files
-	window_gwas_genotype = extract_variants_in_window(gwas_plink_stem, window_rsids)
-	# Save gwas genotype
-	output_file = processed_genotype_data_dir + 'gwas_genotype_' + str(window_iter) + '.npy'
-	np.save(output_file, window_gwas_genotype)
-
-	# Save variant LD
-	LD = np.corrcoef(np.transpose(window_gwas_genotype))
-	# Save LD genotype
-	output_file = processed_genotype_data_dir + 'gwas_genotype_LD_' + str(window_iter) + '.npy'
-	np.save(output_file, LD)
-
-	# LD LD transpose
-	'''
-	ld_ld_t = np.dot(LD, np.transpose(LD))
-	# Save 
-	output_file = processed_genotype_data_dir + 'gwas_genotype_LD_LD_t_' + str(window_iter) + '.npy'
-	np.save(output_file, ld_ld_t)
-	'''
+# Extract dictionary list of window rsids
+window_rsids = extract_dictionary_list_of_window_rsids(bim_file, window_start, window_end)
 
 
-	# Iterate through eqtl sample sizes
-	eqtl_sss = [100, 300, 500, 1000, 5000]
-	for eqtl_ss in eqtl_sss:
-		print(eqtl_ss)
-		eqtl_plink_stem = processed_genotype_data_dir + 'simulated_eqtl_' + str(eqtl_ss) + '_data_' + str(chrom_num)
-		window_eqtl_genotype = extract_variants_in_window(eqtl_plink_stem, window_rsids)
-		# Save eqtl genotype
-		output_file = processed_genotype_data_dir + 'eqtl_' + str(eqtl_ss) + '_genotype_' + str(window_iter) + '.npy'
-		np.save(output_file, window_eqtl_genotype)
+# Extract gwas genotype matrix
+gwas_plink_stem = processed_genotype_data_dir + 'simulated_gwas_data_' + str(chrom_num)  # Genotype files
+window_gwas_genotype = extract_variants_in_window(gwas_plink_stem, window_rsids)
+# Save gwas genotype
+output_file = processed_genotype_data_dir + 'gwas_genotype_' + str(window_iter) + '.npy'
+np.save(output_file, window_gwas_genotype)
 
-		# Save eqtl genotype LD
-		output_file = processed_genotype_data_dir + 'eqtl_' + str(eqtl_ss) + '_genotype_LD_' + str(window_iter) + '.npy'
-		eqtl_LD = np.corrcoef(np.transpose(window_eqtl_genotype))
-		np.save(output_file, eqtl_LD)
+# Save variant LD
+LD = np.corrcoef(np.transpose(window_gwas_genotype))
+# Save LD genotype
+output_file = processed_genotype_data_dir + 'gwas_genotype_LD_' + str(window_iter) + '.npy'
+np.save(output_file, LD)
 
 
-	window_iter = window_iter + 1
+# Iterate through eqtl sample sizes
+eqtl_sss = [100, 300, 500, 1000, 5000]
+for eqtl_ss in eqtl_sss:
+	print(eqtl_ss)
+	eqtl_plink_stem = processed_genotype_data_dir + 'simulated_eqtl_' + str(eqtl_ss) + '_data_' + str(chrom_num)
+	window_eqtl_genotype = extract_variants_in_window(eqtl_plink_stem, window_rsids)
+	# Save eqtl genotype
+	output_file = processed_genotype_data_dir + 'eqtl_' + str(eqtl_ss) + '_genotype_' + str(window_iter) + '.npy'
+	np.save(output_file, window_eqtl_genotype)
+
+	# Save eqtl genotype LD
+	output_file = processed_genotype_data_dir + 'eqtl_' + str(eqtl_ss) + '_genotype_LD_' + str(window_iter) + '.npy'
+	eqtl_LD = np.corrcoef(np.transpose(window_eqtl_genotype))
+	np.save(output_file, eqtl_LD)
+
 
 
 

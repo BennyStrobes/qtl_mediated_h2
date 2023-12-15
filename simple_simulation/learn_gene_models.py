@@ -7,6 +7,7 @@ import statsmodels.api as sm
 from sklearn.linear_model import LinearRegression
 import trait_likelihood_gibbs_variant_only
 import rss_gibbs_variant_only
+import time
 
 
 def extract_non_colinear_predictors(corry, abs_correlation_threshold):
@@ -238,12 +239,35 @@ def estimate_rgk_unbiased(expression_vec, genotype, gene_snp_indices):
 	
 	return rgk_sq_unbiased, gene_est_h2_rough_ldsc
 
-def estimate_causal_eqtl_effect_distribution_ss(marginal_beta, N, gene_genotype_mat, expression_vec):
+def estimate_causal_eqtl_effect_distribution_ss(marginal_beta, N, gene_genotype_mat, expression_vec, update_beta_variance=False, beta_var_init=1.0):
 	local_ld = np.corrcoef(np.transpose(gene_genotype_mat))
 
-	mod = rss_gibbs_variant_only.RSS_GIBBS_VARIANT_ONLY(LD=local_ld, marginal_beta=marginal_beta, N=N, X=gene_genotype_mat, Y=expression_vec, max_iter=9000, burn_in_iter=4000)
+	#mod = rss_gibbs_variant_only.RSS_GIBBS_VARIANT_ONLY(LD=local_ld, marginal_beta=marginal_beta, N=N, X=gene_genotype_mat, Y=expression_vec, update_beta_variance=update_beta_variance, beta_var_init=beta_var_init, max_iter=100, burn_in_iter=60)
+	mod = rss_gibbs_variant_only.RSS_GIBBS_VARIANT_ONLY(LD=local_ld, marginal_beta=marginal_beta, N=N, X=gene_genotype_mat, Y=expression_vec, update_beta_variance=update_beta_variance, beta_var_init=beta_var_init, max_iter=9000, burn_in_iter=6000)
+
+
 	mod.fit()
 	return mod
+
+def get_rgk_sq_unbiased(causal_eqtl_effects_mean, gene_cov, LD, gene_snp_indices):
+	R_gene = LD[gene_snp_indices, :][:, gene_snp_indices]
+	# Calculate gene variance
+	gene_meanT_mean = np.dot(causal_eqtl_effects_mean.reshape(len(causal_eqtl_effects_mean),1), causal_eqtl_effects_mean.reshape(1,len(causal_eqtl_effects_mean)))
+
+
+	unbiased_delta_t_delta = gene_meanT_mean - gene_cov
+	tot_gene_variance = np.sum(R_gene*unbiased_delta_t_delta)
+
+
+	n_snps = LD.shape[0]
+	sub_ld = LD[:, gene_snp_indices]
+	rgk_sq = np.zeros(n_snps)
+	for kk in range(n_snps):
+		tmp = np.dot(np.dot(sub_ld[kk,:], (unbiased_delta_t_delta/tot_gene_variance)), sub_ld[kk,:])
+		rgk_sq[kk] = rgk_sq[kk] + tmp
+	
+	return rgk_sq
+
 
 ######################
 # Command line args
@@ -277,7 +301,7 @@ cc = []
 # Open output file handle
 output_file = simulated_gene_models_dir + simulation_name_string + 'model_summaries_' + str(eqtl_ss) + '.txt'
 t = open(output_file,'w')
-t.write('gene_name\tgene_snp_indices\tgene_snp_causal_eqtl_effects\testimated_effect_file\testimated_effect_varcov_file\tgene_h2_est\tmarginal_beta_file\tgene_sampling_variance\tldsc_gene_h2\tgenetic_ge_marginal_beta_file\testimated_causal_eqtl_effect_mean_file\test_noise_ratio\ttrue_noise_ratio\testimated_causal_eqtl_effect_cov_file\n')
+t.write('gene_name\tgene_snp_indices\tgene_snp_causal_eqtl_effects\tmarginal_beta_file\tgenetic_ge_marginal_beta_file\testimated_causal_eqtl_effect_mean_file\tridge_regr_estimated_causal_eqtl_effect_mean_file\tblup_estimated_causal_eqtl_effects_file\tridge_regr_true_var_estimated_causal_eqtl_effect_mean_file\tblup_beta_variance\ttrue_noise_ratio\tpred_expr_var\tpred_noise_var\n')
 # Loop through genes
 simulated_causal_eqtl_effect_file = simulated_eqtl_data_dir + simulation_name_string + 'causal_eqtl_effect_summary.txt'
 f = open(simulated_causal_eqtl_effect_file)
@@ -292,6 +316,7 @@ for line in f:
 	# Extract relevent fields
 	gene_name = data[0]
 	print(gene_index)
+	print(time.time())
 	gene_snp_indices = np.asarray(data[1].split(',')).astype(int)
 	gene_snp_causal_effects = np.asarray(data[2].split(',')).astype(float)
 	if int(gene_name.split('_')[1]) != gene_index:
@@ -300,13 +325,15 @@ for line in f:
 	expression_vec = gene_expression[gene_index,:]
 	genetic_expression_vec = genetic_gene_expression[gene_index,:]
 
-	beta, beta_varcov, gene_h2_est, marginal_betas, gene_sampling_var, marginal_z = estimate_causal_eqtl_effects_for_a_single_gene(expression_vec, genotype[:, gene_snp_indices])
+	#beta, beta_varcov, gene_h2_est, marginal_betas, gene_sampling_var, marginal_z = estimate_causal_eqtl_effects_for_a_single_gene(expression_vec, genotype[:, gene_snp_indices])
 	full_marginal_betas = estimate_marginal_eqtl_effects_for_a_single_gene(expression_vec, genotype)
 	full_marginal_betas_genetic_ge = estimate_marginal_eqtl_effects_for_a_single_gene_from_genetic_expression(genetic_expression_vec, genotype)
 	adj_r_squared = np.square(full_marginal_betas_genetic_ge) - ((1.0 - np.square(full_marginal_betas_genetic_ge))/(float(eqtl_ss)-2))
 
-	gene_est_h2_ldsc = estimate_heritability_of_single_gene_with_ldsc(expression_vec, genotype[:, gene_snp_indices], marginal_z)
+	pdb.set_trace()
 
+	#gene_est_h2_ldsc = estimate_heritability_of_single_gene_with_ldsc(expression_vec, genotype[:, gene_snp_indices], marginal_z)
+	marginal_betas = full_marginal_betas[gene_snp_indices]
 
 	gene_genotype_mat = genotype[:, gene_snp_indices]
 
@@ -314,101 +341,48 @@ for line in f:
 	sampled_betas = np.asarray(causal_eqtl_effect_distribution.sampled_betas)
 	causal_eqtl_effects_mean = np.mean(sampled_betas,axis=0)
 	causal_eqtl_effects_cov = np.cov(np.transpose(sampled_betas))
-	#causal_eqtl_effect_distribution2 = estimate_causal_eqtl_effect_distribution(expression_vec, gene_genotype_mat)
-	#causal_eqtl_effects2 = np.mean(np.asarray(causal_eqtl_effect_distribution2.sampled_betas),axis=0)
 
 
 	pred_expr = np.dot(gene_genotype_mat, causal_eqtl_effects_mean)
-	#pred_expr_2 = np.dot(gene_genotype_mat, causal_eqtl_effects2)
 
-
-	#pred_expr_var = np.var(pred_expr,ddof=1)
-	#pred_expr_distr = np.dot(gene_genotype_mat, np.transpose(np.asarray(causal_eqtl_effect_distribution.sampled_betas)))
 
 	R_gene = np.corrcoef(np.transpose(gene_genotype_mat))
 
 	pred_expr_var = np.sum(R_gene*np.dot(causal_eqtl_effects_mean.reshape(len(causal_eqtl_effects_mean),1), causal_eqtl_effects_mean.reshape(1,len(causal_eqtl_effects_mean))))
 	est_noise_var = np.sum(R_gene*causal_eqtl_effects_cov)
+
+
 	#est_noise_var = np.mean(np.var(pred_expr_distr,axis=1,ddof=1))
 	diff = (genetic_expression_vec - np.dot(gene_genotype_mat, causal_eqtl_effects_mean))
 	true_noise_var = np.var(diff,ddof=1)
 
 	est_noise_ratio = est_noise_var/pred_expr_var
 	true_noise_ratio = true_noise_var/pred_expr_var
-	aa.append(est_noise_ratio)
-	bb.append(true_noise_ratio)
-	print(est_noise_ratio)
-	print(true_noise_ratio)
-
-
-	#rgk_sq_unbiased, gene_est_h2_rough_ldsc = estimate_rgk_unbiased(expression_vec, genotype, gene_snp_indices)
-
-	'''
-	# Run bootstrapping
-	print('start')
-	bs_rgk_sq_unbiased_arr = []
-	bs_gene_est_h2_rough_ldsc_arr = []
-	successful_bootstraps = 0
-	for bootstrap_iter in range(n_bootstraps):
-		# Sample bootstrapped indices
-		bootstrapped_indices = np.random.choice(np.arange(len(expression_vec)), size=len(expression_vec), replace=True)
-
-		# Bootstrap expression and genotype
-		bs_expression_vec = expression_vec[bootstrapped_indices]
-		bs_genotype = genotype[bootstrapped_indices, :]
-
-		if np.sum(np.std(bs_genotype,axis=0) == 0) > 0:
-			continue
-
-		if np.mod(bootstrap_iter,1000) == 0:
-			print(bootstrap_iter)
-
-		# Restandardize expression
-		bs_expression_vec_std = (bs_expression_vec - np.mean(bs_expression_vec))/np.std(bs_expression_vec)
-		bs_genotype_std = (bs_genotype - np.mean(bs_genotype,axis=0))/np.std(bs_genotype,axis=0)
-
-		# Calculate unbiased estimates
-		bs_rgk_sq_unbiased, bs_gene_est_h2_rough_ldsc = estimate_rgk_unbiased(bs_expression_vec_std, bs_genotype_std, gene_snp_indices)
-		
-		# Add to global array
-		bs_rgk_sq_unbiased_arr.append(bs_rgk_sq_unbiased)
-		bs_gene_est_h2_rough_ldsc_arr.append(bs_gene_est_h2_rough_ldsc)
-
-		# Count up number of times bootstrap did not crash
-		successful_bootstraps = successful_bootstraps + 1
-
-	bs_rgk_sq_unbiased_arr = np.asarray(bs_rgk_sq_unbiased_arr)
-	'''
 
 
 
-	#rgk_unbiased = estimate_rgk_unbiased_from_causal_eqtl_effect_distribution_using_individual_level_data(causal_eqtl_effect_distribution, genotype, gene_snp_indices)
+	blup_causal_eqtl_effect_distribution = estimate_causal_eqtl_effect_distribution_ss(marginal_betas, gene_genotype_mat.shape[0], gene_genotype_mat, expression_vec, update_beta_variance=True)
+	blup_sampled_betas = np.asarray(blup_causal_eqtl_effect_distribution.sampled_betas)
+	blup_causal_eqtl_effects_mean = np.mean(blup_sampled_betas,axis=0)
+	blup_pred_expr = np.dot(gene_genotype_mat, blup_causal_eqtl_effects_mean)
+	blup_beta_variance = np.mean(np.mean(blup_causal_eqtl_effect_distribution.sampled_beta_variances))
 
-	#full_marginal_betas_causal_eqtl_effect_distribution, full_marginal_betas_causal_eqtl_effect_distribution_squared = estimate_marginal_eqtl_effects_for_a_single_gene_from_causal_eqtl_effect_distribution(causal_eqtl_effect_distribution, LD, gene_snp_indices)
-	#full_marginal_betas_causal_eqtl_effect_distribution, full_marginal_betas_causal_eqtl_effect_distribution_squared = estimate_marginal_eqtl_effects_for_a_single_gene_from_causal_eqtl_effect_distribution_using_individual_data(causal_eqtl_effect_distribution, genotype, gene_snp_indices)
+
+	ridge_regr_causal_eqtl_effect_distribution = estimate_causal_eqtl_effect_distribution_ss(marginal_betas, gene_genotype_mat.shape[0], gene_genotype_mat, expression_vec, update_beta_variance=False, beta_var_init=1.0/len(marginal_betas))
+	ridge_regr_sampled_betas = np.asarray(ridge_regr_causal_eqtl_effect_distribution.sampled_betas)
+	ridge_regr_causal_eqtl_effects_mean = np.mean(ridge_regr_sampled_betas,axis=0)
+	ridge_regr_pred_expr = np.dot(gene_genotype_mat, ridge_regr_causal_eqtl_effects_mean)
+
+
+	ridge_regr_true_var_causal_eqtl_effect_distribution = estimate_causal_eqtl_effect_distribution_ss(marginal_betas, gene_genotype_mat.shape[0], gene_genotype_mat, expression_vec, update_beta_variance=False, beta_var_init=0.05/len(marginal_betas))
+	ridge_regr_true_var_sampled_betas = np.asarray(ridge_regr_true_var_causal_eqtl_effect_distribution.sampled_betas)
+	ridge_regr_true_var_causal_eqtl_effects_mean = np.mean(ridge_regr_true_var_sampled_betas,axis=0)
+	ridge_regr_true_var_pred_expr = np.dot(gene_genotype_mat, ridge_regr_true_var_causal_eqtl_effects_mean)
 	
-	#print(np.mean(np.abs(full_marginal_betas_genetic_ge)))
-	#print(np.mean(np.abs(full_marginal_betas_causal_eqtl_effect_distribution)))
-
-	'''
-	# Run bootstrapping
-	bs_full_marginal_betas_causal_eqtl_effect_distribution_squared_arr = []
-	for bootstrap_iter in range(n_bootstraps):
-		bootstrapped_indices = np.random.choice(np.arange(len(expression_vec)), size=len(expression_vec), replace=True)
-		pdb.set_trace()
-		# NEED TO re-standardize here.
-		bs_causal_eqtl_effect_distribution = estimate_causal_eqtl_effect_distribution(expression_vec[bootstrapped_indices], gene_genotype_mat[bootstrapped_indices])
-		# Consider better way to do LD
-		bs_full_marginal_betas_causal_eqtl_effect_distribution, bs_full_marginal_betas_causal_eqtl_effect_distribution_squared = estimate_marginal_eqtl_effects_for_a_single_gene_from_causal_eqtl_effect_distribution(bs_causal_eqtl_effect_distribution, LD, gene_snp_indices)
-	'''
 
 
-	# Save beta file
-	beta_file = simulated_gene_models_dir + simulation_name_string + 'estimated_eqtl_beta_' + str(eqtl_ss) + '_' + gene_name + '.npy'
-	np.save(beta_file, beta)
-	# save beta-varcov file
-	beta_varcov_file = simulated_gene_models_dir + simulation_name_string + 'estimated_eqtl_beta_varcov_' + str(eqtl_ss) + '_' + gene_name + '.npy'
-	np.save(beta_varcov_file, beta_varcov)
+
+
 	# Save marginal beta file
 	marginal_beta_file = simulated_gene_models_dir + simulation_name_string + 'estimated_eqtl_marginal_beta_' + str(eqtl_ss) + '_' + gene_name + '.npy'
 	np.save(marginal_beta_file, full_marginal_betas)
@@ -418,12 +392,18 @@ for line in f:
 	# Save estimated causal eqtl effects
 	estimated_causal_eqtl_effects_file = simulated_gene_models_dir + simulation_name_string + 'estimated_causal_eqtl_effects_mean_' + str(eqtl_ss) + '_' + gene_name + '.npy'
 	np.save(estimated_causal_eqtl_effects_file, causal_eqtl_effects_mean)
-	# Save estimated causal eqtl effects cov
-	estimated_causal_eqtl_effects_cov_file = simulated_gene_models_dir + simulation_name_string + 'estimated_causal_eqtl_effects_cov_' + str(eqtl_ss) + '_' + gene_name + '.npy'
-	np.save(estimated_causal_eqtl_effects_cov_file, causal_eqtl_effects_cov)
+	# Save estimated causal eqtl effects
+	ridge_regr_estimated_causal_eqtl_effects_file = simulated_gene_models_dir + simulation_name_string + 'ridge_regr_estimated_causal_eqtl_effects_mean_' + str(eqtl_ss) + '_' + gene_name + '.npy'
+	np.save(ridge_regr_estimated_causal_eqtl_effects_file, ridge_regr_causal_eqtl_effects_mean)
+	# Save estimated causal eqtl effects
+	ridge_regr_true_var_estimated_causal_eqtl_effects_file = simulated_gene_models_dir + simulation_name_string + 'ridge_regr_true_var_estimated_causal_eqtl_effects_mean_' + str(eqtl_ss) + '_' + gene_name + '.npy'
+	np.save(ridge_regr_true_var_estimated_causal_eqtl_effects_file, ridge_regr_true_var_causal_eqtl_effects_mean)
+	# Save estimated causal eqtl effects
+	blup_estimated_causal_eqtl_effects_file = simulated_gene_models_dir + simulation_name_string + 'blup_estimated_causal_eqtl_effects_mean_' + str(eqtl_ss) + '_' + gene_name + '.npy'
+	np.save(blup_estimated_causal_eqtl_effects_file, blup_causal_eqtl_effects_mean)
 
 
-	t.write(data[0] + '\t' + data[1] + '\t' + data[2] + '\t' + beta_file + '\t' + beta_varcov_file + '\t' + str(gene_h2_est) + '\t' + str(marginal_beta_file) + '\t' + str(gene_sampling_var) + '\t' + str(gene_est_h2_ldsc) + '\t' + genetic_ge_marginal_beta_file + '\t' + estimated_causal_eqtl_effects_file + '\t' + str(est_noise_ratio) + '\t' + str(true_noise_ratio) + '\t' + estimated_causal_eqtl_effects_cov_file + '\n')
+	t.write(data[0] + '\t' + data[1] + '\t' + data[2] + '\t' + str(marginal_beta_file) + '\t' + genetic_ge_marginal_beta_file + '\t' + estimated_causal_eqtl_effects_file + '\t' + ridge_regr_estimated_causal_eqtl_effects_file + '\t' + blup_estimated_causal_eqtl_effects_file + '\t' + ridge_regr_true_var_estimated_causal_eqtl_effects_file + '\t' + str(blup_beta_variance) + '\t' + str(true_noise_ratio) + '\t' + str(pred_expr_var) + '\t' + str(est_noise_var) + '\n')
 
 	gene_index = gene_index + 1
 

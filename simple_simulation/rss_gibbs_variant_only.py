@@ -12,7 +12,7 @@ from scipy.stats import invgamma
 
 
 class RSS_GIBBS_VARIANT_ONLY(object):
-	def __init__(self, LD=None, marginal_beta=None, N=None, X=None, Y=None, update_residual_variance=True, max_iter=3000, burn_in_iter=2000):
+	def __init__(self, LD=None, marginal_beta=None, N=None, X=None, Y=None, update_beta_variance=False, beta_var_init=1.0,update_residual_variance=True, max_iter=3000, burn_in_iter=2000):
 		self.LD = LD
 		self.marginal_beta = marginal_beta
 		self.X = X
@@ -21,6 +21,8 @@ class RSS_GIBBS_VARIANT_ONLY(object):
 		self.max_iter = max_iter
 		self.burn_in_iter = burn_in_iter
 		self.update_residual_variance = update_residual_variance
+		self.update_beta_variance = update_beta_variance
+		self.beta_var_init = beta_var_init
 		print('##############################################################################')
 		print('Variant heritability analysis by optimizing RSS likelihood with Gibbs sampling')
 		print('##############################################################################')
@@ -44,7 +46,8 @@ class RSS_GIBBS_VARIANT_ONLY(object):
 			self.beta_updates(mean_field=True)
 
 			# Update genetic variance parameters
-			#self.beta_variance_updates()
+			if self.update_beta_variance:
+				self.beta_variance_updates()
 
 			# Update residual variance parameters
 			if self.update_residual_variance:
@@ -116,7 +119,7 @@ class RSS_GIBBS_VARIANT_ONLY(object):
 		self.beta = np.zeros(self.K)
 
 		# Intialize genetic variance parameters
-		self.beta_variance = 1.0/1.0
+		self.beta_variance = self.beta_var_init/1.0
 
 		# Initialize residual variance parameters
 		self.residual_variance = 1.0/1.0

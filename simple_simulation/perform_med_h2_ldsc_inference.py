@@ -58,12 +58,12 @@ def load_in_trait_file(trait_file):
 	return np.asarray(arr)
 
 def extract_previously_estimsted_causal_eqtl_effects(gene_summary_file):
-	causal_eqtl_effects = []
+	est_causal_eqtl_effects = []
 	causal_eqtl_indices = []
 	true_causal_eqtl_effects = []
-	est_noise_ratios = []
-	true_noise_ratios = []
-	causal_eqtl_effect_covs = []
+	blup_causal_eqtl_effects = []
+	ridge_regr_causal_eqtl_effects = []
+	ridge_regr_true_var_causal_eqtl_effects = []
 	head_count = 0
 	f = open(gene_summary_file)
 	for line in f:
@@ -73,26 +73,30 @@ def extract_previously_estimsted_causal_eqtl_effects(gene_summary_file):
 			head_count = head_count + 1
 			continue
 		gene_snp_indices = np.asarray(data[1].split(',')).astype(int)
-		gene_snp_causal_effects = np.asarray(data[2].split(',')).astype(float)
-		estimated_causal_eqtl_file = data[10]
-		estimated_causal_eqtl_effects = np.load(estimated_causal_eqtl_file)
-		est_noise_ratio = float(data[11])
-		true_noise_ratio = float(data[12])
-		causal_eqtl_effect_cov = np.load(data[13])
+		true_causal_eqtl_effect = np.asarray(data[2].split(',')).astype(float)
+		
+		estimated_causal_eqtl_file = data[5]
+		estimated_causal_eqtl_effect = np.load(estimated_causal_eqtl_file)
+		
+		ridge_regr_causal_eqtl_file = data[6]
+		ridge_regr_causal_eqtl_effect = np.load(ridge_regr_causal_eqtl_file)
 
-		# Quick error check
-		if len(estimated_causal_eqtl_effects) != len(gene_snp_indices):
-			continue
+		blup_causal_eqtl_effect_file = data[7]
+		blup_causal_eqtl_effect = np.load(blup_causal_eqtl_effect_file)
 
-		causal_eqtl_effects.append(estimated_causal_eqtl_effects)
+		ridge_regr_true_var_causal_eqtl_file = data[8]
+		ridge_regr_true_var_causal_eqtl_effect = np.load(ridge_regr_true_var_causal_eqtl_file)
+
+
+		est_causal_eqtl_effects.append(estimated_causal_eqtl_effect)
 		causal_eqtl_indices.append(gene_snp_indices)
-		true_causal_eqtl_effects.append(gene_snp_causal_effects)
-		est_noise_ratios.append(est_noise_ratio)
-		true_noise_ratios.append(true_noise_ratio)
-		causal_eqtl_effect_covs.append(causal_eqtl_effect_cov)
+		true_causal_eqtl_effects.append(true_causal_eqtl_effect)
+		blup_causal_eqtl_effects.append(blup_causal_eqtl_effect)
+		ridge_regr_causal_eqtl_effects.append(ridge_regr_causal_eqtl_effect)
+		ridge_regr_true_var_causal_eqtl_effects.append(ridge_regr_true_var_causal_eqtl_effect)
 
 	f.close()
-	return causal_eqtl_effects, causal_eqtl_indices, true_causal_eqtl_effects, est_noise_ratios, true_noise_ratios, causal_eqtl_effect_covs
+	return causal_eqtl_indices, true_causal_eqtl_effects, est_causal_eqtl_effects, blup_causal_eqtl_effects, ridge_regr_causal_eqtl_effects, ridge_regr_true_var_causal_eqtl_effects
 
 
 def sldsc_with_variants_and_distribution_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, causal_eqtl_effects, causal_eqtl_effect_covs, causal_eqtl_indices):
@@ -164,6 +168,168 @@ def sldsc_with_variants_and_distribution_genetic_gene_expression_no_twas_chi_sq(
 
 	return nm_h2, med_h2
 
+def sldsc_with_variants_and_marginal_gene_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, causal_eqtl_indices):
+	# Get number of genes
+	n_genes = len(causal_eqtl_indices)
+	# Get number of snps
+	n_snps = len(gwas_z_scores)
+
+	# Square LD
+	LD_sq = np.square(LD)
+	
+	#####################################################
+	# Standardize genetic distribution of gene expression
+	#####################################################
+	unbiased_delta_t_deltas = []
+	unbiased_gene_variances = []		
+	for gg in range(n_genes):
+		# LD specifically for gene
+		R_gene = LD[causal_eqtl_indices[gg], :][:, causal_eqtl_indices[gg]]
+		# Get number of snps for gene
+		n_gene_snps = len(causal_eqtl_indices[gg])
+
+		unbiased_delta_t_delta = np.eye(n_gene_snps)/n_gene_snps
+
+
+		tot_gene_variance = np.sum(R_gene*unbiased_delta_t_delta)
+		unbiased_delta_t_deltas.append(unbiased_delta_t_delta)
+		unbiased_gene_variances.append(tot_gene_variance)
+
+	#####################################################
+	# Create gene LD scores
+	#####################################################
+	gene_ld_scores = np.zeros(n_snps)
+	for gg in range(n_genes):
+		unbiased_gene_variance = unbiased_gene_variances[gg]
+		unbiased_delta_t_delta = unbiased_delta_t_deltas[gg]
+
+
+		sub_ld = LD[:, causal_eqtl_indices[gg]]
+		for kk in range(n_snps):
+			tmp = np.dot(np.dot(sub_ld[kk,:], (unbiased_delta_t_delta/unbiased_gene_variance)), sub_ld[kk,:])
+			gene_ld_scores[kk] = gene_ld_scores[kk] + tmp
+
+	##########################
+	# Prepare LDSC regression data
+	##########################
+	chi_sq = np.hstack((np.square(gwas_z_scores)))
+	var_ld_scores = np.hstack((np.sum(LD_sq,axis=0)))
+	joint_ld_scores = np.transpose(np.vstack((var_ld_scores,gene_ld_scores)))
+
+	############################
+	# Run SLDSC
+	############################
+	model = LinearRegression(fit_intercept=False)
+	ldsc_fit = model.fit(joint_ld_scores, chi_sq-1)
+
+	nm_h2 = ldsc_fit.coef_[0]*n_snps/N_gwas
+	med_h2 = ldsc_fit.coef_[1]*n_genes/N_gwas
+
+
+	return nm_h2, med_h2
+
+
+
+
+def sldsc_with_variants_and_unbiased_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, causal_eqtl_effects, causal_eqtl_effect_covs, causal_eqtl_indices):
+	# Get number of genes
+	n_genes = len(causal_eqtl_indices)
+	# Get number of snps
+	n_snps = len(gwas_z_scores)
+
+	# Square LD
+	LD_sq = np.square(LD)
+
+	#####################################################
+	# Standardize genetic distribution of gene expression
+	#####################################################
+	unbiased_delta_t_deltas = []
+	unbiased_gene_variances = []
+	for gg in range(n_genes):
+		# LD specifically for gene
+		R_gene = LD[causal_eqtl_indices[gg], :][:, causal_eqtl_indices[gg]]
+		# Calculate gene variance
+		causal_eqtl_effects_mean = causal_eqtl_effects[gg]
+		gene_meanT_mean = np.dot(causal_eqtl_effects_mean.reshape(len(causal_eqtl_effects_mean),1), causal_eqtl_effects_mean.reshape(1,len(causal_eqtl_effects_mean)))
+		gene_cov = causal_eqtl_effect_covs[gg]
+
+		unbiased_delta_t_delta = gene_meanT_mean - gene_cov
+
+		tot_gene_variance = np.sum(R_gene*unbiased_delta_t_delta)
+		unbiased_delta_t_deltas.append(unbiased_delta_t_delta)
+		unbiased_gene_variances.append(tot_gene_variance)
+
+
+	#####################################################
+	# Create gene LD scores
+	#####################################################
+	gene_ld_scores = np.zeros(n_snps)
+	for gg in range(n_genes):
+		unbiased_gene_variance = unbiased_gene_variances[gg]
+		unbiased_delta_t_delta = unbiased_delta_t_deltas[gg]
+
+
+		sub_ld = LD[:, causal_eqtl_indices[gg]]
+		for kk in range(n_snps):
+			tmp = np.dot(np.dot(sub_ld[kk,:], (unbiased_delta_t_delta/unbiased_gene_variance)), sub_ld[kk,:])
+			gene_ld_scores[kk] = gene_ld_scores[kk] + tmp
+
+		#gene_score = np.diag(np.dot(np.dot(LD[:, causal_eqtl_indices[gg]], (gene_meanT_mean + std_causal_eqtl_covs[gg])), LD[causal_eqtl_indices[gg], :]))
+
+	##########################
+	# Prepare LDSC regression data
+	##########################
+	chi_sq = np.hstack((np.square(gwas_z_scores)))
+	var_ld_scores = np.hstack((np.sum(LD_sq,axis=0)))
+	joint_ld_scores = np.transpose(np.vstack((var_ld_scores,gene_ld_scores)))
+
+	############################
+	# Run SLDSC
+	############################
+	model = LinearRegression(fit_intercept=False)
+	ldsc_fit = model.fit(joint_ld_scores, chi_sq-1)
+
+	nm_h2 = ldsc_fit.coef_[0]*n_snps/N_gwas
+	med_h2 = ldsc_fit.coef_[1]*n_genes/N_gwas
+
+
+	return nm_h2, med_h2
+
+def sldsc_he_with_variants_and_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, causal_eqtl_effects, causal_eqtl_indices, LD_LD_t):
+	# Get number of genes
+	n_genes = len(causal_eqtl_indices)
+	n_snps = len(gwas_z_scores)
+
+
+	z_mat = np.dot(gwas_z_scores.reshape(len(gwas_z_scores),1), gwas_z_scores.reshape(1,len(gwas_z_scores)))
+
+	ld_scores = np.copy(LD_LD_t)
+	gene_ld_scores = np.copy(z_mat)*0.0
+
+	for gg in range(n_genes):
+		# Calculate gene variance
+		gene_variance = np.dot(np.dot(causal_eqtl_effects[gg], LD[causal_eqtl_indices[gg], :][:, causal_eqtl_indices[gg]]), causal_eqtl_effects[gg])
+
+		# Standardize gene effects
+		std_causal_eqtl_effect = causal_eqtl_effects[gg]/np.sqrt(gene_variance)
+
+		delta_delta_t = np.dot(std_causal_eqtl_effect.reshape(len(std_causal_eqtl_effect),1), std_causal_eqtl_effect.reshape(1,len(std_causal_eqtl_effect)))
+
+		sub_ld = LD[:, causal_eqtl_indices[gg]]
+		gene_ld_scores = gene_ld_scores + np.dot(np.dot(sub_ld, delta_delta_t), np.transpose(sub_ld))
+
+
+	model = LinearRegression(fit_intercept=False, normalize=False)
+	z_mat = z_mat - LD
+
+	joint_ld_scores = np.transpose(np.vstack((np.matrix.flatten(ld_scores),np.matrix.flatten(gene_ld_scores))))
+	mpldsc_fit = model.fit(joint_ld_scores, np.matrix.flatten(z_mat))
+
+
+	mpldsc_var_h2 = mpldsc_fit.coef_[0]*n_snps/N_gwas
+	mpldsc_gene_h2 = mpldsc_fit.coef_[1]*n_genes/N_gwas
+
+	return mpldsc_var_h2, mpldsc_gene_h2
 
 
 def sldsc_with_variants_and_noisy_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, causal_eqtl_effects, causal_eqtl_indices, noise_ratios):
@@ -329,9 +495,9 @@ simulated_expression_data_dir = sys.argv[7]
 # File summarizing inferred gene models
 gene_summary_file = simulated_gene_models_dir + simulation_name_string + 'model_summaries_' + eqtl_ss + '.txt'
 
-# Extract previously estimated causal eqtl effects
-causal_eqtl_effects, causal_eqtl_indices, true_causal_eqtl_effects, est_noise_ratios, true_noise_ratios, causal_eqtl_effect_covs = extract_previously_estimsted_causal_eqtl_effects(gene_summary_file)
 
+# Extract previously estimated causal eqtl effects
+causal_eqtl_indices, true_causal_eqtl_effects, est_causal_eqtl_effects, blup_causal_eqtl_effects, ridge_regr_causal_eqtl_effects, ridge_regr_true_var_causal_eqtl_effects = extract_previously_estimsted_causal_eqtl_effects(gene_summary_file)
 
 # File containing gwas summary statistics
 gwas_sum_stats_file = simulated_gwas_data_dir + simulation_name_string + 'simulated_gwas_summary_stats.txt'
@@ -359,6 +525,9 @@ print(sim_med_genetic_var)
 ld_file = processed_genotype_data_dir + 'gwas_genotype_LD_1.npy'
 LD = np.load(ld_file)
 
+ld_ld_t_file = processed_genotype_data_dir + 'gwas_genotype_LD_LD_t_1.npy'
+LD_LD_t = np.load(ld_ld_t_file)
+
 # Genotype file
 geno_file = processed_genotype_data_dir + 'gwas_genotype_1.npy'
 #genotype_mat = np.load(geno_file)
@@ -371,6 +540,76 @@ trait_vec = load_in_trait_file(trait_file)
 # Gwas sample size
 N_gwas = len(trait_vec)
 
+# Number of genes
+n_genes = len(causal_eqtl_indices)
+
+
+# Run SLDSC with variants and true genetic gene expression (accounting for zero noise) and without modeling twas chi-squared stats
+nm_h2_true_gene, med_h2_true_gene = sldsc_with_variants_and_noisy_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, true_causal_eqtl_effects, causal_eqtl_indices, np.zeros(n_genes))
+
+# Run SLDSC with variants and predicted genetic gene expression (accounting for zero noise) and without modeling twas chi-squared stats
+nm_h2_pred_gene, med_h2_pred_gene = sldsc_with_variants_and_noisy_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, est_causal_eqtl_effects, causal_eqtl_indices, np.zeros(n_genes))
+
+# Run SLDSC with variants and ridge regression predicted genetic gene expression (accounting for zero noise) and without modeling twas chi-squared stats
+nm_h2_ridge_regr_pred_gene, med_h2_ridge_regr_pred_gene = sldsc_with_variants_and_noisy_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, ridge_regr_causal_eqtl_effects, causal_eqtl_indices, np.zeros(n_genes))
+
+# Run SLDSC with variants and blup regression predicted genetic gene expression (accounting for zero noise) and without modeling twas chi-squared stats
+nm_h2_blup_pred_gene, med_h2_blup_pred_gene = sldsc_with_variants_and_noisy_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, blup_causal_eqtl_effects, causal_eqtl_indices, np.zeros(n_genes))
+
+# Run SLDSC with variants and ridge regression known variance predicted genetic gene expression (accounting for zero noise) and without modeling twas chi-squared stats
+nm_h2_ridge_regr_true_var_pred_gene, med_h2_ridge_regr_true_var_pred_gene = sldsc_with_variants_and_noisy_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, ridge_regr_true_var_causal_eqtl_effects, causal_eqtl_indices, np.zeros(n_genes))
+
+# Run SLDSC with variants and genetic gene expression assuming each snp contributes equally and without modeling twas chi-squared stats
+nm_h2_marginal_gene, med_h2_marginal_gene = sldsc_with_variants_and_marginal_gene_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, causal_eqtl_indices)
+
+# Run HE-SLDSC with variants and predicted genetic gene expression (accounting for zero noise) and without modeling twas chi-squared stats
+nm_he_h2_pred_gene, med_he_h2_pred_gene = sldsc_he_with_variants_and_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, ridge_regr_causal_eqtl_effects, causal_eqtl_indices,LD_LD_t)
+
+
+
+# Print results to output
+output_file = mediated_h2_results_dir + simulation_name_string + 'eqtl_ss_' + eqtl_ss + '_med_h2_ldsc_style_summary.txt'
+t = open(output_file,'w')
+# Header
+t.write('sim_h2\tsim_nm_h2\tsim_med_h2\t')
+t.write('nm_h2_true_gene\tmed_h2_true_gene\t')
+t.write('nm_h2_pred_gene\tmed_h2_pred_gene\t')
+t.write('nm_h2_ridge_regr_pred_gene\tmed_h2_ridge_regr_pred_gene\t')
+t.write('nm_h2_blup_pred_gene\tmed_h2_blup_pred_gene\t')
+t.write('nm_h2_ridge_regr_true_var_pred_gene\tmed_h2_ridge_regr_true_var_pred_gene\t')
+t.write('nm_h2_marginal_gene\tmed_h2_marginal_gene\t')
+t.write('nm_h2_he_ridge_regr_pred_gene\tmed_h2_he_ridge_regr_pred_gene\n')
+
+
+
+# Line
+t.write(str(sim_genetic_var) + '\t' + str(sim_nm_genetic_var) + '\t' + str(sim_med_genetic_var) + '\t')
+t.write(str(nm_h2_true_gene) + '\t' + str(med_h2_true_gene) + '\t')
+t.write(str(nm_h2_pred_gene) + '\t' + str(med_h2_pred_gene) + '\t')
+t.write(str(nm_h2_ridge_regr_pred_gene) + '\t' + str(med_h2_ridge_regr_pred_gene) + '\t')
+t.write(str(nm_h2_blup_pred_gene) + '\t' + str(med_h2_blup_pred_gene) + '\t')
+t.write(str(nm_h2_ridge_regr_true_var_pred_gene) + '\t' + str(med_h2_ridge_regr_true_var_pred_gene) + '\t')
+t.write(str(nm_h2_marginal_gene) + '\t' + str(med_h2_marginal_gene) + '\t')
+t.write(str(nm_he_h2_pred_gene) + '\t' + str(med_he_h2_pred_gene) + '\n')
+
+
+
+
+t.close()
+
+print(output_file)
+
+
+
+
+
+
+
+
+
+
+
+'''
 # Run SLDSC with variants and true genetic gene expression (no true noise)
 nm_h2_true_gene_no_noise, med_h2_true_gene_no_noise = sldsc_with_variants_and_noisy_genetic_gene_expression(gwas_z_scores, N_gwas, LD, true_causal_eqtl_effects, causal_eqtl_indices, np.zeros(len(est_noise_ratios)))
 
@@ -389,33 +628,12 @@ nm_h2_pred_gene_no_noise_no_twas_chi_sq, med_h2_pred_gene_no_noise_no_twas_chi_s
 # Run SLDSC with variants and genetic distribution of gene expression and without modeling twas chi-squared
 nm_h2_distr_gene_no_twas_chi_sq, med_h2_distr_gene_no_twas_chi_sq = sldsc_with_variants_and_distribution_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, causal_eqtl_effects, causal_eqtl_effect_covs, causal_eqtl_indices)
 
+# Run SLDSC with variants and genetic unbiased gene expression and without modeling twas chi-squared
+nm_h2_unbiased_gene_no_twas_chi_sq, med_h2_unbiased_gene_no_twas_chi_sq = sldsc_with_variants_and_unbiased_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, causal_eqtl_effects, causal_eqtl_effect_covs, causal_eqtl_indices)
 
-# Print results to output
-output_file = mediated_h2_results_dir + simulation_name_string + 'eqtl_ss_' + eqtl_ss + '_med_h2_ldsc_style_summary.txt'
-t = open(output_file,'w')
-# Header
-t.write('sim_h2\tsim_nm_h2\tsim_med_h2\t')
-t.write('nm_h2_true_gene_no_noise\tmed_h2_true_gene_no_noise\t')
-t.write('nm_h2_pred_gene_no_noise\tmed_h2_pred_gene_no_noise\t')
-t.write('nm_h2_pred_gene_pred_noise\tmed_h2_pred_gene_pred_noise\t')
-t.write('nm_h2_pred_gene_true_noise\tmed_h2_pred_gene_true_noise\t')
-t.write('nm_h2_pred_gene_no_noise_no_twas_chi_sq\tmed_h2_pred_gene_no_noise_no_twas_chi_sq\t')
-t.write('nm_h2_distr_gene_no_twas_chi_sq\tmed_h2_distr_gene_no_twas_chi_sq\n')
-
-# Line
-t.write(str(sim_genetic_var) + '\t' + str(sim_nm_genetic_var) + '\t' + str(sim_med_genetic_var) + '\t')
-t.write(str(nm_h2_true_gene_no_noise) + '\t' + str(med_h2_true_gene_no_noise) + '\t')
-t.write(str(nm_h2_pred_gene_no_noise) + '\t' + str(med_h2_pred_gene_no_noise) + '\t')
-t.write(str(nm_h2_pred_gene_pred_noise) + '\t' + str(med_h2_pred_gene_pred_noise) + '\t')
-t.write(str(nm_h2_pred_gene_true_noise) + '\t' + str(med_h2_pred_gene_true_noise) + '\t')
-t.write(str(nm_h2_pred_gene_no_noise_no_twas_chi_sq) + '\t' + str(med_h2_pred_gene_no_noise_no_twas_chi_sq) + '\t')
-t.write(str(nm_h2_distr_gene_no_twas_chi_sq) + '\t' + str(med_h2_distr_gene_no_twas_chi_sq) + '\n')
-
-
-t.close()
-
-print(output_file)
-
+# Run SLDSC with variants and genetically predicted gene expression (accounting for zero noise) and without modeling twas chi-squared stats
+nm_h2_blup_pred_gene_no_noise_no_twas_chi_sq, med_h2_blup_pred_gene_no_noise_no_twas_chi_sq = sldsc_with_variants_and_noisy_genetic_gene_expression_no_twas_chi_sq(gwas_z_scores, N_gwas, LD, blup_causal_eqtl_effects, causal_eqtl_indices, np.zeros(len(est_noise_ratios)))
+'''
 
 
 
