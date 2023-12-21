@@ -84,7 +84,7 @@ def estimate_marginal_eqtl_effects_for_a_single_gene_from_genetic_expression(exp
 	marginal_betas = np.asarray(marginal_betas)
 	'''
 
-	marginal_betas = np.dot(np.transpose(genotype_mat), std_expression_vec)/len(expression_vec)
+	marginal_betas = np.dot(np.transpose(genotype_mat), expression_vec)/len(expression_vec)
 
 
 
@@ -299,7 +299,7 @@ cc = []
 # Open output file handle
 output_file = simulated_gene_models_dir + simulation_name_string + 'model_summaries_' + str(eqtl_ss) + '.txt'
 t = open(output_file,'w')
-t.write('gene_name\tgene_snp_indices\tgene_snp_causal_eqtl_effects\tmarginal_beta_file\tgenetic_ge_marginal_beta_file\n')
+t.write('gene_name\tgene_snp_indices\tgene_snp_causal_eqtl_effects\tmarginal_beta_file\tadj_gene_r_squared_file\tgenetic_ge_marginal_beta_file\n')
 # Loop through genes
 simulated_causal_eqtl_effect_file = simulated_eqtl_data_dir + simulation_name_string + 'causal_eqtl_effect_summary.txt'
 f = open(simulated_causal_eqtl_effect_file)
@@ -313,8 +313,8 @@ for line in f:
 		continue
 	# Extract relevent fields
 	gene_name = data[0]
-	print(gene_index)
-	print(time.time())
+	#print(gene_index)
+	#print(time.time())
 	gene_snp_indices = np.asarray(data[1].split(',')).astype(int)
 	gene_snp_causal_effects = np.asarray(data[2].split(',')).astype(float)
 	if int(gene_name.split('_')[1]) != gene_index:
@@ -326,9 +326,7 @@ for line in f:
 	#beta, beta_varcov, gene_h2_est, marginal_betas, gene_sampling_var, marginal_z = estimate_causal_eqtl_effects_for_a_single_gene(expression_vec, genotype[:, gene_snp_indices])
 	full_marginal_betas = estimate_marginal_eqtl_effects_for_a_single_gene(expression_vec, genotype)
 	full_marginal_betas_genetic_ge = estimate_marginal_eqtl_effects_for_a_single_gene_from_genetic_expression(genetic_expression_vec, genotype)
-	adj_r_squared = np.square(full_marginal_betas_genetic_ge) - ((1.0 - np.square(full_marginal_betas_genetic_ge))/(float(eqtl_ss)-2))
-
-	pdb.set_trace()
+	full_adj_r_squared = np.square(full_marginal_betas) - ((1.0 - np.square(full_marginal_betas))/(float(eqtl_ss)-2))
 
 	'''
 	#gene_est_h2_ldsc = estimate_heritability_of_single_gene_with_ldsc(expression_vec, genotype[:, gene_snp_indices], marginal_z)
@@ -387,6 +385,9 @@ for line in f:
 	# Save marginal beta file from genetic ge
 	genetic_ge_marginal_beta_file = simulated_gene_models_dir + simulation_name_string + 'estimated_genetic_ge_eqtl_marginal_beta_' + str(eqtl_ss) + '_' + gene_name + '.npy'
 	np.save(genetic_ge_marginal_beta_file, full_marginal_betas_genetic_ge)
+	# Save adjusted r-squared file
+	adj_r_squared_file = simulated_gene_models_dir + simulation_name_string + 'estimated_adj_r_squared_' + str(eqtl_ss) + '_' + gene_name + '.npy'
+	np.save(adj_r_squared_file, full_adj_r_squared)
 	'''
 	# Save estimated causal eqtl effects
 	estimated_causal_eqtl_effects_file = simulated_gene_models_dir + simulation_name_string + 'estimated_causal_eqtl_effects_mean_' + str(eqtl_ss) + '_' + gene_name + '.npy'
@@ -402,7 +403,7 @@ for line in f:
 	np.save(blup_estimated_causal_eqtl_effects_file, blup_causal_eqtl_effects_mean)
 	'''
 
-	t.write(data[0] + '\t' + data[1] + '\t' + data[2] + '\t' + str(marginal_beta_file) + '\t' + genetic_ge_marginal_beta_file + '\n')
+	t.write(data[0] + '\t' + data[1] + '\t' + data[2] + '\t' + str(marginal_beta_file) + '\t' + adj_r_squared_file + '\t' + genetic_ge_marginal_beta_file + '\n')
 
 	gene_index = gene_index + 1
 
@@ -410,6 +411,7 @@ f.close()
 t.close()
 
 print(output_file)
+
 
 
 
