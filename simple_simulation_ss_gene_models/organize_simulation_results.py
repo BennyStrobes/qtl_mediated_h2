@@ -30,12 +30,12 @@ t.write('method\teqtl_ss\tmed_h2\tmed_h2_lb\tmed_h2_ub\n')
 for eqtl_ss in eqtl_sss:
 	arr = []
 	selection_type='neutral'
-	for simulation_iter in range(201,401):
-		for sub_iter in range(1,3):
+	for simulation_iter in range(401,501):
+		for sub_iter in range(1,5):
 			results_file = mediated_h2_results_dir + 'simulation_' + str(simulation_iter) + '_' + str(sub_iter) + '_' + simulation_name_string + selection_type + '_selection_eqtl_ss_' + str(eqtl_ss) + 'med_h2_ldsc_style_summary.txt'
 			aa = np.loadtxt(results_file, dtype=str,delimiter= '\t')
-			arr.append(aa[1,5:].astype(float))
-			method_names = aa[0,5:]
+			arr.append(aa[1,6:].astype(float))
+			method_names = aa[0,6:]
 	arr = np.asarray(arr)
 
 	for ii, method_name in enumerate(method_names):
@@ -63,8 +63,8 @@ for eqtl_ss in eqtl_sss:
 	arr_true_noise = []
 	arr_est_noise = []
 	selection_type='neutral'
-	for simulation_iter in range(201,401):
-		for sub_iter in range(1,3):
+	for simulation_iter in range(401,501):
+		for sub_iter in range(1,5):
 			results_file = mediated_h2_results_dir + 'simulation_' + str(simulation_iter) + '_' + str(sub_iter) + '_' + simulation_name_string + selection_type + '_selection_eqtl_ss_' + str(eqtl_ss) + 'med_h2_ldsc_style_summary.txt'
 			aa = np.loadtxt(results_file, dtype=str,delimiter= '\t')
 			arr_true_noise.append(aa[1,3].astype(float))

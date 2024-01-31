@@ -26,7 +26,7 @@ kg_genotype_dir="/n/groups/price/ldsc/reference_files/1000G_EUR_Phase3/plink_fil
 ############################
 # Root directory
 temp_output_root_old="/n/scratch/users/b/bes710/qtl_mediated_h2/simple_simulation_per_gene_calibration/"
-temp_output_root="/n/scratch/users/b/bes710/qtl_mediated_h2/simple_simulation_ss_gene_models/"
+temp_output_root="/n/scratch/users/b/bes710/qtl_mediated_h2/simple_simulation_multiple_eqtl_datasets/"
 
 
 # Output directory for processed genotype
@@ -58,23 +58,24 @@ visualize_med_h2_results_dir=${temp_output_root}"visualize_mediated_h2_results/"
 # Run analysis
 ############################
 # RUN SIMULATIONS
-simulation_number="401"
+simulation_number="1"
 if false; then
 sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_gwas_data_dir $mediated_h2_results_dir $simulated_expression_data_dir $simulated_gene_models_dir
 fi
 
 if false; then
-for simulation_number in $(seq 402 500); do 
+for simulation_number in $(seq 2 100); do 
 	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_gwas_data_dir $mediated_h2_results_dir $simulated_expression_data_dir $simulated_gene_models_dir
 done
 fi
-
 
 if false; then
 for simulation_number in $(seq 231 400); do 
 	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_gwas_data_dir $mediated_h2_results_dir $simulated_expression_data_dir $simulated_gene_models_dir
 done
 fi
+
+
 
 
 
