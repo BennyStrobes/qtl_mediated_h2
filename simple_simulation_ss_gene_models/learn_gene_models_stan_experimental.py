@@ -1,14 +1,34 @@
-import sys
-sys.path.remove('/n/app/python/3.7.4-ext/lib/python3.7/site-packages')
 import numpy as np 
 import os
+import sys
 import pdb
-import statsmodels.api as sm
+import stan
 from sklearn.linear_model import LinearRegression
-import time
-import trait_likelihood_gibbs_variant_only
-import time
-import trait_likelihood_uniform_prior_gibbs_variant_only
+
+
+bayes_reg_code = """
+data {                      // Data block; declarations only
+  int<lower = 0> N;         // Sample size                         
+  int<lower = 0> k;         // Dimension of model matrix
+  matrix [N, k] X;          // Model Matrix
+  vector[N] y;              // Target
+}
+
+
+parameters {                // Parameters block; declarations only
+  vector[k] beta;           // Coefficient vector
+  real<lower = 0> sigma;    // Error scale
+  real<lower = 0> sigma_beta;
+}
+
+
+model {                     // Model block; declarations and statements.
+  // priors
+  beta  ~ normal(0, sigma_beta);
+  // likelihood
+  y ~ normal(X * beta, sigma);
+}
+"""
 
 
 def extract_non_colinear_predictors(corry, abs_correlation_threshold):
@@ -349,13 +369,18 @@ def posterior_distribution_on_causal_eqtl_effects_gibbs(expression_vec, genotype
 	return np.mean(gibbsy.sampled_betas,axis=0), np.cov(np.transpose(gibbsy.sampled_betas)), np.mean(gibbsy.sampled_beta_variances)*genotype_mat.shape[1]
 
 def posterior_distribution_on_causal_eqtl_effects_uniform_gibbs(expression_vec, genotype_mat):
+	stan_data = {"N": len(expression_vec), "k": genotype_mat.shape[1], "X": genotype_mat, "y": expression_vec}
 
-	gibbsy = trait_likelihood_uniform_prior_gibbs_variant_only.TRAIT_LIKELIHOOD_GIBBS_VARIANT_ONLY(Y=expression_vec, X=genotype_mat, max_iter=15000, burn_in_iter=8000)
-	gibbsy.fit()
+	posterior = stan.build(bayes_reg_code, data=stan_data)
+	fit = posterior.sample(num_chains=4, num_samples=7500)
 
-	
-	print(np.mean(gibbsy.sampled_pves))
-	return np.mean(gibbsy.sampled_betas,axis=0), np.cov(np.transpose(gibbsy.sampled_betas)), np.mean(gibbsy.sampled_beta_variances)*genotype_mat.shape[1]
+	df = fit.to_frame() 
+
+
+	print(np.square(np.mean(df['sigma_beta']))*40)
+	return
+
+	#return np.mean(gibbsy.sampled_betas,axis=0), np.cov(np.transpose(gibbsy.sampled_betas)), np.mean(gibbsy.sampled_beta_variances)*genotype_mat.shape[1]
 
 
 
@@ -417,23 +442,34 @@ def create_bimbam_phenotype_file(expression_vec, bimbam_phenotype_file):
 	return
 
 
-def bslmm_posterior_distribution_on_causal_eqtl_effects(expression_vec, genotype_mat, gemma_path, tmp_file_root):
+def bslmm_posterior_distribution_on_causal_eqtl_effects(expression_vec, genotype_mat, gemma_path, tmp_file_dir, tmp_file_stem):
 	# Rescale genotype matrix so that each snp has the same variance, however the snp values are bounded between 0 and 2
 	# Note that centering each snp of the rescaled_genotype_mat, and multiplying by the genotype_scale_factor will result in the original genotype_mat
 	# Where the original_genotype_mat is mean centered and scaled.
 	rescaled_genotype_mat, genotype_scale_factor = rescale_genotype_mat(genotype_mat)
 
 	# Create bimbam mean genotype file
-	bimbam_mean_genotype_file = tmp_file_root + 'bimbam_mean_genotype_file.txt'
+	bimbam_mean_genotype_file = tmp_file_dir + tmp_file_stem + 'bimbam_mean_genotype_file.txt'
 	create_bimbam_mean_genotype_file(rescaled_genotype_mat, bimbam_mean_genotype_file)
 
 	# Create bimbam phenotype file
-	bimbam_phenotype_file = tmp_file_root + 'bimbam_phenotype_file.txt'
+	bimbam_phenotype_file = tmp_file_dir + tmp_file_stem + 'bimbam_phenotype_file.txt'
 	create_bimbam_phenotype_file(expression_vec, bimbam_phenotype_file)
 
-	bslmm_output_root = 'bslmm_' 
-	bslmm_cmd = gemma_path + ' -miss 1 -maf 0 -r2 1 -rpace 1000 -wpace 1000 -g ' + bimbam_mean_genotype_file + ' -p ' + bimbam_phenotype_file + ' -bslmm 1 -o ' + bslmm_output_root
+	#bslmm_cmd = gemma_path + ' -miss 1 -maf 0 -r2 1 -rpace 1000 -wpace 1000 -g ' + bimbam_mean_genotype_file + ' -p ' + bimbam_phenotype_file + ' -bslmm 1 -outdir ' + tmp_file_dir + ' -o ' + tmp_file_stem
+	bslmm_cmd = gemma_path + ' -miss 1 -maf 0 -r2 1 -w 3000000 -s 5000000 -rmin 0 -rmax 0 -rpace 1000 -wpace 1000 -g ' + bimbam_mean_genotype_file + ' -p ' + bimbam_phenotype_file + ' -bslmm 1 -outdir ' + tmp_file_dir + ' -o ' + tmp_file_stem
 	os.system(bslmm_cmd)
+
+	bslmm_param_sample_file = tmp_file_dir + tmp_file_stem + '.hyp.txt'
+	bslmm_param_samples = np.loadtxt(bslmm_param_sample_file,dtype=str,delimiter='\t',skiprows=1)
+	h_samples = bslmm_param_samples[:,0].astype(float)
+	pve_samples = bslmm_param_samples[:,1].astype(float)
+
+
+	print(np.mean(h_samples))
+	print(np.mean(pve_samples))
+
+
 	return
 
 def get_pve_est_from_blup_log_file(filer):
@@ -534,18 +570,8 @@ genetic_gene_expression = np.load(genetic_expression_file)
 
 # Initialize output vectors
 n_snps = LD.shape[0]
-noisy_gene_related_snp_anno_vec = np.zeros(n_snps)
-noisy_gene_related_snp_anno_noise_vec = np.zeros(n_snps)
-marginal_beta_genetic_ge_vec = []
+posterior_gene_related_snp_anno_vec = np.zeros(n_snps)
 
-posterior_known_h2_known_resid_var_gene_related_snp_anno_vec = np.zeros(n_snps)
-posterior_known_h2_unknown_resid_var_gene_related_snp_anno_vec = np.zeros(n_snps)
-posterior_unknown_h2_unknown_resid_var_gene_related_snp_anno_vec = np.zeros(n_snps)
-posterior_blup_related_snp_anno_vec = np.zeros(n_snps)
-
-
-est_gene_h2 = []
-blup_pves = []
 
 simulated_causal_eqtl_effect_file = simulated_eqtl_data_dir + simulation_name_string + 'causal_eqtl_effect_summary.txt'
 f = open(simulated_causal_eqtl_effect_file)
@@ -571,27 +597,9 @@ for line in f:
 	expression_vec = gene_expression[gene_index,:]
 	genetic_expression_vec = genetic_gene_expression[gene_index,:]
 
-	#################
-	# Get gene related snp annotations by knowing true genetic genetic gene expression
-	#################
-	# Get marginal betas from simulated, unknown genetic gene expression
-	full_marginal_betas_genetic_ge = estimate_marginal_eqtl_effects_for_a_single_gene_from_genetic_expression(genetic_expression_vec, genotype)
-	marginal_beta_genetic_ge_vec.append(full_marginal_betas_genetic_ge)
-	#print(np.sum(np.square(gene_snp_causal_effects))/len(gene_snp_causal_effects))
-	print('#########')
-	print(np.var(genetic_expression_vec,ddof=1))
 
-	#################
-	# Get gene related snp annotations by getting noisy, unbiased estimates of them
-	#################
-	# Estimate marginal betas
-	full_marginal_betas, full_marginal_beta_variances = estimate_marginal_eqtl_effects_for_a_single_gene(expression_vec, genotype)
-	# Estimate gene_related_snp_annotations
-	full_adj_r_squared = np.square(full_marginal_betas) - full_marginal_beta_variances
-	noisy_gene_related_snp_anno_vec = noisy_gene_related_snp_anno_vec + full_adj_r_squared
-	# Estimate noise in gene related snp annotations
-	full_adj_r_squared_noise = calculate_gene_ld_score_noise_according_to_gaussian_distr(full_marginal_betas, full_marginal_beta_variances, float(eqtl_ss))
-	noisy_gene_related_snp_anno_noise_vec = noisy_gene_related_snp_anno_noise_vec + full_adj_r_squared_noise
+	# Print genetic variance
+
 
 	'''
 	#################
@@ -618,7 +626,12 @@ for line in f:
 	#################
 	# Get posterior distribution on gene-related snp-annotation by not knowning h2 and not knowing residual variance
 	#################
-	eqtl_posterior_mean_unknown_h2_unknown_resid_var, eqtl_posterior_var_unknown_h2_unknown_resid_var, est_gene_h2_unknown_h2_unknown_resid_var  = posterior_distribution_on_causal_eqtl_effects_uniform_gibbs(expression_vec, genotype[:,gene_snp_indices])
+	'''
+	if gene_index == 10:
+		posterior_distribution_on_causal_eqtl_effects_uniform_gibbs(expression_vec, genotype[:,gene_snp_indices])
+		print(np.var(genetic_expression_vec,ddof=1))
+	'''
+
 	#gene_posterior_gene_related_snp_anno_unknown_h2_unknown_resid_var = get_genes_posterior_on_gene_related_snp_anno(eqtl_posterior_mean_unknown_h2_unknown_resid_var, eqtl_posterior_var_unknown_h2_unknown_resid_var, LD, gene_snp_indices)
 
 
@@ -626,8 +639,9 @@ for line in f:
 	#################
 	# Get BSLMM Posterior
 	#################
-	#tmp_file_root = simulated_gene_models_dir + simulation_name_string + '_' + str(eqtl_ss) + '_' + str(gene_index)
-	#bslmm_posterior_mean, bslmm_posterior_var = bslmm_posterior_distribution_on_causal_eqtl_effects(expression_vec, genotype[:,gene_snp_indices], gemma_path, tmp_file_root)
+	tmp_file_stem = simulation_name_string + '_' + str(eqtl_ss) + '_tmp_bslmm_'
+	bslmm_posterior_distribution_on_causal_eqtl_effects(expression_vec, genotype[:,gene_snp_indices], gemma_path, simulated_gene_models_dir, tmp_file_stem)
+	print(print(np.var(genetic_expression_vec,ddof=1)))
 	#bslmm_posterior_distribution_on_causal_eqtl_effects(expression_vec, genotype[:,gene_snp_indices], gemma_path, tmp_file_root)
 
 	'''

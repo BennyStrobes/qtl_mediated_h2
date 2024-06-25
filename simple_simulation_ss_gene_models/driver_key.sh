@@ -58,10 +58,9 @@ visualize_med_h2_results_dir=${temp_output_root}"visualize_mediated_h2_results/"
 # Run analysis
 ############################
 # RUN SIMULATIONS
-simulation_number="401"
-if false; then
-sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_gwas_data_dir $mediated_h2_results_dir $simulated_expression_data_dir $simulated_gene_models_dir
-fi
+simulation_number="501"
+sh run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_gwas_data_dir $mediated_h2_results_dir $simulated_expression_data_dir $simulated_gene_models_dir
+
 
 if false; then
 for simulation_number in $(seq 402 500); do 
@@ -75,6 +74,7 @@ for simulation_number in $(seq 231 400); do
 	sbatch run_single_simulation_shell.sh $simulation_number $processed_genotype_data_dir $simulated_eqtl_data_dir $simulated_gwas_data_dir $mediated_h2_results_dir $simulated_expression_data_dir $simulated_gene_models_dir
 done
 fi
+
 
 
 

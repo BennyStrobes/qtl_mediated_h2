@@ -79,9 +79,8 @@ fi
 
 
 
-if false; then
 sh organize_and_visualize_simulation_results.sh $mediated_h2_results_dir $visualize_med_h2_results_dir
-fi
+
 
 
 

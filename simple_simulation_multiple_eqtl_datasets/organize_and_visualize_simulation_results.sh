@@ -21,17 +21,18 @@ visualize_med_h2_results_dir="$2"
 n_genes="400"
 fraction_genes_cis_h2="1.0"
 ge_h2="0.05"
+n_eqtl_datasets="5"
+n_causal_eqtl_datasets="2"
 per_element_heritability="0.0005"
 total_heritability="0.3"
 fraction_expression_mediated_heritability="0.3"
 
-
 date
 
 
+simulation_name_string="n_genes_"${n_genes}"_frac_genes_h2_"${fraction_genes_cis_h2}"_ele_h2_"${per_element_heritability}"_tot_h2_"${total_heritability}"_frac_mediated_"${fraction_expression_mediated_heritability}"_ge_h2_"${ge_h2}"_n_eqtl_data_"${n_eqtl_datasets}"_"${n_causal_eqtl_datasets}"_"
 if false; then
-simulation_name_string="n_genes_"${n_genes}"_frac_genes_h2_"${fraction_genes_cis_h2}"_ele_h2_"${per_element_heritability}"_tot_h2_"${total_heritability}"_frac_mediated_"${fraction_expression_mediated_heritability}"_ge_h2_"${ge_h2}"_"
-python3 organize_simulation_results.py $mediated_h2_results_dir $visualize_med_h2_results_dir $simulation_name_string
+python3 organize_simulation_results.py $mediated_h2_results_dir $visualize_med_h2_results_dir $simulation_name_string $n_eqtl_datasets
 fi
 
 if false; then

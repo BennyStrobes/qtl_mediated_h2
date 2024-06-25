@@ -62,18 +62,19 @@ make_med_h2_se_barplot <- function(df) {
   	return(p)
 }
 
-make_med_h2_se_barplot_w_axis_lim <- function(df) {
+make_med_h2_se_barplot_with_limits <- function(df) {
 	df$eqtl_ss = factor(df$eqtl_ss)
 	p<-ggplot(data=df, aes(x=eqtl_ss, y=med_h2, fill=method)) +
   		geom_bar(stat="identity", position=position_dodge()) +
   		geom_errorbar(aes(ymin=med_h2_lb, ymax=med_h2_ub), width=.4, position=position_dodge(.9), colour="black")  +
   		figure_theme() +
   		labs(x="eQTL sample size", y="h2-med", fill="") +
-  		ylim(0,.2) + 
+  		ylim(0,.2) +
   		theme(legend.position="bottom") +
   		geom_hline(yintercept=.09, linetype=2)
   	return(p)
 }
+
 
 make_noise_est_se_barplot <- function(df) {
 	df$eqtl_ss = factor(df$eqtl_ss)
@@ -108,29 +109,27 @@ make_med_h2_est_w_w_o_atten <- function(df) {
 visualize_med_h2_results_dir = args[1]
 
 
-
-old_med_h2_summary_file <- paste0(visualize_med_h2_results_dir, "less_ols/med_h2_summary.txt")
-old_df <- read.table(old_med_h2_summary_file, header=TRUE,sep="\t")
-old_df = old_df[as.character(old_df$method) == "med_h2_est_posterior_gene_ld_scores_unknown_gene_h2_unknown_residvar",]
-
-
 med_h2_summary_file <- paste0(visualize_med_h2_results_dir, "med_h2_summary.txt")
 df_med_h2 <- read.table(med_h2_summary_file, header=TRUE, sep="\t")
-
-df_med_h2 = rbind(df_med_h2, old_df)
-
-df_med_h2$method <- recode(df_med_h2$method, med_h2_sim_gene_ld_scores="simulated", med_h2_est_gene_ld_scores="estimated", med_h2_est_gene_ld_scores_dissattenuated_true_noise="dissatten", med_h2_est_gene_ld_scores_dissattenuated_est_noise="dissatten_e_noise", med_h2_est_posterior_gene_ld_scores_known_gene_h2_known_residvar="posterior", med_h2_est_posterior_gene_ld_scores_blup="posterior_blup", med_h2_est_posterior_gene_ld_scores_unknown_gene_h2_unknown_residvar="posterior_mcmc")
-df_med_h2$method = factor(df_med_h2$method, levels=c("simulated", "estimated", "dissatten", "dissatten_e_noise", "posterior", "posterior_blup", "posterior_mcmc"))
+df_med_h2 = df_med_h2[as.character(df_med_h2$method) != "med_h2_est_prediction_gene_ld_scores_blup",]
+df_med_h2$method <- recode(df_med_h2$method, med_h2_sim_gene_ld_scores="simulated", med_h2_est_gene_ld_scores="estimated", med_h2_est_gene_ld_scores_dissattenuated_true_noise="dissatten", med_h2_est_gene_ld_scores_dissattenuated_est_noise="dissatten_e_noise", med_h2_est_posterior_gene_ld_scores_known_gene_h2_known_residvar="posterior", med_h2_est_posterior_gene_ld_scores_blup="posterior_blup")
+df_med_h2$method = factor(df_med_h2$method, levels=c("simulated", "estimated", "dissatten", "dissatten_e_noise", "posterior", "posterior_blup"))
 pp <- make_med_h2_se_barplot(df_med_h2)
-output_file <- paste0(visualize_med_h2_results_dir, "med_h2_se_barplot.pdf")
+output_file <- paste0(visualize_med_h2_results_dir, "multi_eqtl_med_h2_se_barplot.pdf")
 ggsave(pp, file=output_file, width=7.2, height=4.5, units="in")
 
 
-df_med_h2$method <- recode(df_med_h2$method, med_h2_sim_gene_ld_scores="simulated", med_h2_est_gene_ld_scores="estimated", med_h2_est_gene_ld_scores_dissattenuated_true_noise="dissatten", med_h2_est_gene_ld_scores_dissattenuated_est_noise="dissatten_e_noise", med_h2_est_posterior_gene_ld_scores_known_gene_h2_known_residvar="posterior", med_h2_est_posterior_gene_ld_scores_blup="posterior_blup", med_h2_est_posterior_gene_ld_scores_unknown_gene_h2_unknown_residvar="posterior_mcmc")
-df_med_h2$method = factor(df_med_h2$method, levels=c("simulated", "estimated", "dissatten", "dissatten_e_noise", "posterior", "posterior_blup", "posterior_mcmc"))
-pp <- make_med_h2_se_barplot_w_axis_lim(df_med_h2)
-output_file <- paste0(visualize_med_h2_results_dir, "med_h2_axis_lim_se_barplot.pdf")
+pp <- make_med_h2_se_barplot_with_limits(df_med_h2)
+output_file <- paste0(visualize_med_h2_results_dir, "multi_eqtl_w_axis_limits_med_h2_se_barplot.pdf")
 ggsave(pp, file=output_file, width=7.2, height=4.5, units="in")
+
+df_med_h2 = df_med_h2[as.character(df_med_h2$method) != "dissatten",]
+df_med_h2 = df_med_h2[as.character(df_med_h2$method) != "dissatten_e_noise",]
+pp <- make_med_h2_se_barplot(df_med_h2)
+output_file <- paste0(visualize_med_h2_results_dir, "multi_eqtl_no_dissatten_med_h2_se_barplot.pdf")
+ggsave(pp, file=output_file, width=7.2, height=4.5, units="in")
+
+
 
 
 
