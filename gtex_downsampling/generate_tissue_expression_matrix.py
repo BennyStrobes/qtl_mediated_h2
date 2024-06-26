@@ -409,7 +409,7 @@ tissue_ordered_sample_names = get_tissue_sample_names(tissue_sample_names_file)
 
 # Extract gene expression from normalized gtex expression data
 normalized_expression_matrix_file = tissue_expression_dir + tissue + '_normalized_expression.txt'
-#get_normalized_expression(tissue, tissue_ordered_sample_names, gtex_normalized_expression_dir, normalized_expression_matrix_file, gene_name_to_gene_info)
+get_normalized_expression(tissue, tissue_ordered_sample_names, gtex_normalized_expression_dir, normalized_expression_matrix_file, gene_name_to_gene_info)
 
 
 # Generate expression PCs (to be used as covariates)

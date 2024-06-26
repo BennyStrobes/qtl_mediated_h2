@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-20:00                         # Runtime in D-HH:MM format
+#SBATCH -t 0-13:00                         # Runtime in D-HH:MM format
 #SBATCH -p medium                           # Partition to run in
 #SBATCH --mem=5G                         # Memory total in MiB (for all cores)
 
@@ -16,8 +16,9 @@ expr_file="$4"
 cov_file="$5"
 gwas_genotype_stem="$6"
 mesc_code_dir="$7"
-mesc_run_name="${8}"
-expression_score_dir="${9}"
+plink_executable="$8"
+mesc_run_name="${9}"
+expression_score_dir="${10}"
 
 
 
@@ -25,9 +26,16 @@ expression_score_dir="${9}"
 module load python/2.7.12
 conda activate mesc
 
-
+echo $mesc_run_name
 echo $Tissue_name
 date
+
+
+###############################
+# Create MESC expression scores
+################################
+tmp_output_dir=${expression_score_dir}"GTEx_v8_genotype_EUR_tmp_"${mesc_run_name}"_"${Tissue_name}
+mkdir ${tmp_output_dir}
 
 # Loop through chromosomes
 for CHR in {1..22}
@@ -50,11 +58,18 @@ do
 
 
     # Run MESC analysis
-	python ${mesc_code_dir}run_mesc.py --compute-expscore-indiv --plink-path plink --expression-matrix $expr_file --exp-bfile $tmp_plink_stem --geno-bfile $gwas_genotype_stem${CHR} --chr $CHR --covariates $cov_file --out $expression_score_dir"overall_"${mesc_run_name}"_"${Tissue_name}"_"${CHR} --est-lasso-only
-
+	python ${mesc_code_dir}run_mesc.py --compute-expscore-indiv --plink-path $plink_executable --expression-matrix $expr_file --exp-bfile $tmp_plink_stem --geno-bfile $gwas_genotype_stem${CHR} --chr $CHR --covariates $cov_file --tmp $tmp_output_dir --out $expression_score_dir"overall_"${mesc_run_name}"_"${Tissue_name}"_"${CHR} --est-lasso-only
+    
     # Delete unnessary, temporary plink file
-    rm ${tmp_plink_stem}*
-
+    rm ${tmp_plink_stem}".bim"
+    rm ${tmp_plink_stem}".fam"
+    rm ${tmp_plink_stem}".bed"
+    rm ${tmp_plink_stem}".log"
 done
+
+
+# Delete temporary output dir
+rm -rf ${tmp_output_dir}
+
 date
 
