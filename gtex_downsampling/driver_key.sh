@@ -54,6 +54,9 @@ gene_annotation_file="/n/scratch/users/b/bes710/tmp_storage/ge_misc/gencode.v26.
 # https://www.cog-genomics.org/plink/ (Linux 64-bit)
 plink_executable="/n/scratch/users/b/bes710/tmp_storage/plink/plink"
 
+# Code directory for tglr
+tglr_code_dir="/n/scratch/users/b/bes710/code/code_temp3/tglr/"
+
 
 ##################
 # Output data
@@ -91,6 +94,17 @@ downsampling_info_dir=${tmp_output_root}"downsampling_info/"
 # TGLR expression score directory
 tglr_expression_score_dir=${tmp_output_root}"tglr_expression_scores/"
 
+# TGLR results directory
+tglr_results_dir=${tmp_output_root}"tglr_results/"
+
+# Gene LD score - variant ld score correlations
+gene_ldscore_variant_ld_score_corr_dir=${tmp_output_root}"gene_ldscore_variant_ldscore_correlations/"
+
+
+# Visualize gtex downsamping analysis
+visualize_gtex_downsampling_dir=${tmp_output_root}"visualize_gtex_downsampling/"
+
+
 
 ##################
 # Run analysis
@@ -126,8 +140,6 @@ fi
 if false; then
 sbatch preprocess_variant_annotation_for_tglr.sh $ldsc_code_dir $hapmap3_rsid_file $baselineLD_anno_dir $kg_plink_dir $tglr_variant_annotations_dir
 fi
-
-
 
 
 
@@ -177,6 +189,19 @@ fi
 
 
 
+###################
+# Run TGLR
+if false; then
+sh run_tglr.sh ${tissue_info_file} ${mesc_run_name} ${ldsc_genotype_intercept_annotation_stem} ${ldsc_baseline_ld_annotation_stem} ${tglr_expression_score_dir} ${tglr_results_dir} $tglr_code_dir $sumstat_dir ${non_redundent_summary_statistics_file} ${sldsc_weights_stem}
+fi
+
+
+###################
+# Compute correlations between gene ld scores and variant ld scores
+# Exploratory analysis
+if false; then
+sh compute_correlations_between_gene_ldscores_and_variant_ldscores.sh ${mesc_run_name} ${expression_score_dir} ${ldsc_baseline_ld_annotation_stem} ${gene_ldscore_variant_ld_score_corr_dir}
+fi
 
 
 
@@ -231,16 +256,37 @@ done
 fi
 
 
+###################
+# Run MESC on all traits
+ldsc_baseline_ld_annotation_stem=${tglr_variant_annotations_dir}"baselineLD_no_qtl."
+ldsc_genotype_intercept_annotation_stem=${tglr_variant_annotations_dir}"genotype_intercept."
+
+sldsc_weights_stem=${tglr_variant_annotations_dir}"regression_weights."
+frq_file_stem=${kg_plink_dir}"1000G.EUR.hg38."
+if false; then
+sed 1d $downsample_run_summary_file | while read downsampled_run_name downsampled_sample_size downsampled_tissue_info_file; do
+	sbatch run_mesc.sh ${downsampled_tissue_info_file} ${downsampled_run_name} ${gwas_genotype_stem} ${expression_score_dir} ${sumstat_dir} ${non_redundent_summary_statistics_file} ${ldsc_genotype_intercept_annotation_stem} ${ldsc_baseline_ld_annotation_stem} ${sldsc_weights_stem} ${frq_file_stem} ${mesc_results_dir} ${mesc_code_dir}
+done
+fi
+
+
+
+###################
+# Meta-analyze mesc results across downsampling runs
+if false; then
+sh meta_analyze_mesc_results_across_downsampling_runs.sh ${downsample_run_summary_file} ${mesc_results_dir}
+fi
 
 
 
 
 
 
-
-
-
-
+###################
+# visualize results of downsampling analysis
+if false; then
+Rscript visualize_gtex_downsampling_analysis.R ${mesc_results_dir} ${tglr_results_dir} ${gene_ldscore_variant_ld_score_corr_dir} $visualize_gtex_downsampling_dir
+fi
 
 
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-8:00                         # Runtime in D-HH:MM format
+#SBATCH -t 0-4:00                         # Runtime in D-HH:MM format
 #SBATCH -p short                           # Partition to run in
 #SBATCH --mem=20G                         # Memory total in MiB (for all cores)
 
@@ -25,12 +25,8 @@ mesc_code_dir="${12}"
 
 
 
+echo ${mesc_run_name}
 
-
-
-
-
-if false; then
 #############################
 # Meta-analyze mesc gene scores across tissues
 #############################
@@ -70,7 +66,7 @@ sed 1d $non_redundent_summary_statistics_file | while read gwas_trait_name h2 h2
 	mesc_output_stem=${mesc_results_dir}${gwas_trait_name}"_"${mesc_run_name}"_baselineLD_no_qtl"
 	python ${mesc_code_dir}run_mesc.py --h2med ${gwas_file_name} --exp-chr ${meta_analyzed_expr_score_prefix} --ref-ld-chr ${ldsc_baseline_ld_annotation_stem} --w-ld-chr ${sldsc_weights_stem} --frqfile-chr ${frq_file_stem} --out ${mesc_output_stem}
 done
-fi
+
 
 
 #############################
