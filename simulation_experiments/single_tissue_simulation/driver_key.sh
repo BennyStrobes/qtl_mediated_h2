@@ -29,6 +29,9 @@ simulated_trait_dir=$output_root_dir"simulated_trait/"
 # Directory contaiing simulated gwas results
 simulated_gwas_dir=$output_root_dir"simulated_gwas/"
 
+# Directory containing results of trait h2 inference
+trait_h2_inference_dir=$output_root_dir"trait_h2_inference/"
+
 
 
 ############################
@@ -90,5 +93,24 @@ done
 fi
 
 
+simulation_number="1"
+simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_num}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}
+if false; then
+sh run_single_trait_simulation.sh $simulation_number $chrom_num $cis_window $n_gwas_individuals $simulation_name_string $simulated_gene_position_file $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture
+fi
 
-
+############################
+# Run trait heritability inference
+############################
+simulation_number="2"
+if false; then
+for simulation_number in $(seq 1 100); do 
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_num}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}
+	sbatch trait_h2_inference.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $n_gwas_individuals $trait_h2_inference_dir
+done
+fi
+if false; then
+simulation_number="1"
+simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_num}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}
+sh trait_h2_inference.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $n_gwas_individuals $trait_h2_inference_dir
+fi

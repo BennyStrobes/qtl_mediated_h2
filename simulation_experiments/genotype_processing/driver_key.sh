@@ -32,6 +32,7 @@ chrom_num="1"
 ############################
 # NOTE: THERE IS CURRENTLY A HACK IN HERE TO REMOVE 3 variants (out of 500000) on chrom 1 that have no variance across the 100-sample eqtl data set.
 ############################
+# Needs to be 200GB and 25 h
 n_gwas_individuals="100000"
 if false; then
 sbatch prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir 

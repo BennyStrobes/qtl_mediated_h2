@@ -129,37 +129,17 @@ def construct_variant_ld_scores_based_on_distance(genotype_stem, output_stem, wi
 ##############################
 # Command line argumemnts
 ##############################
-simulation_number = int(sys.argv[1])
-chrom_num = sys.argv[2]
-simulation_name_string = sys.argv[3]
-processed_genotype_data_dir = sys.argv[4]
-simulated_gwas_dir = sys.argv[5]
+processed_genotype_data_dir = sys.argv[1]
 
 
 
 ref_genotype_stem = processed_genotype_data_dir +'simulated_eqtl_1000_data_1'
-output_stem = simulated_gwas_dir + simulation_name_string + '_variant_ref_geno_window_1_mb_ld_scores'
-#construct_variant_ld_scores_based_on_distance(ref_genotype_stem, output_stem, window_size=1)
 
 
-ref_genotype_stem = processed_genotype_data_dir +'simulated_eqtl_1000_data_1'
-output_stem = simulated_gwas_dir + simulation_name_string + '_variant_ref_geno_window_2_mb_ld_scores'
-#construct_variant_ld_scores_based_on_distance(ref_genotype_stem, output_stem, window_size=2)
 
+window_sizes = [1, 2, 3, 4, 5]
 
-ref_genotype_stem = processed_genotype_data_dir +'simulated_eqtl_1000_data_1'
-output_stem = simulated_gwas_dir + simulation_name_string + '_variant_ref_geno_window_3_mb_ld_scores'
-construct_variant_ld_scores_based_on_distance(ref_genotype_stem, output_stem, window_size=3)
-
-
-ref_genotype_stem = processed_genotype_data_dir +'simulated_eqtl_1000_data_1'
-output_stem = simulated_gwas_dir + simulation_name_string + '_variant_ref_geno_window_4_mb_ld_scores'
-construct_variant_ld_scores_based_on_distance(ref_genotype_stem, output_stem, window_size=4)
-
-ref_genotype_stem = processed_genotype_data_dir +'simulated_eqtl_1000_data_1'
-output_stem = simulated_gwas_dir + simulation_name_string + '_variant_ref_geno_window_5_mb_ld_scores'
-construct_variant_ld_scores_based_on_distance(ref_genotype_stem, output_stem, window_size=5)
-
-
-in_sample_genotype_stem = processed_genotype_data_dir + 'simulated_gwas_data_1'
+for window_size in window_sizes:
+	output_stem = processed_genotype_data_dir + 'variant_ref_geno_eqtl_1000_window_' + str(window_size) + '_mb_ld_scores'
+	construct_variant_ld_scores_based_on_distance(ref_genotype_stem, output_stem, window_size=window_size)
 

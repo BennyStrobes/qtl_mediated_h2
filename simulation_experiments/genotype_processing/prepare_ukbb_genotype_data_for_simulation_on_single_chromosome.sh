@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-50:00                         # Runtime in D-HH:MM format
+#SBATCH -t 0-25:00                         # Runtime in D-HH:MM format
 #SBATCH -p medium                           # Partition to run in
 #SBATCH --mem=200GB                         # Memory total in MiB (for all cores)
 
@@ -66,6 +66,7 @@ python3 extract_lists_of_simulated_individuals.py ${processed_genotype_data_dir}
 ###############################
 plink2 --bfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${gwas_individual_file} --make-bed --keep-allele-order --threads 1 --out ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num}
 
+
 ###############################
 # Filter UKBB genotype data to only include individuals in eqtl gwas data set 
 ###############################
@@ -98,8 +99,9 @@ plink2 --bfile ${kg_genotype_dir}"1000G.EUR.QC."${chrom_num} --extract ${process
 
 
 #########################
-# Remove unnecessary plink files
+# Get variant LD scores
 ##########################
-if false; then
-rm ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num}*
-fi
+source ~/.bash_profile
+
+
+python3 get_variant_ld_scores.py ${processed_genotype_data_dir}
