@@ -23,8 +23,10 @@ simulated_trait_dir="${14}"
 simulated_gwas_dir="${15}"
 eqtl_architecture="${16}"
 
+if false; then
 source /home/bes710/.bash_profile
 module load R/4.0.1
+fi
 echo "Simulation"$simulation_number
 date
 echo $simulation_name_string
@@ -48,8 +50,9 @@ if false; then
 python3 simulate_trait_values.py $simulation_number $chrom_num $cis_window $simulated_gene_expression_dir $simulation_name_string $processed_genotype_data_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $simulated_trait_dir $n_gwas_individuals $eqtl_architecture $ge_h2
 fi
 
+if false; then
 source /home/bes710/.bash_profile
-
+fi
 #######################################################
 # Step 3: Run GWAS on simulated trait on only snps in TGFM windows.
 #######################################################
@@ -71,6 +74,8 @@ do
 done
 fi
 
+eqtl_sample_size="300"
+python3 fit_gene_models.py $simulation_number $chrom_num $cis_window $simulated_gene_position_file $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $ge_h2 $eqtl_architecture $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $eqtl_sample_size
 
 
 date
@@ -89,6 +94,12 @@ date
 
 
 
+
+
+
+##########
+# OLD
+#########
 
 
 

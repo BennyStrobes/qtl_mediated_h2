@@ -629,16 +629,16 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 	t.write('gene_id\tvariant_id\teffect_size\teffect_size_se\n')
 	# Ld scores (in sample)
 	gene_ld_scores_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_eqtl_in_sample_ld_scores.txt'
-	t_lds = open(gene_ld_scores_output_file,'w')
-	t_lds.write('gene_id\tvariant_id\tld_score\n')
+	#t_lds = open(gene_ld_scores_output_file,'w')
+	#t_lds.write('gene_id\tvariant_id\tld_score\n')
 	# Ld scores (in sample, bias corrected)
 	gene_ld_scores2_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_eqtl_in_sample_bias_corrected_ld_scores.txt'
-	t_lds2 = open(gene_ld_scores2_output_file,'w')
-	t_lds2.write('gene_id\tvariant_id\tld_score\n')
+	#t_lds2 = open(gene_ld_scores2_output_file,'w')
+	#t_lds2.write('gene_id\tvariant_id\tld_score\n')
 	# Ld scores (ref, bias corrected)
 	gene_ld_scores3_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_eqtl_reference_bias_corrected_ld_scores.txt'
 	t_lds3 = open(gene_ld_scores3_output_file,'w')
-	t_lds3.write('gene_id\tvariant_id\tld_score\n')
+	t_lds3.write('gene_id\tvariant_id\tld_score\tcis_snp\n')
 
 
 	# Now loop through genes
@@ -653,6 +653,7 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 			head_count = head_count + 1
 			continue
 		counter = counter + 1
+		print(counter)
 		# AT A SINGLE GENE
 		# Extract relevent information from the line
 		ensamble_id = data[0]
@@ -675,7 +676,6 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 		cis_snp_indices = np.asarray([False]*total_n_genome_snps)
 		cis_snp_indices[cis_snp_indices_raw] = True
 
-
 		n_cis_snps = np.sum(cis_snp_indices)
 		cis_rsids = G_obj_rsids[cis_snp_indices]
 
@@ -687,6 +687,14 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 		# Extract standardized matrix of cis snps around the gene
 		gene_geno = G_obj_geno_stand[:, cis_snp_indices]
 		gene_geno_ref = G_obj_geno2_stand[:, cis_snp_indices]
+
+		# Get big indices
+		big_cis_snp_indices = (G_obj_pos >= (gene_tss - 3000000)) & (G_obj_pos < (gene_tss + 3000000))
+		gene_geno_big = G_obj_geno_stand[:, big_cis_snp_indices]
+		gene_geno_ref_big = G_obj_geno2_stand[:, big_cis_snp_indices]
+		cis_rsids_big = G_obj_rsids[big_cis_snp_indices]
+		gene_big_pos = G_obj_pos[big_cis_snp_indices]
+		big_window_cis_subset_indices = (gene_big_pos >= (gene_tss - 100000)) & (gene_big_pos < (gene_tss + 100000))
 
 		# Simulate gene expression in this gene
 		sim_expr = simulate_gene_expression(gene_geno, sim_causal_eqtl_effect_sizes)
@@ -702,27 +710,27 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 
 
 		# Construct ld scores for variants in this gene based on only variants in this gene
-		squared_ld_mat = np.square(np.corrcoef(np.transpose(gene_geno)))
+		'''
+		squared_ld_mat = np.square(np.corrcoef(np.transpose(gene_geno_big)))[big_window_cis_subset_indices,:]
 		in_sample_ld_scores = np.sum(squared_ld_mat, axis=0)
 		bias_corrected_squared_ld_mat = squared_ld_mat - ((1.0-squared_ld_mat)/(eqtl_sample_size-2.0))
 		bias_corrected_ld_scores = np.sum(bias_corrected_squared_ld_mat,axis=0)
+		'''
 
 		squared_ld_mat_ref = np.square(np.corrcoef(np.transpose(gene_geno_ref)))
+		#squared_ld_mat_ref = np.square(np.dot(np.transpose(gene_geno_ref),gene_geno_ref_big)/1000)
 		ref_ld_scores = np.sum(squared_ld_mat_ref,axis=0)
 		bias_corrected_squared_ref_ld_mat = squared_ld_mat_ref - ((1.0-squared_ld_mat_ref)/(1000-2.0))
 		bias_corrected_ref_ld_scores = np.sum(bias_corrected_squared_ref_ld_mat,axis=0)
 
-
 		
 		for snp_iter, snp_rsid in enumerate(cis_rsids):
-			t_lds.write(ensamble_id + '\t' + snp_rsid + '\t' + str(in_sample_ld_scores[snp_iter]) + '\n')
-			t_lds2.write(ensamble_id + '\t' + snp_rsid + '\t' + str(bias_corrected_ld_scores[snp_iter]) + '\n')
-			t_lds3.write(ensamble_id + '\t' + snp_rsid + '\t' + str(bias_corrected_ref_ld_scores[snp_iter]) + '\n')
+			t_lds3.write(ensamble_id + '\t' + snp_rsid + '\t' + str(bias_corrected_ref_ld_scores[snp_iter]) + '\t' + str(int(big_window_cis_subset_indices[snp_iter]*1.0)) + '\n')
 
 	f.close()
 	t.close()
-	t_lds.close()
-	t_lds2.close()
+	#t_lds.close()
+	#t_lds2.close()
 	t_lds3.close()
 	return
 

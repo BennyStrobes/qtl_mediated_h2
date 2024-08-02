@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH -c 1                               # Request one core
+#SBATCH -t 0-18:00                         # Runtime in D-HH:MM format
+#SBATCH -p medium                           # Partition to run in
+#SBATCH --mem=10GB                         # Memory total in MiB (for all cores)
+
+
+
+
+simulation_number="$1"
+simulation_name_string="$2"
+simulated_trait_dir="$3"
+simulated_gwas_dir="$4"
+simulation_genotype_dir="$5"
+n_gwas_individuals="$6"
+n_eqtl_individuals="$7"
+simulated_learned_gene_models_dir="$8"
+trait_med_h2_inference_dir="$9"
+
+
+if false; then
+module load gcc/9.2.0
+module load python/3.9.14
+module load cuda/12.1
+source /n/groups/price/ben/environments/tf_new/bin/activate
+fi
+
+python3 trait_mediated_h2_inference_w_rss_likelihood.py $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $n_gwas_individuals $n_eqtl_individuals $simulated_learned_gene_models_dir $trait_med_h2_inference_dir
