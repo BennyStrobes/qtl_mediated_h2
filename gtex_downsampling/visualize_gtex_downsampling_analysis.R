@@ -30,8 +30,13 @@ scatter_showing_med_h2_with_sample_size <- function(df, title="") {
 
 
 scatter_showing_med_h2_with_sample_size_unweighted <- function(df, title="") {
+	df$lb = df$unweighted_mean - (1.96*df$med_h2_se)
+	df$ub = df$unweighted_mean + (1.96*df$med_h2_se)
+
+	print(cor.test(df$sample_size, df$unweighted_mean))
 	pp <- ggplot(df, aes(y=unweighted_mean, x=sample_size)) +
   		geom_point(size=2.0, color="dodgerblue") +
+  		geom_errorbar(aes(ymin = lb, ymax=ub), width = 0.2, color='grey45') +
   		figure_theme() +
   		labs(y="Fraction h2 mediated by predicted expression", x="Aggregate GTEx sample size", title=title) +
   		theme(legend.position="bottom")
@@ -148,6 +153,7 @@ trait_name_readable_df <- read.table(trait_name_readable, header=TRUE, sep="\t")
 trait_name_readable <- as.character(trait_name_readable_df$trait_identifier)
 
 
+
 ###########################
 # Scatter plot comparing mesc med-h2 as a function of sample size
 ###########################
@@ -164,8 +170,9 @@ ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
 scatter <- scatter_showing_med_h2_with_sample_size_unweighted(df, title=anno_version)
 output_file <- paste0(visualize_gtex_downsampling_dir, "mesc_med_h2_vs_sample_size_", anno_version, "_unweighted_scatter.pdf")
 ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
+}
 
-
+print("HELLO")
 # Load in data for BaselineLD
 anno_version="baselineLD_no_qtl"
 mesc_res_file = paste0(mesc_results_dir, "downsampled_med_h2_meta_analyzed_summary_", anno_version, ".txt")
@@ -179,7 +186,6 @@ ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
 scatter <- scatter_showing_med_h2_with_sample_size_unweighted(df, title=anno_version)
 output_file <- paste0(visualize_gtex_downsampling_dir, "mesc_med_h2_vs_sample_size_", anno_version, "_unweighted_scatter.pdf")
 ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
-}
 
 
 ###########################
@@ -196,7 +202,6 @@ se_barplot <- make_se_barplot_of_mesc_results_across_traits(mesc_df, trait_name_
 output_file <- paste0(visualize_gtex_downsampling_dir, "mesc_med_h2_across_traits_", anno_version, "_se_barplot.pdf")
 ggsave(se_barplot, file=output_file, width=7.2, height=5.5, units="in")
 }
-
 
 ###########################
 # Scatter plot (across traits) comparing mesc (full sample size) and MESC (half sample size)
@@ -251,7 +256,7 @@ ggsave(scatter, file=output_file, width=7.2, height=5.5, units="in")
 ###########################
 # Standard error bar plot showing correlation between gene ld scores and variant ld scores
 ###########################
-
+if (FALSE) {
 anno_version="baselineLD_no_qtl"
 anno_corr_file <- paste0(gene_ldscore_variant_ld_score_corr_dir, "full_datagene_ld_score_variant_ld_score_correlations.txt")
 anno_corr_df <- read.table(anno_corr_file, header=TRUE,sep="\t")
@@ -264,3 +269,4 @@ ggsave(se_barplot, file=output_file, width=9.2, height=5.5, units="in")
 se_barplot <- make_se_barplot_of_correlations_between_gene_ld_scores_and_variant_annotations(anno_corr_df, threshold=TRUE,font_size=11)
 output_file <- paste0(visualize_gtex_downsampling_dir, "corr_gene_ld_score_variant_ld_score_se_barplot2.pdf")
 ggsave(se_barplot, file=output_file, width=7.2, height=5.5, units="in")
+}

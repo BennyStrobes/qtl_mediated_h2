@@ -147,6 +147,7 @@ def simulate_expression_mediated_gene_causal_effect_sizes_one_causal_tissues(sim
 	# Causal eqtl effects can only be selected in gene, tissue pairs that are cis heritable
 	cis_h2_gene_boolean_matrix = extract_boolean_matrix_of_cis_heritable_genes(simulated_expression_summary_file)
 
+
 	# Quick error checking
 	if cis_h2_gene_boolean_matrix.shape[0] != total_genes:
 		print('assumption eroror')
@@ -159,6 +160,7 @@ def simulate_expression_mediated_gene_causal_effect_sizes_one_causal_tissues(sim
 	# We are going to assume 50% of gene-mediated h2 is coming from one tissue and 50% of gene-mediated h2 is coming from another tissue
 	# And as a reminder there are 10 tissues
 	n_causal_genes_per_causal_tissue = int(np.round(total_mediated_h2/per_element_heritability))
+
 
 	# Get average ge_h2 
 	avg_ge_h2 = ((ge_h2/2.0) + ge_h2 + (2.0*ge_h2))/3.0

@@ -153,21 +153,25 @@ gwas_rsids, gwas_beta, gwas_beta_se = load_in_gwas_data(gwas_summary_file)
 
 
 
+'''
+# Load in window and LD info
+ld_window_summary_file = simulation_genotype_dir + 'variant_ref_geno_gwas_window_1_mb_ld_summary.txt'
+window_names, window_info = load_in_window_info(ld_window_summary_file)
+
+
+temp_output_file = trait_h2_inference_dir + simulation_name_string + '_rss_h2_inference_tmp_in_samp_results.txt'
+mod = bayesian_lmm_rss_h2.Bayesian_LMM_RSS_h2_inference(gwas_beta, n_gwas_individuals, window_names, window_info, temp_output_file)
+mod.fit(burn_in_iterations=1, total_iterations=10000)
+'''
 
 # Load in window and LD info
 ld_window_summary_file = simulation_genotype_dir + 'variant_ref_geno_eqtl_1000_window_1_mb_ld_summary.txt'
 window_names, window_info = load_in_window_info(ld_window_summary_file)
 
 
-window_subset = window_names[:50]
-if len(np.unique(window_subset)) != 50:
-	print('assumption eroror')
-
 temp_output_file = trait_h2_inference_dir + simulation_name_string + '_rss_h2_inference_tmp_out_samp_results.txt'
-mod = bayesian_lmm_rss_h2.Bayesian_LMM_RSS_h2_inference(gwas_beta, n_gwas_individuals, window_subset, window_info, temp_output_file)
+mod = bayesian_lmm_rss_h2.Bayesian_LMM_RSS_h2_inference(gwas_beta, n_gwas_individuals, window_names, window_info, temp_output_file)
 mod.fit(burn_in_iterations=1, total_iterations=10000)
-
-
 
 
 '''

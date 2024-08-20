@@ -182,6 +182,38 @@ done
 fi
 
 
+
+sim_iter="1"
+frac_causal_genes="0.5"
+mean_cis_h2="0.05"
+med_h2="0.03"
+eqtl_ss="50"
+eqtl_ss_arr=("50" "100" "300")
+if false; then
+for eqtl_ss in "${eqtl_ss_arr[@]}"; do
+	for sim_iter in $(seq 1 30); do 
+		output_stem=${med_h2_simulation_dir}"proportional_med_h2_simulation_"${sim_iter}"_gwas_ss_"${gwas_ss}"_eqtl_ss_"${eqtl_ss}"_med_h2_"${med_h2}"_nm_h2_"${nm_h2}"_mean_cis_h2_"${mean_cis_h2}"_gene_frac_"${frac_causal_genes}"_arch_"$eqtl_arch
+		sbatch run_proportional_med_h2_no_ld_simulation.sh $sim_iter $n_sims $gwas_ss $n_snps $n_genes $snps_per_gene $med_h2 $nm_h2 $eqtl_ss $eqtl_arch $mean_cis_h2 $frac_causal_genes $output_stem
+	done
+done
+fi
+
+n_snps="10000"
+
+frac_causal_genes="0.05"
+sim_iter="33"
+eqtl_ss="100"
+frac_causal_genes_arr=("0.05" "0.1" "0.3")
+
+if false; then
+for frac_causal_genes in "${frac_causal_genes_arr[@]}"; do
+for sim_iter in $(seq 1 30); do 
+	output_stem=${med_h2_simulation_dir}"proportional_med_h2_simulation_"${sim_iter}"_gwas_ss_"${gwas_ss}"_eqtl_ss_"${eqtl_ss}"_med_h2_"${med_h2}"_nm_h2_"${nm_h2}"_mean_cis_h2_"${mean_cis_h2}"_gene_frac_"${frac_causal_genes}"_arch_"$eqtl_arch
+	sbatch run_proportional_med_h2_no_ld_simulation.sh $sim_iter $n_sims $gwas_ss $n_snps $n_genes $snps_per_gene $med_h2 $nm_h2 $eqtl_ss $eqtl_arch $mean_cis_h2 $frac_causal_genes $output_stem
+done
+done
+fi
+
 if false; then
 python3 organize_proportional_med_h2_results.py $med_h2_simulation_dir
 

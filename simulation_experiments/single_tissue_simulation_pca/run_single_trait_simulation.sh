@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-6:00                         # Runtime in D-HH:MM format
+#SBATCH -t 0-7:30                         # Runtime in D-HH:MM format
 #SBATCH -p short                           # Partition to run in
 #SBATCH --mem=11GB                         # Memory total in MiB (for all cores)
 
@@ -29,20 +29,19 @@ date
 echo $simulation_name_string
 echo $eqtl_architecture
 
-
 module load gcc/9.2.0
 module load python/3.9.14
 module load cuda/12.1
 source /n/groups/price/ben/environments/tf_new/bin/activate
 
 
-
 #######################################################
 # Step 1: Simulate gene expression causal eqtl effects
 #######################################################
 echo "Simulation Step 1"
+if false; then
 python3 simulate_gene_expression.py $simulation_number $chrom_num $cis_window $simulated_gene_position_file $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $ge_h2 $eqtl_architecture $per_element_heritability $total_heritability $fraction_expression_mediated_heritability
-
+fi
 
 #######################################################
 # Step 2: Simulate trait values
@@ -66,10 +65,17 @@ python3 run_gwas_on_simulated_trait.py $simulation_number $chrom_num $simulation
 #######################################################
 echo "Simulation Step 5"
 eqtl_sample_size_arr=( "100" "300" "500")
+if false; then
 for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
 do
+	echo $eqtl_sample_size
 	python3 fit_gene_models.py $simulation_number $chrom_num $cis_window $simulated_gene_position_file $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $ge_h2 $eqtl_architecture $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $eqtl_sample_size
 done
+fi
+
+eqtl_sample_size="300"
+python3 fit_gene_models.py $simulation_number $chrom_num $cis_window $simulated_gene_position_file $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $ge_h2 $eqtl_architecture $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $eqtl_sample_size
+
 
 
 date

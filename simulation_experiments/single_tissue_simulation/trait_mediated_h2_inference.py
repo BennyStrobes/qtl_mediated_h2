@@ -164,7 +164,7 @@ def load_in_eqtl_data(eqtl_sumstat_file, eqtl_ldscore_file, rsid_to_position):
 		if np.array_equal(gene_indices1, gene_indices2) == False:
 			print('assumption eroror')
 
-		positive_ld_scores_indices = gene_ldscore > .01
+		positive_ld_scores_indices = gene_ldscore > 0.01
 
 		beta_arr.append(gene_beta[positive_ld_scores_indices])
 		beta_se_arr.append(gene_beta_ses[positive_ld_scores_indices])
@@ -224,8 +224,8 @@ if np.array_equal(gwas_rsids, ldscore_rsids) == False:
 rsid_to_position = create_mapping_from_rsid_to_position(gwas_rsids)
 
 # load in eqtl data
-eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_ss) + '_eqtl_sumstats.txt'
-eqtl_ldscore_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_ss) + '_eqtl_reference_bias_corrected_ld_scores.txt'
+eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_ss) + '_big_cis_window_eqtl_sumstats.txt'
+eqtl_ldscore_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_ss) + '_big_cis_window_eqtl_reference_bias_corrected_ld_scores.txt'
 genes, eqtl_beta, eqtl_beta_se, eqtl_ldscore, eqtl_position, cis_snp_arr = load_in_eqtl_data(eqtl_sumstat_file, eqtl_ldscore_file, rsid_to_position)
 
 
@@ -235,8 +235,8 @@ genes, eqtl_beta, eqtl_beta_se, eqtl_ldscore, eqtl_position, cis_snp_arr = load_
 # Equal weights
 print('start')
 mod = bayesian_lmm_ss_h2_med.Bayesian_LMM_SS_h2_med_inference(gwas_beta, gwas_beta_se, ldscores, eqtl_beta, eqtl_beta_se, eqtl_ldscore, eqtl_position, cis_snp_arr)
-mod.fit(burn_in_iterations=2, total_iterations=5000, gamma_var_update_version='equal_weights')
-#mod.fit(burn_in_iterations=2, total_iterations=5000, gamma_var_update_version='ld_score_weighting')
+mod.fit(burn_in_iterations=2, total_iterations=15000, gamma_var_update_version='equal_weights')
+#mod.fit(burn_in_iterations=2, total_iterations=15000, gamma_var_update_version='ld_score_weighting')
 
 pdb.set_trace()
 

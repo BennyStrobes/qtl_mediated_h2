@@ -1,13 +1,9 @@
 import sys
-sys.path.remove('/n/app/python/3.7.4-ext/lib/python3.7/site-packages')
-import pandas as pd
 import numpy as np 
-import os 
+import os
 import pdb
-import scipy.special
-import pickle
-from pandas_plink import read_plink1_bin
 import statsmodels.api as sm
+from bgen import BgenReader
 
 
 
@@ -590,36 +586,99 @@ def run_greml_no_covariate_h2_analysis_and_FUSION(chrom_num, gene_tss, expr_vec,
 	#os.system('rm ' + tmp_output_stem + '*')
 	return hsq, hsq_se, hsq_p, causal_effects
 
-def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_causal_eqtl_effect_summary_file, eqtl_sample_size, simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num):
-	# Load in genotype data across chromosome for eQTL data set
-	genotype_stem = processed_genotype_data_dir + 'simulated_eqtl_' + str(eqtl_sample_size) + '_data_' + chrom_num
-	G_obj = read_plink1_bin(genotype_stem + '.bed', genotype_stem + '.bim', genotype_stem + '.fam', verbose=False)
-	G_obj_geno = G_obj.values # Numpy 2d array of dimension num samples X num snps
-	G_obj_chrom = np.asarray(G_obj.chrom)
-	G_obj_pos = np.asarray(G_obj.pos)
-	# For our purposes, a0 is the effect allele
-	# For case of plink package, a0 is the first column in the plink bim file
-	G_obj_a0 = np.asarray(G_obj.a0)
-	G_obj_a1 = np.asarray(G_obj.a1)
-	# RSids
-	G_obj_rsids = np.asarray(G_obj.snp)
-	G_obj_sample_names = np.asarray(G_obj.sample)
-	# Snp ids
-	G_obj_snp_ids = 'chr' + G_obj_chrom + '_' + (G_obj_pos.astype(str)) + '_' + G_obj_a0 + '_' + G_obj_a1
 
-	# Mean impute and standardize genotype
-	G_obj_geno_stand = mean_impute_and_standardize_genotype(G_obj_geno)
+
+def load_in_alt_allele_genotype_dosage_mat(bfile, window_indices, ref_alt_alleles):
+	dosages = []
+
+	for window_index in window_indices:
+		var = bfile[window_index]
+		dosage = var.minor_allele_dosage
+		ma = var.minor_allele
+
+		index_ref_alt_allele = ref_alt_alleles[window_index]
+
+		# Flip dosage if alt-allele is not equal to minor allele
+		if index_ref_alt_allele[1] != ma:
+			# Quick error check
+			if ma != index_ref_alt_allele[0]:
+				print('assumptino eroror')
+				pdb.set_trace()
+			# Flip dosage
+			dosage = 2.0 - dosage
+
+		# Append snp dosage to global array
+		dosages.append(dosage)
+
+	# Convert to 2d matrix
+	dosages = np.asarray(dosages)
+
+	return np.transpose(dosages)
+
+
+def load_in_ref_alt_allele_arr(pvar_file):
+	ref_alt_alleles = []
+	f = open(pvar_file)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		if len(data) != 5:
+			print('assumptino erooror')
+			pdb.set_trace()
+		ref_allele = data[3]
+		alt_allele = data[4]
+		if ref_allele == alt_allele:
+			print('assumptino eororor')
+			pdb.set_trace()
+		ref_alt_alleles.append((ref_allele, alt_allele))
+	f.close()
+	return ref_alt_alleles
+
+def standardize_genotype_dosage_matrix(genotype_dosage):
+	# Quick error checking to make sure there do not exist missing entries
+	n_missing = np.sum(np.isnan(genotype_dosage))
+	if n_missing != 0:
+		print('assumption eroror')
+		pdb.set_trace()
+
+	# Now standardize genotype of each snp
+	n_snps = genotype_dosage.shape[1]
+	# Initialize standardize genotype dosage matrix
+	std_genotype_dosage = np.copy(genotype_dosage)
+	for snp_iter in range(n_snps):
+		# Standardize
+		std_genotype_dosage[:, snp_iter] = (genotype_dosage[:,snp_iter] - np.mean(genotype_dosage[:,snp_iter]))/np.std(genotype_dosage[:,snp_iter])
+
+	return std_genotype_dosage
+
+
+def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_causal_eqtl_effect_summary_file, eqtl_sample_size, simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num):
+
+	# Load in genotype object
+	genotype_stem = processed_genotype_data_dir + 'simulated_eqtl_' + str(eqtl_sample_size) + '_data_' + chrom_num
+	genotype_obj = BgenReader(genotype_stem + '.bgen')
+	G_obj_pos = np.asarray(genotype_obj.positions())
+	G_obj_rsids = np.asarray(genotype_obj.rsids())
+	# Load in ref-alt alleles
+	ref_alt_alleles = load_in_ref_alt_allele_arr(genotype_stem + '.pvar')
+	genotype_dosage = load_in_alt_allele_genotype_dosage_mat(genotype_obj, np.arange(len(G_obj_rsids)), ref_alt_alleles)
+	G_obj_geno_stand = standardize_genotype_dosage_matrix(genotype_dosage)
 
 
 
 	# Load in genotype data across chromosome for eQTL data set (reference genotype)
 	genotype_stem2 = processed_genotype_data_dir + 'simulated_eqtl_' + str(1000) + '_data_' + chrom_num
-	G_obj2 = read_plink1_bin(genotype_stem2 + '.bed', genotype_stem2 + '.bim', genotype_stem2 + '.fam', verbose=False)
-	G_obj_geno2 = G_obj2.values # Numpy 2d array of dimension num samples X num snps
-
-	# Mean impute and standardize genotype
-	G_obj_geno2_stand = mean_impute_and_standardize_genotype(G_obj_geno2)
-
+	genotype_obj2 = BgenReader(genotype_stem2 + '.bgen')
+	snp_pos2 = np.asarray(genotype_obj2.positions())
+	ordered_rsids2 = np.asarray(genotype_obj2.rsids())
+	# Load in ref-alt alleles
+	ref_alt_alleles2 = load_in_ref_alt_allele_arr(genotype_stem2 + '.pvar')
+	genotype_dosage2 = load_in_alt_allele_genotype_dosage_mat(genotype_obj2, np.arange(len(ordered_rsids2)), ref_alt_alleles2)
+	G_obj_geno2_stand = standardize_genotype_dosage_matrix(genotype_dosage2)
 
 
 	# Open output file handles
@@ -627,18 +686,10 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 	sumstat_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_eqtl_sumstats.txt'
 	t = open(sumstat_output_file,'w')
 	t.write('gene_id\tvariant_id\teffect_size\teffect_size_se\n')
-	# Ld scores (in sample)
-	gene_ld_scores_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_eqtl_in_sample_ld_scores.txt'
-	#t_lds = open(gene_ld_scores_output_file,'w')
-	#t_lds.write('gene_id\tvariant_id\tld_score\n')
-	# Ld scores (in sample, bias corrected)
-	gene_ld_scores2_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_eqtl_in_sample_bias_corrected_ld_scores.txt'
-	#t_lds2 = open(gene_ld_scores2_output_file,'w')
-	#t_lds2.write('gene_id\tvariant_id\tld_score\n')
-	# Ld scores (ref, bias corrected)
+
 	gene_ld_scores3_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_eqtl_reference_bias_corrected_ld_scores.txt'
-	t_lds3 = open(gene_ld_scores3_output_file,'w')
-	t_lds3.write('gene_id\tvariant_id\tld_score\tcis_snp\n')
+	t_lds = open(gene_ld_scores3_output_file,'w')
+	t_lds.write('gene_id\tvariant_id\tld_score\tcis_snp\n')
 
 
 	# Now loop through genes
@@ -653,7 +704,6 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 			head_count = head_count + 1
 			continue
 		counter = counter + 1
-		print(counter)
 		# AT A SINGLE GENE
 		# Extract relevent information from the line
 		ensamble_id = data[0]
@@ -704,35 +754,152 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 		# Compute marginal association statistics for this gene
 		marginal_effects, marginal_effects_se = compute_marginal_regression_coefficients(sim_stand_expr, gene_geno)
 
+
 		# Print eqtl sumstats to output file
 		for snp_iter, snp_rsid in enumerate(cis_rsids):
 			t.write(ensamble_id + '\t' + snp_rsid + '\t' + str(marginal_effects[snp_iter]) + '\t' + str(marginal_effects_se[snp_iter]) + '\n')
 
 
 		# Construct ld scores for variants in this gene based on only variants in this gene
-		'''
-		squared_ld_mat = np.square(np.corrcoef(np.transpose(gene_geno_big)))[big_window_cis_subset_indices,:]
-		in_sample_ld_scores = np.sum(squared_ld_mat, axis=0)
-		bias_corrected_squared_ld_mat = squared_ld_mat - ((1.0-squared_ld_mat)/(eqtl_sample_size-2.0))
-		bias_corrected_ld_scores = np.sum(bias_corrected_squared_ld_mat,axis=0)
-		'''
-
 		squared_ld_mat_ref = np.square(np.corrcoef(np.transpose(gene_geno_ref)))
 		#squared_ld_mat_ref = np.square(np.dot(np.transpose(gene_geno_ref),gene_geno_ref_big)/1000)
 		ref_ld_scores = np.sum(squared_ld_mat_ref,axis=0)
 		bias_corrected_squared_ref_ld_mat = squared_ld_mat_ref - ((1.0-squared_ld_mat_ref)/(1000-2.0))
 		bias_corrected_ref_ld_scores = np.sum(bias_corrected_squared_ref_ld_mat,axis=0)
-
 		
 		for snp_iter, snp_rsid in enumerate(cis_rsids):
-			t_lds3.write(ensamble_id + '\t' + snp_rsid + '\t' + str(bias_corrected_ref_ld_scores[snp_iter]) + '\t' + str(int(big_window_cis_subset_indices[snp_iter]*1.0)) + '\n')
+			t_lds.write(ensamble_id + '\t' + snp_rsid + '\t' + str(bias_corrected_ref_ld_scores[snp_iter]) + '\t' + str(int(1.0)) + '\n')
 
 	f.close()
 	t.close()
-	#t_lds.close()
-	#t_lds2.close()
-	t_lds3.close()
+	t_lds.close()
 	return
+
+
+
+
+def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell_big_cis_window(simulated_causal_eqtl_effect_summary_file, eqtl_sample_size, simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num):
+
+	# Load in genotype object
+	genotype_stem = processed_genotype_data_dir + 'simulated_eqtl_' + str(eqtl_sample_size) + '_data_' + chrom_num
+	genotype_obj = BgenReader(genotype_stem + '.bgen')
+	G_obj_pos = np.asarray(genotype_obj.positions())
+	G_obj_rsids = np.asarray(genotype_obj.rsids())
+	# Load in ref-alt alleles
+	ref_alt_alleles = load_in_ref_alt_allele_arr(genotype_stem + '.pvar')
+	genotype_dosage = load_in_alt_allele_genotype_dosage_mat(genotype_obj, np.arange(len(G_obj_rsids)), ref_alt_alleles)
+	G_obj_geno_stand = standardize_genotype_dosage_matrix(genotype_dosage)
+
+
+
+	# Load in genotype data across chromosome for eQTL data set (reference genotype)
+	genotype_stem2 = processed_genotype_data_dir + 'simulated_eqtl_' + str(1000) + '_data_' + chrom_num
+	genotype_obj2 = BgenReader(genotype_stem2 + '.bgen')
+	snp_pos2 = np.asarray(genotype_obj2.positions())
+	ordered_rsids2 = np.asarray(genotype_obj2.rsids())
+	# Load in ref-alt alleles
+	ref_alt_alleles2 = load_in_ref_alt_allele_arr(genotype_stem2 + '.pvar')
+	genotype_dosage2 = load_in_alt_allele_genotype_dosage_mat(genotype_obj2, np.arange(len(ordered_rsids2)), ref_alt_alleles2)
+	G_obj_geno2_stand = standardize_genotype_dosage_matrix(genotype_dosage2)
+
+
+	# Open output file handles
+	# Sumstats
+	sumstat_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_big_cis_window_eqtl_sumstats.txt'
+	t = open(sumstat_output_file,'w')
+	t.write('gene_id\tvariant_id\teffect_size\teffect_size_se\n')
+
+	gene_ld_scores3_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_big_cis_window_eqtl_reference_bias_corrected_ld_scores.txt'
+	t_lds = open(gene_ld_scores3_output_file,'w')
+	t_lds.write('gene_id\tvariant_id\tld_score\tcis_snp\n')
+
+
+	# Now loop through genes
+	f = open(simulated_causal_eqtl_effect_summary_file)
+	head_count = 0
+	counter = 0
+	used_genes = {}
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		counter = counter + 1
+		# AT A SINGLE GENE
+		# Extract relevent information from the line
+		ensamble_id = data[0]
+		gene_tss = int(data[2])
+		gene_causal_eqtl_effect_file = data[3]
+		gene_cis_snp_indices_file = data[5]
+		total_n_genome_snps = int(data[6])
+
+		# Quick error check
+		if ensamble_id in used_genes:
+			print('assumption eroror')
+			pdb.set_trace()
+		used_genes[ensamble_id] = 1
+
+		# Extract simulated causal effect sizes for this gene (cis_snpsXn_tissues)
+		sim_causal_eqtl_effect_sizes = np.load(gene_causal_eqtl_effect_file)
+
+		# Extract indices of cis_snps
+		cis_snp_indices_raw = np.load(gene_cis_snp_indices_file)
+		cis_snp_indices = np.asarray([False]*total_n_genome_snps)
+		cis_snp_indices[cis_snp_indices_raw] = True
+
+		n_cis_snps = np.sum(cis_snp_indices)
+		cis_rsids = G_obj_rsids[cis_snp_indices]
+
+		# Quick error check
+		if np.sum(cis_snp_indices) < 10:
+			print('assumption eroror')
+			pdb.set_trace()
+
+		# Extract standardized matrix of cis snps around the gene
+		gene_geno = G_obj_geno_stand[:, cis_snp_indices]
+		gene_geno_ref = G_obj_geno2_stand[:, cis_snp_indices]
+
+		# Get big indices
+		big_cis_snp_indices = (G_obj_pos >= (gene_tss - 3000000)) & (G_obj_pos < (gene_tss + 3000000))
+		gene_geno_big = G_obj_geno_stand[:, big_cis_snp_indices]
+		gene_geno_ref_big = G_obj_geno2_stand[:, big_cis_snp_indices]
+		cis_rsids_big = G_obj_rsids[big_cis_snp_indices]
+		gene_big_pos = G_obj_pos[big_cis_snp_indices]
+		big_window_cis_subset_indices = (gene_big_pos >= (gene_tss - 100000)) & (gene_big_pos < (gene_tss + 100000))
+
+		# Simulate gene expression in this gene
+		sim_expr = simulate_gene_expression(gene_geno, sim_causal_eqtl_effect_sizes)
+		# Standardize simulated gene expression
+		sim_stand_expr = (sim_expr - np.mean(sim_expr))/np.std(sim_expr)
+
+		# Compute marginal association statistics for this gene
+		marginal_effects, marginal_effects_se = compute_marginal_regression_coefficients(sim_stand_expr, gene_geno_big)
+
+		if len(marginal_effects) != len(cis_rsids_big):
+			print('assumption eroror')
+			pdb.set_trace()
+
+		# Print eqtl sumstats to output file
+		for snp_iter, snp_rsid in enumerate(cis_rsids_big):
+			t.write(ensamble_id + '\t' + snp_rsid + '\t' + str(marginal_effects[snp_iter]) + '\t' + str(marginal_effects_se[snp_iter]) + '\n')
+
+
+		# Construct ld scores for variants in this gene based on only variants in this gene
+		#squared_ld_mat_ref2 = np.square(np.corrcoef(np.transpose(gene_geno_ref_big)))[big_window_cis_subset_indices, :]
+		squared_ld_mat_ref = np.square(np.dot(np.transpose(gene_geno_ref),gene_geno_ref_big)/1000)
+		ref_ld_scores = np.sum(squared_ld_mat_ref,axis=0)
+		bias_corrected_squared_ref_ld_mat = squared_ld_mat_ref - ((1.0-squared_ld_mat_ref)/(1000-2.0))
+		bias_corrected_ref_ld_scores = np.sum(bias_corrected_squared_ref_ld_mat,axis=0)
+
+		for snp_iter, snp_rsid in enumerate(cis_rsids_big):
+			t_lds.write(ensamble_id + '\t' + snp_rsid + '\t' + str(bias_corrected_ref_ld_scores[snp_iter]) + '\t' + str(int(big_window_cis_subset_indices[snp_iter]*1.0)) + '\n')
+
+	f.close()
+	t.close()
+	t_lds.close()
+	return
+
 
 def simulate_gene_expression_and_fit_gene_model_for_all_genes_w_variable_eqtl_ss_shell(simulated_causal_eqtl_effect_summary_file, realistic_eqtl_sss, simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num, eqtl_sample_size_name, run_lasso_identifier):
 	# Load in genotype data across chromosome for eQTL data set
@@ -971,4 +1138,5 @@ simulated_causal_eqtl_effect_summary_file = simulated_gene_expression_dir + simu
 # Simulate Gene expression and fit gene models for each data-set (eqtl sample-size), tissue
 ############################
 simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_causal_eqtl_effect_summary_file, int(eqtl_sample_size), simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num)
+simulate_gene_expression_and_fit_gene_model_for_all_genes_shell_big_cis_window(simulated_causal_eqtl_effect_summary_file, int(eqtl_sample_size), simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num)
 

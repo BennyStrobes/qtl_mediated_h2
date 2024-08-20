@@ -62,14 +62,32 @@ def create_mapping_from_gene_name_to_gene_info(gene_annotation_file):
 	f.close()
 	return mapping
 
+def extract_quasi_independent_block_thresholds(quasi_ld_block_file):
+	thresholds = []
 
+	head_count = 0
+	f = open(quasi_ld_block_file)
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		thresholds.append(int(data[2]))
+	f.close()
+
+	return np.asarray(thresholds)
 
 
 
 chrom_num = sys.argv[1]
 gencode_gene_annotation_file = sys.argv[2]
 simulated_gene_position_file = sys.argv[3]
+quasi_independent_dir = sys.argv[4]
 
+
+# File containing quasi inpependent ld blocks
+block_thresholds = extract_quasi_independent_block_thresholds(quasi_independent_dir + 'EUR/' + 'fourier_ls-chr1.bed')
 np.random.seed(1)
 
 dicti = {}
@@ -120,6 +138,17 @@ for line in f:
 	if gene_status != 'KNOWN':
 		continue
 
+	gene_start = int(tss) - 100000
+	gene_end = int(tss) + 100000
+
+	if gene_end > 25897727:
+		continue
+
+	# check if gene overlaps block threshold
+	if np.sum((block_thresholds >= (gene_start - 5)) & (block_thresholds <= (gene_end +5))) > 0:
+		print('skip gene cause of block threshold')
+		continue
+
 	if np.random.choice([0,1]) == 1:
 		t.write(chrom_num + '\t' + ensamble_id + '\t' + tss + '\t' + tes + '\n')
 
@@ -128,6 +157,8 @@ for line in f:
 f.close()
 t.close()
 
+
+print(simulated_gene_position_file)
 
 
 

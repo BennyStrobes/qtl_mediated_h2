@@ -1,44 +1,90 @@
 import sys
-sys.path.remove('/n/app/python/3.7.4-ext/lib/python3.7/site-packages')
-import pandas as pd
 import numpy as np 
 import os
 import pdb
-from pandas_plink import read_plink1_bin
 import statsmodels.api as sm
+from bgen import BgenReader
 
-def mean_impute_and_standardize_genotype(G_obj_geno):
-	# Fill in missing values
-	G_obj_geno_stand = np.copy(G_obj_geno)
-	ncol = G_obj_geno_stand.shape[1]
-	n_missing = []
-	for col_iter in range(ncol):
-		nan_indices = np.isnan(G_obj_geno[:,col_iter])
-		non_nan_mean = np.mean(G_obj_geno[nan_indices==False, col_iter])
-		G_obj_geno_stand[nan_indices, col_iter] = non_nan_mean
-		n_missing.append(np.sum(nan_indices))
-	n_missing = np.asarray(n_missing)
 
-	# Quick error check
-	if np.sum(np.std(G_obj_geno_stand,axis=0) == 0) > 0:
-		print('no variance genotype assumption error')
+def load_in_alt_allele_genotype_dosage_mat(bfile, window_indices, ref_alt_alleles):
+	dosages = []
+
+	for window_index in window_indices:
+		var = bfile[window_index]
+		dosage = var.minor_allele_dosage
+		ma = var.minor_allele
+
+		index_ref_alt_allele = ref_alt_alleles[window_index]
+
+		# Flip dosage if alt-allele is not equal to minor allele
+		if index_ref_alt_allele[1] != ma:
+			# Quick error check
+			if ma != index_ref_alt_allele[0]:
+				print('assumptino eroror')
+				pdb.set_trace()
+			# Flip dosage
+			dosage = 2.0 - dosage
+
+		# Append snp dosage to global array
+		dosages.append(dosage)
+
+	# Convert to 2d matrix
+	dosages = np.asarray(dosages)
+
+	return np.transpose(dosages)
+
+
+def load_in_ref_alt_allele_arr(pvar_file):
+	ref_alt_alleles = []
+	f = open(pvar_file)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		if len(data) != 5:
+			print('assumptino erooror')
+			pdb.set_trace()
+		ref_allele = data[3]
+		alt_allele = data[4]
+		if ref_allele == alt_allele:
+			print('assumptino eororor')
+			pdb.set_trace()
+		ref_alt_alleles.append((ref_allele, alt_allele))
+	f.close()
+	return ref_alt_alleles
+
+def standardize_genotype_dosage_matrix(genotype_dosage):
+	# Quick error checking to make sure there do not exist missing entries
+	n_missing = np.sum(np.isnan(genotype_dosage))
+	if n_missing != 0:
+		print('assumption eroror')
 		pdb.set_trace()
 
-	# Standardize genotype
-	G_obj_geno_stand = (G_obj_geno_stand -np.mean(G_obj_geno_stand,axis=0))/np.std(G_obj_geno_stand,axis=0)
+	# Now standardize genotype of each snp
+	n_snps = genotype_dosage.shape[1]
+	# Initialize standardize genotype dosage matrix
+	std_genotype_dosage = np.copy(genotype_dosage)
+	for snp_iter in range(n_snps):
+		# Standardize
+		std_genotype_dosage[:, snp_iter] = (genotype_dosage[:,snp_iter] - np.mean(genotype_dosage[:,snp_iter]))/np.std(genotype_dosage[:,snp_iter])
 
-	return G_obj_geno_stand
+	return std_genotype_dosage
 
 
 
 
 def construct_variant_ld_scores_based_on_distance(genotype_stem, output_stem, window_size=1):
-	# Load in genotype object
-	genotype_obj = read_plink1_bin(genotype_stem + '.bed', genotype_stem + '.bim', genotype_stem + '.fam', verbose=False)
+	# Load in ref-alt alleles
+	ref_alt_alleles = load_in_ref_alt_allele_arr(genotype_stem + '.pvar')
 
-	snp_pos = np.asarray(genotype_obj['pos'])
-	snp_rsids = np.asarray(genotype_obj['snp'])
-	snp_variant_ids = np.asarray(genotype_obj['variant'])
+	# Load in genotype object
+	bfile = BgenReader(genotype_stem + '.bgen')
+
+	snp_pos = np.asarray(bfile.positions())
+	snp_rsids = np.asarray(bfile.rsids())
 
 	inner_window_start_pos = np.min(snp_pos) - 1
 
@@ -71,10 +117,13 @@ def construct_variant_ld_scores_based_on_distance(genotype_stem, output_stem, wi
 			inner_window_start_pos = inner_window_start_pos + (window_size*mb)
 			continue
 
+
 		# Extract genotype data for this window
-		window_variant_genotype = np.asarray(genotype_obj.sel(variant=snp_variant_ids[window_position_indices]))
-		# standardize genotype
-		window_std_variant_genotype = mean_impute_and_standardize_genotype(window_variant_genotype)
+		window_indices = np.arange(len(window_position_indices))[window_position_indices].astype(int)
+		genotype_dosage = load_in_alt_allele_genotype_dosage_mat(bfile, window_indices, ref_alt_alleles)
+
+		# Standardize genotype dosage matrix
+		window_std_variant_genotype = standardize_genotype_dosage_matrix(genotype_dosage)
 
 		# Compute LD matrix for window
 		ref_ss =window_std_variant_genotype.shape[0]
@@ -137,7 +186,7 @@ ref_genotype_stem = processed_genotype_data_dir +'simulated_eqtl_1000_data_1'
 
 
 
-window_sizes = [1, 2, 3, 4, 5]
+window_sizes = [1,3]
 
 for window_size in window_sizes:
 	output_stem = processed_genotype_data_dir + 'variant_ref_geno_eqtl_1000_window_' + str(window_size) + '_mb_ld_scores'

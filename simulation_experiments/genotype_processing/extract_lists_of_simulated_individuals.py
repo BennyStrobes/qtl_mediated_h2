@@ -22,22 +22,29 @@ gwas_individual_file = sys.argv[3]
 eqtl_individual_stem = sys.argv[4]
 ref_genotype_individual_file = sys.argv[5]
 
+np.random.seed(1)
+
 eqtl_sample_sizes = np.asarray([100, 200, 300, 500, 1000])
 
 
-plink_fam_file = plink_file_stem + '.fam'
+plink_fam_file = plink_file_stem + '.psam'
 
 individual_list = []
 f = open(plink_fam_file)
+head_count = 0
 for line in f:
 	line = line.rstrip()
 	data = line.split()
+	if head_count == 0:
+		head_count = head_count +1
+		continue
 	indi_id = data[0] + '\t' + data[1]
 	individual_list.append(indi_id)
 f.close()
 individual_list = np.asarray(individual_list)
 
 
+individual_list = np.random.permutation(individual_list)
 
 print_individual_list_to_output(individual_list, 0, n_gwas_individuals, gwas_individual_file)
 

@@ -11,10 +11,19 @@ ldsc_baseline_hg19_annotation_dir="/n/groups/price/ldsc/reference_files/1000G_EU
 # LDSC 1KG genotype files (hg19)
 kg_genotype_dir="/n/groups/price/ldsc/reference_files/1000G_EUR_Phase3/plink_files/"
 
+# Directory containing HM3 snp lists
+hm3_snp_list_dir="/n/groups/price/ldsc/reference_files/1000G_EUR_Phase3/weights/"
+
+# Directory containing quasi indpendent ld blocks
+quasi_independent_dir="/n/groups/price/ben/quasi_independent_ld_blocks/"
+
+
 ############################
 # Output data
 ############################
 processed_genotype_data_dir="/n/scratch/users/b/bes710/qtl_mediated_h2/simulation_experiments/genotype_processing/"
+
+
 
 ############################
 # Simulation parameters
@@ -35,5 +44,13 @@ chrom_num="1"
 # Needs to be 200GB and 25 h
 n_gwas_individuals="100000"
 if false; then
-sbatch prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir 
+sh prepare_ukbb_hm3_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir
+fi
+
+
+
+
+# No longer completely up to date
+if false; then
+sh prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir 
 fi

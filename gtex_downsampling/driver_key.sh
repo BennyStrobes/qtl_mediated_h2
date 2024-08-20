@@ -284,9 +284,8 @@ fi
 
 ###################
 # visualize results of downsampling analysis
-if false; then
 Rscript visualize_gtex_downsampling_analysis.R ${mesc_results_dir} ${tglr_results_dir} ${gene_ldscore_variant_ld_score_corr_dir} $visualize_gtex_downsampling_dir
-fi
+
 
 
 

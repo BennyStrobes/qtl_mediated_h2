@@ -684,7 +684,7 @@ def simulate_causal_eqtl_effect_sizes(cis_window, simulated_gene_position_file, 
 
 		# Write to output file
 		t.write(ensamble_id + '\t' + chrom_num + '\t' + str(tss) + '\t' + gene_causal_effect_file + '\t' + gene_cis_snpid_file + '\t' + gene_cis_snp_indices_file + '\t' + str(len(G_obj_rsids)) + '\t' + str(np.sum(np.square(causal_eqtl_effects))) + '\n')
-
+	print(simulated_causal_eqtl_effect_summary_file)
 	f.close()
 	t.close()
 

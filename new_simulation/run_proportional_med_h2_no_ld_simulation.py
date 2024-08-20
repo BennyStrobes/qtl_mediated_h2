@@ -5,6 +5,7 @@ import os
 import pdb
 from scipy.stats import invgamma
 import statsmodels.api as sm
+import bayesian_lmm_rss_med_h2_no_pca
 
 '''
 import tensorflow as tf
@@ -42,8 +43,8 @@ def simulate_data(gwas_ss, n_snps, eqtl_ss_1, med_h2_1, ge_h2_options, n_genes, 
 			gene_snp_causal_eqtl_effects[gene_snp_indices] = np.random.normal(loc=0, scale=np.sqrt(ge_h2/snps_per_gene), size=snps_per_gene)
 		elif eqtl_architecture == 'sparse':
 			gene_snp_causal_eqtl_effects = np.zeros(n_snps)
-			causal_indices = np.random.choice(gene_snp_indices, size=10, replace=False)
-			gene_snp_causal_eqtl_effects[causal_indices] = np.random.normal(loc=0, scale=np.sqrt(ge_h2/10), size=10)
+			causal_indices = np.random.choice(gene_snp_indices, size=5, replace=False)
+			gene_snp_causal_eqtl_effects[causal_indices] = np.random.normal(loc=0, scale=np.sqrt(ge_h2/5), size=5)
 		else:
 			print('assumption error: eqtl architecture ' + eqtl_architecture + ' currently not implemented')
 			pdb.set_trace()
@@ -108,6 +109,7 @@ def get_marginal_summary_statistics(Y, G):
 		olser = sm.OLS(Y, sm.add_constant(G[:,snp_iter])).fit()
 		beta.append(olser.params[1])
 		beta_se.append(olser.bse[1])
+		#beta_se.append(np.sqrt(1/len(Y)))
 	return np.asarray(beta), np.asarray(beta_se)
 
 def get_marginal_summary_statistics_across_genes(Es, G, gene_snp_indices_arr):
@@ -126,6 +128,7 @@ def get_marginal_summary_statistics_across_genes(Es, G, gene_snp_indices_arr):
 			olser = sm.OLS(Es[gene_iter], sm.add_constant(G[:,gene_snp_index])).fit()
 			beta[gene_snp_index] = olser.params[1]
 			beta_se[gene_snp_index] = olser.bse[1]
+			#beta_se[gene_snp_index] = np.sqrt(1/len(Es[gene_iter]))
 
 		# Add to global array
 		beta_arr.append(beta)
@@ -646,7 +649,7 @@ def update_gamma_var(gamma):
 
 
 	# Initialize inverse gamma distribution
-	invgamma_dist = invgamma(vv/2 + 1e-5, scale=vv*tau_sq/2 + 1e-5)
+	invgamma_dist = invgamma(vv/2 + 1e-6, scale=vv*tau_sq/2 + 1e-6)
 	# Sample from it
 	gamma_var = invgamma_dist.rvs(size=1)[0]
 
@@ -654,7 +657,7 @@ def update_gamma_var(gamma):
 
 
 
-def med_h2_with_sumstat_bayesian_no_ld(gwas_beta, gwas_beta_se, eqtl_beta_raw, eqtl_beta_se_raw, max_iters=18000, burn_in_iter=15000):
+def med_h2_with_sumstat_bayesian_no_ld(gwas_beta, gwas_beta_se, eqtl_beta_raw, eqtl_beta_se_raw, max_iters=22000, burn_in_iter=15000):
 	# Initialize variables
 	KK = len(gwas_beta)
 	GG = eqtl_beta_raw.shape[0]
@@ -677,9 +680,9 @@ def med_h2_with_sumstat_bayesian_no_ld(gwas_beta, gwas_beta_se, eqtl_beta_raw, e
 	for gene_iter in range(GG):
 		deltas.append(eqtl_betas[gene_iter])
 	# Initialize variance parameters
-	gamma_var = 1e-6
-	alpha_var = 1e-6
-	delta_vars = np.ones(GG)*1e-6
+	gamma_var = 1e-5
+	alpha_var = 1e-4
+	delta_vars = np.ones(GG)*1e-3
 
 	# Remove causal effects from gwas beta
 	# Only works because initialize all causal effects to zero
@@ -729,6 +732,8 @@ def med_h2_with_sumstat_bayesian_no_ld(gwas_beta, gwas_beta_se, eqtl_beta_raw, e
 			sampled_med_h2s.append(med_h2)
 
 
+
+
 	sampled_gamma_vars = np.asarray(sampled_gamma_vars)
 	sampled_alpha_vars = np.asarray(sampled_alpha_vars)
 	sampled_med_h2s = np.asarray(sampled_med_h2s)
@@ -737,6 +742,52 @@ def med_h2_with_sumstat_bayesian_no_ld(gwas_beta, gwas_beta_se, eqtl_beta_raw, e
 
 
 	return np.mean(sampled_med_h2s), np.mean(sampled_nm_h2s), np.mean(sampled_delta_vars,axis=0)*200
+
+def med_h2_with_sumstat_bayesian_no_ld_alt(gwas_beta, gwas_beta_se, eqtl_beta_raw, eqtl_beta_se_raw, gwas_ss, eqtl_ss):
+	window_info = {}
+	window_name = 'full'
+	window_info[window_name] = {}
+	n_snps = len(gwas_beta)
+
+	window_info[window_name]['beta'] = np.copy(gwas_beta)
+	window_info[window_name]['n_snps'] = len(gwas_beta)
+	window_info[window_name]['genes'] = []
+	window_info[window_name]['LD'] = np.eye(n_snps)
+
+	rsids = []
+	for snp_iter in range(window_info[window_name]['n_snps']):
+		rsids.append('snp' + str(snp_iter))
+	window_info[window_name]['rsids'] = np.asarray(rsids)
+
+	GG = eqtl_beta_raw.shape[0]
+	# Reorganize eqtl data
+	eqtl_betas = []
+	eqtl_beta_vars = []
+	eqtl_indices = []
+	gene_info = {}
+
+
+	for gene_iter in range(GG):
+		gene_indices = eqtl_beta_raw[gene_iter,:] != 0.0
+
+		gene_name = 'gene' + str(gene_iter)
+		window_info[window_name]['genes'].append(gene_name)
+
+		gene_info[gene_name] = {}
+		gene_info[gene_name]['beta'] = eqtl_beta_raw[gene_iter,:]
+		gene_info[gene_name]['window_name'] = window_name
+		gene_info[gene_name]['beta_se'] = eqtl_beta_se_raw[gene_iter, :]
+		gene_info[gene_name]['cis_snps'] = gene_indices
+		gene_info[gene_name]['n_cis_snps'] = np.sum(gene_indices)
+
+	window_info[window_name]['genes'] = np.asarray(window_info[window_name]['genes'])
+
+
+	tmp_output_file = 'hi.txt'
+
+	mod = bayesian_lmm_rss_med_h2_no_pca.Bayesian_LMM_RSS_med_h2_inference(window_info, gene_info, gwas_ss, eqtl_ss, tmp_output_file)
+	mod.fit(burn_in_iterations=1, total_iterations=10000, update_resid_var_bool=False)
+
 
 
 
@@ -781,35 +832,31 @@ for sim_iter in range(n_sims):
 	eqtl_beta, eqtl_beta_se = get_marginal_summary_statistics_across_genes(Es, E_geno, gene_snp_indices_arr)
 
 	# Temp loading of data
-	'''
 	np.save('gwas_beta.npy',gwas_beta)
 	np.save('gwas_beta_se.npy',gwas_beta_se)
 	np.save('eqtl_beta.npy',eqtl_beta)
 	np.save('eqtl_beta_se.npy',eqtl_beta_se)
-
+	
+	'''
 	gwas_beta = np.load('gwas_beta.npy')
 	gwas_beta_se = np.load('gwas_beta_se.npy')
 	eqtl_beta = np.load('eqtl_beta.npy')
 	eqtl_beta_se = np.load('eqtl_beta_se.npy')
 	'''
-
 	sim_med_h2 = np.sum(np.square(np.dot(np.transpose(gene_causal_eqtl_effects), gene_trait_effects)))
 	sim_nm_h2 = np.sum(np.square(nm_var_causal_effects))
 	sim_eqtl_h2 = np.sum(np.square(gene_causal_eqtl_effects),axis=1)
 
-
-	# Goes to nans
-	#med_h2_sumstat_reml_per_snps, nm_h2_sumstat_reml_per_snp, eqtl_h2_sumstat_reml_per_snp = med_h2_with_sumstat_reml_per_snp_no_ld(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se)
-	#med_h2_sumstat_reml_chunked, nm_h2_sumstat_reml_chunked, eqtl_h2_sumstat_reml_chunked = med_h2_with_sumstat_reml_chunked_no_ld(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se)
-
 	# Bayesian approach
+	# REASONABLE WORKING
 	med_h2_sumstat_bayesian, nm_h2_sumstat_bayesian, eqtl_h2_sumstat_bayesian = med_h2_with_sumstat_bayesian_no_ld(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se)
-
-
 	t.write(str(sim_iter) + '\t' + 'sumstat_bayesian\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(np.mean(sim_eqtl_h2)) + '\t' + str(nm_h2_sumstat_bayesian) + '\t' + str(med_h2_sumstat_bayesian) + '\t' +  str(np.mean(eqtl_h2_sumstat_bayesian)) + '\n')
 
-	'''
+	# Alt bayesian approach
+	#med_h2_with_sumstat_bayesian_no_ld_alt(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se, gwas_ss, eqtl_ss)
 
+
+	'''
 	med_h2_sumstat_reml_two_step, nm_h2_sumstat_reml_two_step, eqtl_h2_sumstat_reml_two_step = med_h2_with_sumstat_reml_no_ld_two_step(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se)
 	med_h2_sumstat_reml, nm_h2_sumstat_reml, eqtl_h2_sumstat_reml = med_h2_with_sumstat_reml_no_ld(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se)
 

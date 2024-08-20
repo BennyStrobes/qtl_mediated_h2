@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-7:00                         # Runtime in D-HH:MM format
+#SBATCH -t 0-10:00                         # Runtime in D-HH:MM format
 #SBATCH -p short                           # Partition to run in
 #SBATCH --mem=20GB                         # Memory total in MiB (for all cores)
 
@@ -14,6 +14,8 @@ chrom_num="$3"
 n_gwas_individuals="$4"
 ldsc_baseline_hg19_annotation_dir="$5"
 kg_genotype_dir="$6"
+hm3_snp_list_dir="$7"
+quasi_independent_dir="$8"
 
 if false; then
 source ~/.bash_profile
@@ -21,20 +23,20 @@ fi
 ###############################
 # Extract list of variants in ldsc baseline analysis
 ###############################
-ldsc_annotation_rs_id_file=${processed_genotype_data_root_dir}"ldsc_annotation_rsids_chr"${chrom_num}".txt"
+hm3_rs_id_file=${processed_genotype_data_root_dir}"hm3_rsids_chr"${chrom_num}".txt"
 if false; then
-python3 extract_list_of_ldsc_annotation_rs_ids.py $ldsc_baseline_hg19_annotation_dir $chrom_num $kg_genotype_dir $ldsc_annotation_rs_id_file
+python3 extract_list_of_hm3_rs_ids.py $hm3_snp_list_dir $chrom_num $kg_genotype_dir $hm3_rs_id_file
 fi
 
 ###############################
 # Make genotype subdirectory for this gwas sample size
 ###############################
-processed_genotype_data_dir=${processed_genotype_data_root_dir}"gwas_sample_size_"${n_gwas_individuals}"/"
+processed_genotype_data_dir=${processed_genotype_data_root_dir}"hm3_gwas_sample_size_"${n_gwas_individuals}"/"
 if false; then
-
 mkdir $processed_genotype_data_dir
 echo $processed_genotype_data_dir
 fi
+
 ###############################
 # Filter UKBB genotype data to only include those variants in ldsc baseline analysis
 ###############################
@@ -54,10 +56,12 @@ plink2 \
     --out ${processed_genotype_data_dir}"ukb_imp_chr"${chrom_num}"_tmper"
 fi
 
+if false; then
+plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr"${chrom_num}"_tmper" --hwe .01 --extract ${hm3_rs_id_file} --maf .05 --keep-allele-order --threads 1 --make-pgen --out ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num}"_double_tmper"
+plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num}"_double_tmper" --chr 1 --from-bp 10585 --to-bp 25897727 --keep-allele-order --threads 1 --make-pgen --out ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num}
+fi
 
-plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr"${chrom_num}"_tmper" --hwe .01 --extract ${ldsc_annotation_rs_id_file} --maf .05 --keep-allele-order --threads 1 --make-pgen --out ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num}
-
-
+if false; then
 ###############################
 # extract lists of Individuals for each data set
 ###############################
@@ -94,25 +98,6 @@ plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep $
 
 
 ###############################
-# Conver to vcfs
-###############################
-# GWAS
-plink2 --pfile ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num} --keep-allele-order --export vcf vcf-dosage=DS --out ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num}
-
-# eQTL 
-eqtl_sample_size="100"
-plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --export vcf vcf-dosage=DS --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
-eqtl_sample_size="200"
-plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --export vcf vcf-dosage=DS --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
-eqtl_sample_size="300"
-plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --export vcf vcf-dosage=DS --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
-eqtl_sample_size="500"
-plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --export vcf vcf-dosage=DS --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
-eqtl_sample_size="1000"
-plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --export vcf vcf-dosage=DS --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
-
-
-###############################
 # Conver to bgen
 ###############################
 # GWAS 
@@ -129,44 +114,47 @@ eqtl_sample_size="500"
 plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --export bgen-1.2 --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
 eqtl_sample_size="1000"
 plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --export bgen-1.2 --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
-
-
-
-
-
-
-
-
-
-
-
-###############################
-# Filter UKBB genotype data to only include individuals in reference genotype data
-###############################
-if false; then
-plink2 --bfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${ref_genotype_individual_file} --make-bed --threads 1 --keep-allele-order --out ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num}
-
-
-#########################
-# Filter 1KG variants to only those in our analysis
-##########################
-plink2 --bfile ${kg_genotype_dir}"1000G.EUR.QC."${chrom_num} --extract ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num}".bim" --threads 1 --make-bed --keep-allele-order --out ${processed_genotype_data_dir}"100G.EUR.QC.filtered."${chrom_num}
 fi
 
-#########################
-# Get variant LD scores
-##########################
-if false; then
-source ~/.bash_profile
-fi
-if false; then
-python3 get_variant_ld_scores.py ${processed_genotype_data_dir}
-fi
+
+
+
+
 
 #########################
 # Get LD matrices
 ##########################
+module load gcc/9.2.0
+module load python/3.9.14
+module load cuda/12.1
+source /n/groups/price/ben/environments/tf_new/bin/activate
+
+python3 get_quasi_independent_ld_matrices.py ${processed_genotype_data_dir} $quasi_independent_dir
+
+
+
+
+
+
+
+
 if false; then
 python3 get_ld_matrices.py ${processed_genotype_data_dir}
 fi
+
+
+
+if false; then
+#########################
+# Get variant LD scores
+##########################
+python3 get_variant_ld_scores.py ${processed_genotype_data_dir}
+fi
+
+
+
+
+
+
+
 

@@ -44,7 +44,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		self.avg_eqtl_ld_scores = np.asarray(avg_eqtl_ld_scores)
 
 
-	def fit(self, total_iterations=15000, burn_in_iterations=10000, gamma_var_update_version='ld_score_weighting'):
+	def fit(self, total_iterations=15000, burn_in_iterations=10000, gamma_var_update_version='ld_score_weighting', update_resid_var=False):
 		""" Fit the model.
 		"""
 		# Initialize model params
@@ -55,14 +55,14 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 
 		# Iterative Gibbs sampling algorithm
 		for itera in range(total_iterations):
-			# Update gamma
-			self.update_gamma()
-
 			# Update alpha
 			self.update_alpha()
 
 			# Update alpha
 			self.update_deltas()
+
+			# Update gamma
+			self.update_gamma()
 	
 			# Update gamma_var
 			self.update_gamma_var(version=gamma_var_update_version)
@@ -72,6 +72,9 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 
 			# Update delta var
 			self.update_delta_vars(version=gamma_var_update_version)
+
+			if update_resid_var:
+				self.update_resid_var()
 
 			# Update iteration number
 			self.itera = self.itera + 1
@@ -99,6 +102,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 					print('med: ' + str(med_h2))
 					print('nm: ' + str(nm_h2))
 					print('eqtl: ' + str(eqtl_h2))
+					print('resid_var: ' + str(self.resid_var))
 
 		self.sampled_gamma_vars = np.asarray(self.sampled_gamma_vars)
 		self.sampled_nm_h2 = self.KK*self.sampled_gamma_vars
@@ -106,6 +110,10 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		self.sampled_alpha_vars = np.asarray(self.sampled_alpha_vars)
 		self.sampled_med_h2 = np.asarray(self.sampled_med_h2)
 
+		return
+
+	def update_resid_var(self):
+		self.resid_var = np.sum(np.square(self.gwas_beta_resid)/self.gwas_beta_var)/len(self.gwas_beta_resid)
 		return
 
 	def update_delta_vars(self, version='ld_score_weighting', v0=2.0, s_sq=0.0):
@@ -128,7 +136,8 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			vv = np.sum(tmp_indices) + v0
 			tau_sq = np.sum(np.square(self.deltas[gg][tmp_indices])/self.eqtl_ldscore[gg][tmp_indices]) + s_sq
 			'''
-			tmp_indices = self.cis_snps[gg] == 1
+			#tmp_indices = self.cis_snps[gg] == 1
+			tmp_indices = self.cis_snps[gg] < 10
 
 			if version == 'equal_weights':
 				weights = np.ones(np.sum(tmp_indices))
@@ -142,9 +151,10 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			tau_sq = np.sum(weights*np.square(self.deltas[gg][tmp_indices])/self.eqtl_ldscore[gg][tmp_indices]) + s_sq
 
 			# Initialize inverse gamma distribution
-			invgamma_dist = invgamma(vv/2, scale=tau_sq/2)
+			#invgamma_dist = invgamma(vv/2, scale=tau_sq/2)
 			# Sample from it
-			self.delta_vars[gg] = invgamma_dist.rvs(size=1)[0]
+			#self.delta_vars[gg] = invgamma_dist.rvs(size=1)[0]
+			self.delta_vars[gg] = np.sum(weights*np.square(self.deltas[gg][tmp_indices])/self.eqtl_ldscore[gg][tmp_indices])/np.sum(weights)
 
 		return	
 
@@ -162,8 +172,8 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			#gwas_gene_weights = 1.0/np.sqrt(self.var_ldscores[self.eqtl_position[gg]])
 			#eqtl_gene_weights = 1.0/np.sqrt(self.eqtl_ldscore[gg])
 
-			posterior_vars = 1.0/((np.square(self.alpha[gg])/cis_gwas_beta_var) + (1.0/self.eqtl_beta_var[gg]) + (1.0/marginal_delta_vars))
-			posterior_means = ((cis_gwas_beta*self.alpha[gg]/cis_gwas_beta_var) + (self.eqtl_beta[gg]/self.eqtl_beta_var[gg]))*posterior_vars
+			posterior_vars = 1.0/((np.square(self.alpha[gg])/(self.resid_var*cis_gwas_beta_var)) + (1.0/self.eqtl_beta_var[gg]) + (1.0/marginal_delta_vars))
+			posterior_means = ((cis_gwas_beta*self.alpha[gg]/(self.resid_var*cis_gwas_beta_var)) + (self.eqtl_beta[gg]/self.eqtl_beta_var[gg]))*posterior_vars
 
 			# Sample from posterior
 			self.deltas[gg] = np.random.normal(loc=posterior_means, scale=np.sqrt(posterior_vars))
@@ -178,14 +188,15 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		for gg in np.random.permutation(range(self.GG)):
 			# Re include effects of current gene
 			tmp_indices = self.cis_snps[gg] == 1
+
 			cis_gwas_beta = self.gwas_beta_resid[self.eqtl_position[gg]] + self.deltas[gg]*self.alpha[gg]
 			cis_gwas_beta_var = self.gwas_beta_var[self.eqtl_position[gg]]
 
 			# Compute posterior distribution
 			# Consider weighting by gene ld scores here
 			#weight = 1.0/np.sqrt(self.avg_eqtl_ld_scores[gg])
-			posterior_var = 1.0/(np.sum(np.square(self.deltas[gg])/cis_gwas_beta_var) + (1.0/self.alpha_var))
-			posterior_mean = np.sum(cis_gwas_beta*self.deltas[gg]/cis_gwas_beta_var)*posterior_var
+			posterior_var = 1.0/(np.sum(np.square(self.deltas[gg])/(self.resid_var*cis_gwas_beta_var)) + (1.0/self.alpha_var))
+			posterior_mean = np.sum(cis_gwas_beta*self.deltas[gg]/(self.resid_var*cis_gwas_beta_var))*posterior_var
 
 			# Sample
 			self.alpha[gg] = np.random.normal(loc=posterior_mean, scale=np.sqrt(posterior_var))
@@ -210,9 +221,10 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			pdb.set_trace()
 
 		# Initialize inverse gamma distribution
-		invgamma_dist = invgamma(vv/2, scale=tau_sq/2)
+		#invgamma_dist = invgamma(vv/2, scale=tau_sq/2)
 		# Sample from it
-		self.gamma_var = invgamma_dist.rvs(size=1)[0]
+		#self.gamma_var = invgamma_dist.rvs(size=1)[0]
+		self.gamma_var = np.sum(weights*np.square(self.gamma)/self.var_ldscores)/np.sum(weights)
 
 		return
 
@@ -226,7 +238,8 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		# Initialize inverse gamma distribution
 		invgamma_dist = invgamma(vv/2, scale=tau_sq/2)
 		# Sample from it
-		self.alpha_var = invgamma_dist.rvs(size=1)[0]	
+		#self.alpha_var = invgamma_dist.rvs(size=1)[0]
+		self.alpha_var = np.sum(weights*np.square(self.alpha))/np.sum(weights)
 
 		return
 
@@ -237,8 +250,8 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		# Compute posterior distribution
 		marginal_gamma_vars = self.gamma_var*self.var_ldscores
 
-		posterior_vars = 1.0/((1.0/self.gwas_beta_var) + (1.0/marginal_gamma_vars))
-		posterior_means = (self.gwas_beta_resid/self.gwas_beta_var)*posterior_vars
+		posterior_vars = 1.0/((1.0/(self.resid_var*self.gwas_beta_var)) + (1.0/marginal_gamma_vars))
+		posterior_means = (self.gwas_beta_resid/(self.resid_var*self.gwas_beta_var))*posterior_vars
 
 		# Sample from posterior distribution
 		self.gamma = np.random.normal(loc=posterior_means, scale=np.sqrt(posterior_vars))
@@ -261,7 +274,9 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		# Initialize variance parameters
 		self.gamma_var = 1e-6
 		self.alpha_var = 1e-6
-		self.delta_vars = np.ones(self.GG)*1e-6
+		self.delta_vars = np.ones(self.GG)*1e-3
+
+		self.resid_var = 1.0
 
 		# Remove causal effects from gwas beta
 		self.gwas_beta_resid = np.copy(self.gwas_beta) - self.gamma  # Remove non-mediated variant effects
