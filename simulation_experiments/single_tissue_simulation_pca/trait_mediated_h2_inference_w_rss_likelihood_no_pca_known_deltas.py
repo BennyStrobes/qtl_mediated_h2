@@ -7,7 +7,7 @@ from scipy.stats import invgamma
 import statsmodels.api as sm
 import bayesian_lmm_rss_med_h2
 import bayesian_lmm_rss_med_h2_no_pca
-
+import bayesian_lmm_rss_med_h2_no_pca_known_delta
 
 
 
@@ -107,7 +107,7 @@ def extract_eqtl_sumstats_for_specific_gene(sumstats_file, gene_name):
 	return np.asarray(sumstats).astype(float), np.asarray(cis_snps).astype(float), gene_window_name
 
 
-def load_in_eqtl_data(eqtl_sumstat_file, window_info, window_names):
+def load_in_eqtl_data(eqtl_sumstat_file, window_info, window_names, simulated_gene_expression_dir):
 	# First get list of gene names
 	gene_names = []
 	f = open(eqtl_sumstat_file)
@@ -163,10 +163,17 @@ def load_in_eqtl_data(eqtl_sumstat_file, window_info, window_names):
 
 	for gene in [*gene_info]:
 		# Organize arrays
+		causal_eqtl_file = simulated_gene_expression_dir + simulation_name_string + '_' + gene + '_causal_eqtl_effects.npy'
+
+		gene_info[gene]['true_beta'] = np.load(causal_eqtl_file)
 		gene_info[gene]['beta'] = np.asarray(gene_info[gene]['beta'])
 		gene_info[gene]['beta_se'] = np.asarray(gene_info[gene]['beta_se'])
 		gene_info[gene]['cis_snps'] = np.asarray(gene_info[gene]['cis_snps']) == 1.0
 		gene_info[gene]['n_cis_snps'] = np.sum(gene_info[gene]['cis_snps'])
+
+		if len(gene_info[gene]['true_beta']) != gene_info[gene]['n_cis_snps']:
+			print('assumption erororr')
+			pdb.set_trace()
 
 		# add gene to window
 		window_info[gene_info[gene]['window_name']]['genes'].append(gene)
@@ -196,7 +203,8 @@ N_gwas = int(sys.argv[7])
 N_eqtl = int(sys.argv[8])
 trait_med_h2_inference_dir = sys.argv[9]
 window_version = sys.argv[10]
-delta_updates = sys.argv[11]
+simulated_gene_expression_dir = sys.argv[11]
+
 
 
 # Load in true simulated data parameters
@@ -228,8 +236,7 @@ if window_version == 'small':
 else:
 	eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(N_eqtl) + '_big_window_eqtl_sumstats.txt'
 
-
-window_info, gene_info, gene_names = load_in_eqtl_data(eqtl_sumstat_file, window_info, window_names)
+window_info, gene_info, gene_names = load_in_eqtl_data(eqtl_sumstat_file, window_info, window_names, simulated_gene_expression_dir)
 '''
 
 import pickle
@@ -250,7 +257,7 @@ gene_info = pickle.load(f)
 f.close()
 '''
 
-tmp_output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_' + str(N_eqtl) + '_' + window_version + '_' + delta_updates + '_resid_var_variable_rss_tmp_res_big_windows_no_pca.txt'
-mod = bayesian_lmm_rss_med_h2_no_pca.Bayesian_LMM_RSS_med_h2_inference(window_info, gene_info, N_gwas, N_eqtl, tmp_output_file)
-mod.fit(burn_in_iterations=1, total_iterations=40000, update_resid_var_bool=False, delta_updates=delta_updates)
+tmp_output_file = trait_med_h2_inference_dir + simulation_name_string + '_' + window_version + '_resid_var_variable_rss_tmp_res_big_windows_no_pca_known_deltas.txt'
+mod = bayesian_lmm_rss_med_h2_no_pca_known_delta.Bayesian_LMM_RSS_med_h2_inference(window_info, gene_info, N_gwas, N_eqtl, tmp_output_file)
+mod.fit(burn_in_iterations=1, total_iterations=40000, update_resid_var_bool=False)
 

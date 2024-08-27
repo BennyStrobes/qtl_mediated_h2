@@ -15,7 +15,8 @@ n_gwas_individuals="$7"
 eqtl_sample_size="$8"
 trait_med_h2_inference_dir="$9"
 window_version="${10}"
-delta_updates="${11}"
+simulated_gene_expression_dir="${11}"
+
 
 module load gcc/9.2.0
 module load python/3.9.14
@@ -24,4 +25,4 @@ source /n/groups/price/ben/environments/tf_new/bin/activate
 
 
 
-python3 trait_mediated_h2_inference_w_rss_likelihood_no_pca.py $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $eqtl_sample_size $trait_med_h2_inference_dir $window_version $delta_updates
+python3 trait_mediated_h2_inference_w_rss_likelihood_no_pca_known_deltas.py $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $eqtl_sample_size $trait_med_h2_inference_dir $window_version $simulated_gene_expression_dir

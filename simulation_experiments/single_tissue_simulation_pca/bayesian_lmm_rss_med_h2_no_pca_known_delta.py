@@ -28,16 +28,15 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 			self.KK = self.KK + self.window_info[window]['n_snps']
 
 		self.tt = open(tmp_output_file,'w')
-		self.tt.write('Iteration\tnm_h2\talt_nm_h2\tmed_h2\talt_med_h2\talt2_nm_h2\teqtl_h2\talt_eqtl_h2\n')
+		self.tt.write('Iteration\tnm_h2\tmed_h2\talt_med_h2\teqtl_h2\n')
 		
 		return
 
 
 
-	def fit(self, total_iterations=15000, burn_in_iterations=10000, update_resid_var_bool=False, delta_updates='univariate'):
+	def fit(self, total_iterations=15000, burn_in_iterations=10000, update_resid_var_bool=False):
 		""" Fit the model.
 		"""
-		self.delta_updates = delta_updates
 		# Initialize model params
 		self.initialize_variables()
 
@@ -82,13 +81,13 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 				avg_eqtl_h2 = np.mean(eqtl_h2s)
 				eqtl_resid_vars = self.get_eqtl_resid_vars()
 
-				nm_h2_ld_depen, med_h2_ld_depen = self.get_ld_dependent_h2s()
-
 
 				self.sampled_nm_h2.append(nm_h2)
 				self.sampled_med_h2.append(med_h2)
 				self.sampled_eqtl_h2.append(avg_eqtl_h2)
 				self.sampled_alpha_var.append(self.alpha_var)
+
+				nm_h2_ld_depen, med_h2_ld_depen = self.get_ld_dependent_h2s()
 				#self.sampled_gwas_resid_var.append(np.mean(gwas_resid_vars))
 				#self.sampled_eqtl_resid_var.append(np.mean(eqtl_resid_vars))
 
@@ -104,6 +103,7 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 
 
 				self.tt.write(str(itera) + '\t' + str(nm_h2) + '\t' + str(nm_h2_ld_depen) + '\t' + str(med_h2) + '\t' + str(med_h2_alt) + '\t' + str(med_h2_ld_depen) + '\t' + str(avg_eqtl_h2) + '\t' + str(np.mean(alt_eqtl_h2s)) + '\n')
+
 				self.tt.flush()
 
 
@@ -124,6 +124,7 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 			med = med + self.window_med_h2[window]
 			nm = nm + self.window_nm_h2[window]
 		return nm, med
+
 
 	def check_resid_vars(self):
 		for window in self.windows:
@@ -287,19 +288,19 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 	def update_gamma_delta_and_alpha_in_single_window(self, window_name):
 		# Load in relevent quantities for this window
 		window_ld = np.load(self.window_info[window_name]['ld_file'])
-		window_eqtl_ld = np.load(self.window_info[window_name]['eqtl_ld_file'])
+		#window_eqtl_ld = np.load(self.window_info[window_name]['eqtl_ld_file'])
 
 		#order_bool = np.random.choice([0,1])
 
 		# Update gamma and alpha in single window
 		self.update_gamma_and_alpha_in_single_window(window_name, window_ld)
 		# Update delta in single window
-		self.update_delta_in_single_window(window_name, window_ld, window_eqtl_ld, self.delta_updates)
-
+		#self.update_delta_in_single_window(window_name, window_ld, window_eqtl_ld)
 
 		self.update_window_genetic_var(window_name, window_ld)
 
 		return
+
 
 	def update_window_genetic_var(self, window_name, LD_mat):
 
@@ -318,7 +319,7 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 		return
 
 
-	def update_delta_in_single_window(self, window_name, gwas_ld, eqtl_ld, delta_updates):
+	def update_delta_in_single_window(self, window_name, gwas_ld, eqtl_ld):
 		# Get list of genes in this window
 		window_genes = self.window_info[window_name]['genes']
 		window_gwas_resid_var = self.gwas_resid_var[window_name]
@@ -340,7 +341,7 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 			eqtl_gene_beta_resid = self.eqtl_beta_resid[gene]
 
 			# Compute update for single gene
-			delta, window_gwas_beta_resid, eqtl_gene_beta_resid = self.update_delta_for_single_gene(gene_gwas_ld, gene_eqtl_ld, delta, window_gwas_beta_resid, eqtl_gene_beta_resid, self.alpha[gene], self.delta_vars[gene], self.eqtl_resid_vars[gene], window_gwas_resid_var, window_cis_indices, delta_updates)
+			delta, window_gwas_beta_resid, eqtl_gene_beta_resid = self.update_delta_for_single_gene(gene_gwas_ld, gene_eqtl_ld, delta, window_gwas_beta_resid, eqtl_gene_beta_resid, self.alpha[gene], self.delta_vars[gene], self.eqtl_resid_vars[gene], window_gwas_resid_var, window_cis_indices)
 
 			self.eqtl_beta_resid[gene] = eqtl_gene_beta_resid
 			self.deltas[gene] = delta
@@ -351,57 +352,31 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 
 		return
 
-	def update_delta_for_single_gene(self, gwas_ld, eqtl_ld, delta, window_gwas_beta_resid, eqtl_gene_beta_resid, gene_alpha, gene_delta_var, gene_resid_var, gwas_resid_var, window_cis_indices, delta_updates):
+	def update_delta_for_single_gene(self, gwas_ld, eqtl_ld, delta, window_gwas_beta_resid, eqtl_gene_beta_resid, gene_alpha, gene_delta_var, gene_resid_var, gwas_resid_var, window_cis_indices):
 		# N-snps in the the gene
 		gene_K = len(delta)
 
 		# Precompute snp posterior variances
-		if delta_updates == 'univariate':
-			snp_posterior_var = 1.0/((np.square(gene_alpha)*self.N_gwas/gwas_resid_var) + (self.N_eqtl/gene_resid_var) + (1.0/gene_delta_var))
+		snp_posterior_var = 1.0/((np.square(gene_alpha)*self.N_gwas/gwas_resid_var) + (self.N_eqtl/gene_resid_var) + (1.0/gene_delta_var))
 
-			for kk in np.random.permutation(range(gene_K)):
 
-				# Re include current effect
-				window_gwas_beta_resid = window_gwas_beta_resid + (gwas_ld[:, kk]*delta[kk]*gene_alpha)
-				eqtl_gene_beta_resid = eqtl_gene_beta_resid + (eqtl_ld[:, kk]*delta[kk])
+		for kk in np.random.permutation(range(gene_K)):
 
-				# Compute posterior distribution
-				gwas_term = (self.N_gwas/gwas_resid_var)*gene_alpha*window_gwas_beta_resid[window_cis_indices][kk]
-				eqtl_term = (self.N_eqtl/gene_resid_var)*eqtl_gene_beta_resid[kk]
-				snp_posterior_mean = snp_posterior_var*(gwas_term + eqtl_term)
-
-				# Sample from posterior distribution
-				delta[kk] = np.random.normal(loc=snp_posterior_mean, scale=np.sqrt(snp_posterior_var))
-
-				# Remove Updated effect
-				window_gwas_beta_resid = window_gwas_beta_resid - (gwas_ld[:, kk]*delta[kk]*gene_alpha)
-				eqtl_gene_beta_resid = eqtl_gene_beta_resid - (eqtl_ld[:, kk]*delta[kk])
-		elif delta_updates == 'multivariate':
 			# Re include current effect
-			window_gwas_beta_resid = window_gwas_beta_resid + (np.dot(gwas_ld,delta)*gene_alpha)
-			eqtl_gene_beta_resid = eqtl_gene_beta_resid + np.dot(eqtl_ld, delta)
+			window_gwas_beta_resid = window_gwas_beta_resid + (gwas_ld[:, kk]*delta[kk]*gene_alpha)
+			eqtl_gene_beta_resid = eqtl_gene_beta_resid + (eqtl_ld[:, kk]*delta[kk])
 
-			small_gwas_ld = gwas_ld[window_cis_indices, :]
+			# Compute posterior distribution
+			gwas_term = (self.N_gwas/gwas_resid_var)*gene_alpha*window_gwas_beta_resid[window_cis_indices][kk]
+			eqtl_term = (self.N_eqtl/gene_resid_var)*eqtl_gene_beta_resid[kk]
+			snp_posterior_mean = snp_posterior_var*(gwas_term + eqtl_term)
 
-			inv_cov = (small_gwas_ld*np.square(gene_alpha)*self.N_gwas/gwas_resid_var) + (eqtl_ld*self.N_eqtl/gene_resid_var) + (np.eye(gene_K)/gene_delta_var)
-			
-			posterior_cov = np.linalg.inv(inv_cov)
+			# Sample from posterior distribution
+			delta[kk] = np.random.normal(loc=snp_posterior_mean, scale=np.sqrt(snp_posterior_var))
 
-			gwas_term = (self.N_gwas/gwas_resid_var)*gene_alpha*window_gwas_beta_resid[window_cis_indices]
-			eqtl_term = (self.N_eqtl/gene_resid_var)*eqtl_gene_beta_resid
-
-			posterior_mean = np.dot(posterior_cov, (gwas_term + eqtl_term))
-
-			delta = np.random.multivariate_normal(mean=posterior_mean, cov=posterior_cov)
-
-
-			# Remove updated effect
-			window_gwas_beta_resid = window_gwas_beta_resid - (np.dot(gwas_ld,delta)*gene_alpha)
-			eqtl_gene_beta_resid = eqtl_gene_beta_resid - np.dot(eqtl_ld, delta)
-
-		else:
-			print('error: update not yet implemented')
-			pdb.set_trace()
+			# Remove Updated effect
+			window_gwas_beta_resid = window_gwas_beta_resid - (gwas_ld[:, kk]*delta[kk]*gene_alpha)
+			eqtl_gene_beta_resid = eqtl_gene_beta_resid - (eqtl_ld[:, kk]*delta[kk])
 
 
 		return delta, window_gwas_beta_resid, eqtl_gene_beta_resid
@@ -497,8 +472,10 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 		self.gamma = {}
 		self.gwas_beta_resid = {}
 		self.gwas_resid_var = {}
+
 		self.window_med_h2 = {}
 		self.window_nm_h2 = {}
+
 		for window_name in self.windows:
 			self.gamma[window_name] = np.zeros(self.window_info[window_name]['n_snps'])
 			self.gwas_beta_resid[window_name] = np.copy(self.window_info[window_name]['beta'])
@@ -508,6 +485,7 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 
 			self.window_med_h2[window_name] = 0.0
 			self.window_nm_h2[window_name] = 0.0
+
 
 
 		# Create list of genetic elements in each window
@@ -541,17 +519,16 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 
 			gene_beta = gene_beta_full_window[gene_cis_snp_indices]
 			gene_LD = np.load(self.window_info[gene_window]['eqtl_ld_file'])[:, gene_cis_snp_indices][gene_cis_snp_indices, :]
-			gene_mod = bayesian_lmm_ss_h2_single_region.Bayesian_LMM(gene_beta, gene_LD, self.N_eqtl)
-			gene_mod.fit(burn_in_iterations=150, total_iterations=200)
+			#gene_mod = bayesian_lmm_ss_h2_single_region.Bayesian_LMM(gene_beta, gene_LD, self.N_eqtl)
+			#gene_mod.fit(burn_in_iterations=150, total_iterations=200)
 
 			# Initialize
-			self.deltas[gene] = np.mean(gene_mod.sampled_gammas,axis=0)
-			self.delta_vars[gene] = np.mean(gene_mod.sampled_gamma_vars)
+			self.deltas[gene] = self.gene_info[gene]['true_beta']
+			self.delta_vars[gene] = 1e-6
 			#self.eqtl_resid_vars[gene] = np.mean(gene_mod.sampled_resid_vars)
 			self.eqtl_resid_vars[gene] = 1.0
-			self.eqtl_beta_resid[gene] = gene_beta - np.dot(gene_LD, self.deltas[gene])
 
-			self.gene_vars[gene] = self.delta_vars[gene]*np.sum(gene_cis_snp_indices)
+			self.gene_vars[gene] = 1.0
 
 
 		# Initialize variance parameters

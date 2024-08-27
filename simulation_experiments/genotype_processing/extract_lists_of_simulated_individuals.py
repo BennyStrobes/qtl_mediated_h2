@@ -24,7 +24,7 @@ ref_genotype_individual_file = sys.argv[5]
 
 np.random.seed(1)
 
-eqtl_sample_sizes = np.asarray([100, 200, 300, 500, 1000])
+eqtl_sample_sizes = np.asarray([100, 200, 300, 500, 1000, 10000])
 
 
 plink_fam_file = plink_file_stem + '.psam'

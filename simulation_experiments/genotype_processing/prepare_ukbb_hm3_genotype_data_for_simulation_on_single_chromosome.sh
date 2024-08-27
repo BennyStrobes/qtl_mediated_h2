@@ -61,7 +61,6 @@ plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr"${chrom_num}"_tmper" -
 plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num}"_double_tmper" --chr 1 --from-bp 10585 --to-bp 25897727 --keep-allele-order --threads 1 --make-pgen --out ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num}
 fi
 
-if false; then
 ###############################
 # extract lists of Individuals for each data set
 ###############################
@@ -95,6 +94,9 @@ plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep $
 eqtl_sample_size="1000"
 plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${eqtl_individual_stem}${eqtl_sample_size}".txt" --make-pgen --threads 1 --keep-allele-order --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
 
+eqtl_sample_size="10000"
+plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${eqtl_individual_stem}${eqtl_sample_size}".txt" --make-pgen --threads 1 --keep-allele-order --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
+
 
 
 ###############################
@@ -114,9 +116,8 @@ eqtl_sample_size="500"
 plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --export bgen-1.2 --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
 eqtl_sample_size="1000"
 plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --export bgen-1.2 --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
-fi
-
-
+eqtl_sample_size="10000"
+plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --export bgen-1.2 --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
 
 
 

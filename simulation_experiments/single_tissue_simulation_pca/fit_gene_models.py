@@ -677,9 +677,12 @@ def get_window_index(window_borders, gene_snp_positions):
 
 
 
-def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_causal_eqtl_effect_summary_file, eqtl_sample_size, simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num):
+def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_causal_eqtl_effect_summary_file, eqtl_sample_size, simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num, version = 'big'):
 
-	window_summary_file = processed_genotype_data_dir + 'variant_ref_geno_gwas_big_quasi_independent_windows_ld_summary.txt'
+	if version == 'big':
+		window_summary_file = processed_genotype_data_dir + 'variant_ref_geno_gwas_big_quasi_independent_windows_ld_summary.txt'
+	else:
+		window_summary_file = processed_genotype_data_dir + 'variant_ref_geno_gwas_quasi_independent_windows_ld_summary.txt'
 	f = open(window_summary_file)
 	head_count = 0
 	window_names = []
@@ -717,21 +720,12 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 
 	# Open output file handles
 	# Sumstats
-	sumstat_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_eqtl_sumstats.txt'
+	if version == 'big':
+		sumstat_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_big_window_eqtl_sumstats.txt'
+	else:
+		sumstat_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
 	t = open(sumstat_output_file,'w')
 	t.write('gene_id\tvariant_id\twindow_name\tcis_snp\teffect_size\teffect_size_se\n')
-
-	pc_space_sumstat_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_pc_space_eqtl_sumstats.txt'
-	t2 = open(pc_space_sumstat_output_file,'w')
-	t2.write('gene_id\tvariant_id\twindow_name\teffect_size\tsample_size\n')
-
-	h2_est_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_h2_est.txt'
-	t3 = open(h2_est_output_file,'w')
-	t3.write('gene_id\tobs_h2\tldsc_pc_h2\n')
-
-	gene_ld_scores3_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_eqtl_reference_bias_corrected_ld_scores.txt'
-	t_lds = open(gene_ld_scores3_output_file,'w')
-	t_lds.write('gene_id\tvariant_id\twindow_id\tld_score\n')
 
 
 	# Now loop through genes
@@ -784,8 +778,8 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 		window_snp_indices_raw = np.load(window_snp_position_files[window_index])
 		window_snp_indices = np.asarray([False]*total_n_genome_snps)
 		window_snp_indices[window_snp_indices_raw] = True
-		window_q_mat = np.load(window_q_mat_files[window_index])
-		window_w_premult = np.load(window_w_premult_files[window_index])
+		#window_q_mat = np.load(window_q_mat_files[window_index])
+		#window_w_premult = np.load(window_w_premult_files[window_index])
 		window_rsids = np.load(window_rsid_files[window_index])
 
 
@@ -817,13 +811,17 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 		for snp_iter, snp_rsid in enumerate(cis_rsids_big):
 			t.write(ensamble_id + '\t' + snp_rsid + '\t' + window_name + '\t' + str((big_window_cis_subset_indices*1.0)[snp_iter]) + '\t' + str(marginal_effects[snp_iter]) + '\t' + str(marginal_effects_se[snp_iter]) + '\n')
 
+
+
 		# Get PC space marginal effects
+		'''
 		pc_space_marginal_effects = np.dot(window_w_premult, marginal_effects)
 		for snp_iter, pc_space_marginal_effect in enumerate(pc_space_marginal_effects):
 			t2.write(ensamble_id + '\t' + 'ld_pc_' + str(snp_iter) + '\t' + window_name + '\t' + str(pc_space_marginal_effect) + '\t' + str(eqtl_sample_size) + '\n')
-
+		'''
 
 		# Construct ld scores for variants in this gene based on only variants in this gene
+		'''
 		window_ld_scores = np.diag(np.dot(np.dot(window_q_mat,np.diag(big_window_cis_subset_indices*1.0)), np.transpose(window_q_mat)))
 
 
@@ -836,13 +834,11 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 		obs_h2 = np.var(np.dot(gene_geno, sim_causal_eqtl_effect_sizes))
 		t3.write(ensamble_id + '\t' + str(obs_h2) + '\t' + str(ldsc_h2) + '\n')
 		t3.flush()
+		'''
 
 
 	f.close()
 	t.close()
-	t2.close()
-	t3.close()
-	t_lds.close()
 	return
 
 
@@ -1207,7 +1203,8 @@ simulated_causal_eqtl_effect_summary_file = simulated_gene_expression_dir + simu
 ############################
 # Simulate Gene expression and fit gene models for each data-set (eqtl sample-size), tissue
 ############################
-simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_causal_eqtl_effect_summary_file, int(eqtl_sample_size), simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num)
+simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_causal_eqtl_effect_summary_file, int(eqtl_sample_size), simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num, version='small')
+simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_causal_eqtl_effect_summary_file, int(eqtl_sample_size), simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num, version='big')
 
 
 

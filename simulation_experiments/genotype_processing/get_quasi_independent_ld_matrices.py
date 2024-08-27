@@ -388,7 +388,7 @@ quasi_independent_dir = sys.argv[2]
 
 window_size = 1
 
-eqtl_sample_sizes = ['100','300', '500', '1000']
+eqtl_sample_sizes = ['100','300', '500', '1000', '10000']
 
 chrom1_quasi_independent_ld_blocks_file = quasi_independent_dir + 'EUR/' + 'fourier_ls-chr1.bed'
 quasi_windows = get_quasi_windows(chrom1_quasi_independent_ld_blocks_file)
