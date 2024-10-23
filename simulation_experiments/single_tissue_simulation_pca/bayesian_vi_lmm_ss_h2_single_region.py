@@ -28,15 +28,18 @@ class Bayesian_LMM(object):
 	def fit(self, total_iterations=15000, burn_in_iterations=10000, update_resid_var_bool=False, cc=1e-6, univariate_updates=True):
 		""" Fit the model.
 		"""
+		# Extra parameters
+		self.cc = cc
+		self.univariate_updates = univariate_updates
+
+		
 		# Initialize model params
 		self.initialize_variables()
+
 
 		# Keep track of iterations
 		self.itera = 0
 
-		# Parameters to keep track of
-		self.cc = cc
-		self.univariate_updates = univariate_updates
 
 		# Iterative Gibbs sampling algorithm
 		for itera in range(total_iterations):
@@ -61,18 +64,13 @@ class Bayesian_LMM(object):
 				print(self.gamma_var)
 				print(itera)
 			'''
+		self.independent_h2 = self.gamma_var*self.KK
 
-			if itera > burn_in_iterations:
-				self.sampled_gamma_vars.append(self.gamma_var)
-				self.sampled_resid_vars.append(self.resid_var)
-				self.sampled_gammas.append(np.copy(self.gamma))
-				self.sampled_full_h2s.append(np.dot(np.dot(self.gamma, self.LD), self.gamma))
-
-		self.sampled_gamma_vars = np.asarray(self.sampled_gamma_vars)
-		self.sampled_h2 = self.KK*self.sampled_gamma_vars
-		self.sampled_resid_vars = np.asarray(self.sampled_resid_vars)
-		self.sampled_gammas = np.asarray(self.sampled_gammas)
-		self.sampled_full_h2s = np.asarray(self.sampled_full_h2s)
+		if self.univariate_updates:
+			e_beta_t_beta = np.diag(self.gamma_mu_var) + np.dot(self.gamma.reshape(self.KK, 1), self.gamma.reshape(1, self.KK))
+		else:
+			e_beta_t_beta = self.gamma_mu_var + np.dot(self.gamma.reshape(self.KK, 1), self.gamma.reshape(1, self.KK))
+		self.full_h2 = np.trace(np.dot(self.LD, e_beta_t_beta))
 
 		return
 
@@ -93,12 +91,16 @@ class Bayesian_LMM(object):
 	def update_gamma_var(self, v0=0.0, s_sq=0.0):
 		weights = np.ones(self.KK)
 		vv = np.sum(weights) + v0
-		tau_sq = np.sum(weights*np.square(self.gamma)) + s_sq			
+		if self.univariate_updates:
+			tau_sq = np.sum(weights*(np.square(self.gamma) + self.gamma_mu_var)) + s_sq	
+		else:
+			tau_sq = np.sum(weights*(np.square(self.gamma) + np.diag(self.gamma_mu_var))) + s_sq	
+
 
 		# Initialize inverse gamma distribution
-		invgamma_dist = invgamma(vv/2 + self.cc, scale=tau_sq/2 + self.cc)
+		#invgamma_dist = invgamma(vv/2 + self.cc, scale=tau_sq/2 + self.cc)
 		# Sample from it
-		self.gamma_var = invgamma_dist.rvs(size=1)[0]
+		self.gamma_var = (tau_sq/2 + self.cc)/(vv/2 + self.cc)
 
 		#self.gamma_var = tau_sq/vv
 
@@ -107,6 +109,7 @@ class Bayesian_LMM(object):
 
 
 	def update_gamma(self, univariate_updates=True):
+
 		if univariate_updates:
 			for kk in np.random.permutation(range(self.KK)):
 				# Re include current effects
@@ -118,18 +121,17 @@ class Bayesian_LMM(object):
 				posterior_mean = ((self.gwas_beta_resid[kk])/(self.resid_var*self.gwas_beta_var))*posterior_var
 
 				# Sample from posterior distribution
-				self.gamma[kk] = np.random.normal(loc=posterior_mean, scale=np.sqrt(posterior_var))
-
+				self.gamma[kk] = posterior_mean
+				self.gamma_mu_var[kk] = posterior_var
 
 				# Remove updated current effects
 				self.gwas_beta_resid = self.gwas_beta_resid - self.LD[:, kk]*self.gamma[kk]
 
 		elif univariate_updates == False:
-
 			inv_cov = (self.LD/(self.resid_var*self.gwas_beta_var)) + (np.eye(self.KK)/self.gamma_var)
-			posterior_cov = np.linalg.inv(inv_cov)
-			posterior_mu = (1.0/(self.resid_var*self.gwas_beta_var))*np.dot(posterior_cov,self.gwas_beta_resid)
-			self.gamma = np.random.multivariate_normal(mean=posterior_mu, cov=posterior_cov)
+			self.gamma_mu_var = np.linalg.inv(inv_cov)
+			self.gamma = (1.0/(self.resid_var*self.gwas_beta_var))*np.dot(self.gamma_mu_var,self.gwas_beta_resid)
+
 		return
 
 
@@ -137,6 +139,10 @@ class Bayesian_LMM(object):
 	def initialize_variables(self):
 		# Initialize causal effcts
 		self.gamma = np.zeros(self.KK)
+		if self.univariate_updates:
+			self.gamma_mu_var = np.ones(self.KK)
+		else:
+			self.gamma_mu_var = np.ones((self.KK, self.KK))
 
 		# Initialize variance parameters
 		self.gamma_var = 1.0

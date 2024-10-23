@@ -5,7 +5,9 @@ import os
 import pdb
 from scipy.stats import invgamma
 import statsmodels.api as sm
-import time
+
+
+
 
 
 
@@ -38,7 +40,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		return
 
 
-	def fit(self, total_iterations=15000, burn_in_iterations=10000, update_gwas_resid_var=True, update_eqtl_resid_var=True, v0=2.0, s_sq=0.0, cc=0.0):
+	def fit(self, total_iterations=15000, burn_in_iterations=10000, update_resid_var=True, v0=2.0, s_sq=0.0, cc=0.0):
 		""" Fit the model.
 		"""
 		# Initialize model params
@@ -57,7 +59,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 
 			# Update gamma
 			self.update_gamma()
-
+	
 			# Update gamma_var
 			self.update_gamma_var(v0=v0, s_sq=s_sq, cc=cc)
 
@@ -65,14 +67,12 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			self.update_alpha_var(v0=v0, s_sq=s_sq, cc=cc)
 
 			# Update delta var
-			self.update_delta_vars_fast(v0=v0, s_sq=s_sq, cc=cc)
+			self.update_delta_vars(v0=v0, s_sq=s_sq, cc=cc)
 
-			# Update residual variances
-			if update_gwas_resid_var and itera >= 20:
-				self.update_gwas_resid_var(v0=v0, s_sq=s_sq, cc=cc)
-			if update_eqtl_resid_var and itera > 20:
-				self.update_eqtl_resid_var_fast(v0=v0, s_sq=s_sq, cc=cc)
-
+			if update_resid_var:
+				if itera >= 20:
+					self.update_gwas_resid_var(v0=v0, s_sq=s_sq, cc=cc)
+					self.update_eqtl_resid_var(v0=v0, s_sq=s_sq, cc=cc)
 
 			# Update iteration number
 			self.itera = self.itera + 1
@@ -85,37 +85,35 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 
 				tmp_eqtl_h2 = []
 				for gene_iter in range(self.GG):
-					tmp_eqtl_h2.append(self.delta_vars[gene_iter]*self.n_eqtl_snps[gene_iter])
+					tmp_eqtl_h2.append(self.delta_var*self.n_eqtl_snps[gene_iter])
 				eqtl_h2s = np.asarray(tmp_eqtl_h2)
 				eqtl_h2 = np.mean(eqtl_h2s)
 				med_h2 = np.sum(eqtl_h2s*self.alpha_var)
-				alt_med_h2, alt_nm_h2, total_h2, alt_eqtl_h2s = self.compute_overlapping_med_h2()
+				alt_med_h2, alt2_med_h2, total_h2, alt_nm_h2 = self.compute_overlapping_med_h2()
 
 				self.sampled_iters.append(itera)
 				self.sampled_nm_h2_v1.append(nm_h2)
 				self.sampled_nm_h2_v2.append(alt_nm_h2)
 				self.sampled_med_h2_v1.append(med_h2)
 				self.sampled_med_h2_v2.append(alt_med_h2)
+				self.sampled_med_h2_v3.append(alt2_med_h2)
 				self.sampled_total_h2.append(total_h2)
-				self.sampled_eqtl_h2s_v1.append(eqtl_h2)
-				self.sampled_eqtl_h2s_v2.append(np.mean(alt_eqtl_h2s))
+				self.sampled_eqtl_h2s.append(eqtl_h2)
 
 
-				if np.mod(itera, 500) == 0.0:
+				if np.mod(itera, 10) == 0.0:
 
 					print('ITERA ' + str(itera))
 					print('med: ' + str(med_h2))
 					print('alt_med: ' + str(alt_med_h2))
+					print('alt_med2: ' + str(alt2_med_h2))
 					print('nm: ' + str(nm_h2))
 					print('alt_nm: ' + str(alt_nm_h2))
 					print('total: ' + str(total_h2))
 					print('eqtl: ' + str(eqtl_h2))
-					print('alt eqtl: ' + str(np.mean(alt_eqtl_h2s)))
 					print('resid_var: ' + str(self.gwas_resid_var))
 					print('eqtl_resid_var: ' + str(np.mean(self.eqtl_resid_vars)))
 					print(np.sort(eqtl_h2s))
-					print(np.sort(self.eqtl_resid_vars))
-
 
 
 		self.sampled_iters = np.asarray(self.sampled_iters)
@@ -123,10 +121,10 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		self.sampled_nm_h2_v2 = np.asarray(self.sampled_nm_h2_v2)
 		self.sampled_med_h2_v1 = np.asarray(self.sampled_med_h2_v1)
 		self.sampled_med_h2_v2 = np.asarray(self.sampled_med_h2_v2)
+		self.sampled_med_h2_v3 = np.asarray(self.sampled_med_h2_v3)
 		self.sampled_total_h2 = np.asarray(self.sampled_total_h2)
-		self.sampled_eqtl_h2s_v1 = np.asarray(self.sampled_eqtl_h2s_v1)
-		self.sampled_eqtl_h2s_v2 = np.asarray(self.sampled_eqtl_h2s_v2)
-
+		self.sampled_eqtl_h2s = np.asarray(self.sampled_eqtl_h2s)
+		
 		return
 
 	def update_gwas_resid_var(self, v0=0.0, s_sq=0.0, cc=1e-6):
@@ -134,70 +132,30 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		tau_sq = np.sum(np.square(self.gwas_beta_resid)/self.gwas_beta_var) + s_sq
 
 		# Initialize inverse gamma distribution
-		#invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
+		invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
 		# Sample from it
-		#self.gwas_resid_var = invgamma_dist.rvs(size=1)[0]
-
-		self.gwas_resid_var = (1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1))[0]
+		self.gwas_resid_var = invgamma_dist.rvs(size=1)[0]
 
 		return
 
-	def update_delta_vars(self, v0=0.0, s_sq=0.0, cc=1e-6, weighted=False):
+	def update_delta_vars(self, v0=0.0, s_sq=0.0, cc=1e-6):
 		# Loop through genes
+		vv = 0. + v0
+		tau_sq = 0.0 + s_sq
 		for gg in np.random.permutation(range(self.GG)):
 
-			if weighted == False:
-				vv = len(self.deltas[gg]) + v0
-				tau_sq = np.sum(np.square(self.deltas[gg])/self.eqtl_ldscore[gg]) + s_sq
-			else:
-				vv = np.sum(self.eqtl_ldscore[gg]) + v0
-				tau_sq = np.sum(np.square(self.deltas[gg])) + s_sq
+
+			vv = vv + len(self.deltas[gg]) 
+			tau_sq = tau_sq + np.sum(np.square(self.deltas[gg])/self.eqtl_ldscore[gg]) 
 
 
 
-			#indices = self.eqtl_ldscore[gg] > .1		
-			#vv = np.sum(indices)
-			#tau_sq = np.sum(np.square(self.deltas[gg][indices])/self.eqtl_ldscore[gg][indices]) + s_sq
+		# Initialize inverse gamma distribution
+		invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2)+cc)
+		# Sample from it
+		self.delta_var = invgamma_dist.rvs(size=1)[0]
 
-			# Initialize inverse gamma distribution
-			#invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2)+cc)
-			# Sample from it
-			#self.delta_vars[gg] = invgamma_dist.rvs(size=1)[0]
-			
-			# Sample from inverse gamma using numpy
-			self.delta_vars[gg] = 1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1)
 		return
-
-	def update_delta_vars_fast(self, v0=0.0, s_sq=0.0, cc=1e-6, weighted=False):
-		# Loop through genes
-		param1 = []
-		param2 = []
-		for gg in range(self.GG):
-
-			if weighted == False:
-				vv = len(self.deltas[gg]) + v0
-				tau_sq = np.sum(np.square(self.deltas[gg])/self.eqtl_ldscore[gg]) + s_sq
-			else:
-				vv = np.sum(self.eqtl_ldscore[gg]) + v0
-				tau_sq = np.sum(np.square(self.deltas[gg])) + s_sq
-
-			param1.append((vv/2) + cc)
-			param2.append(1.0/((tau_sq/2) + cc))
-
-			#indices = self.eqtl_ldscore[gg] > .1		
-			#vv = np.sum(indices)
-			#tau_sq = np.sum(np.square(self.deltas[gg][indices])/self.eqtl_ldscore[gg][indices]) + s_sq
-
-			# Initialize inverse gamma distribution
-			#invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2)+cc)
-			# Sample from it
-			#self.delta_vars[gg] = invgamma_dist.rvs(size=1)[0]
-			
-			# Sample from inverse gamma using numpy
-			#self.delta_vars[gg] = 1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1)
-		self.delta_vars = 1.0/np.random.gamma(shape=param1, scale=param2)
-		return
-
 
 	def update_eqtl_resid_var(self, v0=0.0, s_sq=0.0, cc=1e-6):
 		for gg in range(self.GG):
@@ -207,52 +165,33 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			tau_sq = np.sum(np.square(resid_vec)/self.eqtl_beta_var) + s_sq
 
 			# Initialize inverse gamma distribution
-			#invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
+			invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
 			# Sample from it
-			#self.eqtl_resid_vars[gg] = invgamma_dist.rvs(size=1)[0]
-			
-			# Sample from inverse gamma using numpy
-			self.eqtl_resid_vars[gg] = 1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1)
+			self.eqtl_resid_vars[gg] = invgamma_dist.rvs(size=1)[0]
+		
 		return
-
-	def update_eqtl_resid_var_fast(self, v0=0.0, s_sq=0.0, cc=1e-6):
-		param1 = []
-		param2 = []
-		for gg in range(self.GG):
-			resid_vec = self.eqtl_beta[gg] - self.deltas[gg]
-
-			vv = len(resid_vec) + v0
-			tau_sq = np.sum(np.square(resid_vec)/self.eqtl_beta_var) + s_sq
-
-			param1.append((vv/2) + cc)
-			param2.append(1.0/((tau_sq/2) + cc))
-
-			# Initialize inverse gamma distribution
-			#invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
-			# Sample from it
-			#self.eqtl_resid_vars[gg] = invgamma_dist.rvs(size=1)[0]
-			
-			# Sample from inverse gamma using numpy
-		self.eqtl_resid_vars = 1.0/np.random.gamma(shape=param1, scale=param2)
-		return
-
 
 	def compute_overlapping_med_h2(self):
 		genome_delta_alpha = np.zeros(self.KK)
-		eqtl_alt = []
-		#genome_delta_alpha2 = np.zeros(self.KK)
+		eqtl_ld_scores = np.zeros(self.KK)
+		v1 = 0
+		total_eqtl_snps = 0
 		for gg in range(self.GG):
 			genome_delta_alpha[self.eqtl_position[gg]] = genome_delta_alpha[self.eqtl_position[gg]] + (self.deltas[gg]*self.alpha[gg])
-			eqtl_alt.append(np.sum(np.square(self.deltas[gg])))
+			v1 = v1 + np.sum(np.square((self.deltas[gg]*self.alpha[gg])))
+			eqtl_ld_scores[self.eqtl_position[gg]] = eqtl_ld_scores[self.eqtl_position[gg]] + self.eqtl_ldscore[gg]
+			total_eqtl_snps = total_eqtl_snps + self.n_eqtl_snps[gg]
 
 
-		med_alt = np.sum(np.square(genome_delta_alpha))
+		v2 = np.sum(np.square(genome_delta_alpha))
+		weighted = np.square(genome_delta_alpha)/eqtl_ld_scores
+		v3 = np.mean(weighted[np.isnan(weighted) == False])*total_eqtl_snps
 
 		total = np.sum(np.square(genome_delta_alpha + self.gamma))
 
 		nm_alt = np.sum(np.square(self.gamma))
 		
-		return med_alt, nm_alt, total, np.asarray(eqtl_alt)
+		return v2, v3, total, nm_alt
 
 	def update_deltas(self):
 		# Loop through genes
@@ -263,7 +202,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			cis_gwas_beta_var = self.gwas_beta_var
 
 			# Compute posterior distribution
-			marginal_delta_vars = self.delta_vars[gg]*self.eqtl_ldscore[gg]
+			marginal_delta_vars = self.delta_var*self.eqtl_ldscore[gg]
 
 			posterior_vars = 1.0/((np.square(self.alpha[gg])/(self.gwas_resid_var*cis_gwas_beta_var)) + (1.0/(self.eqtl_beta_var*self.eqtl_resid_vars[gg])) + (1.0/marginal_delta_vars))
 			posterior_means = ((cis_gwas_beta*self.alpha[gg]/(self.gwas_resid_var*cis_gwas_beta_var)) + (self.eqtl_beta[gg]/(self.eqtl_beta_var*self.eqtl_resid_vars[gg])))*posterior_vars
@@ -298,21 +237,15 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		return
 
 
-	def update_gamma_var(self, v0=0.0, s_sq=0.0, cc=1e-6, weighted=False):
-		if weighted == False:
-			weights = np.ones(self.KK)
-		else:
-			weights = np.copy(self.var_ldscores)
+	def update_gamma_var(self, version='ld_score_weighting', v0=0.0, s_sq=0.0, cc=1e-6):
+		weights = np.ones(self.KK)
 		vv = np.sum(weights) + v0
 		tau_sq = np.sum(weights*np.square(self.gamma)/self.var_ldscores) + s_sq
 
 		# Initialize inverse gamma distribution
-		#invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
+		invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
 		# Sample from it
-		#self.gamma_var = invgamma_dist.rvs(size=1)[0]
-
-		# Inverse gamma distribution in numpy
-		self.gamma_var = (1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1))[0]
+		self.gamma_var = invgamma_dist.rvs(size=1)[0]
 
 		return
 
@@ -324,13 +257,9 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		tau_sq = np.sum(weights*np.square(self.alpha)) + s_sq
 
 		# Initialize inverse gamma distribution
-		#invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2)+cc)
+		invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2)+cc)
 		# Sample from it
-		#self.alpha_var = invgamma_dist.rvs(size=1)[0]
-
-		# Inverse gamma distribution in numpy
-		self.alpha_var = (1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1))[0]
-
+		self.alpha_var = invgamma_dist.rvs(size=1)[0]
 		#self.alpha_var = np.sum(weights*np.square(self.alpha))/np.sum(weights)
 
 		return
@@ -366,7 +295,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		# Initialize variance parameters
 		self.gamma_var = 1e-6
 		self.alpha_var = 1e-3
-		self.delta_vars = np.ones(self.GG)*1e-3
+		self.delta_var = 1e-3
 
 		self.gwas_resid_var = 1.0
 		self.eqtl_resid_vars = []
@@ -386,8 +315,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		self.sampled_med_h2_v2 = []
 		self.sampled_med_h2_v3 = []
 		self.sampled_total_h2 = []
-		self.sampled_eqtl_h2s_v1 = []
-		self.sampled_eqtl_h2s_v2 = []
+		self.sampled_eqtl_h2s = []
 		self.sampled_iters = []
 
 		return

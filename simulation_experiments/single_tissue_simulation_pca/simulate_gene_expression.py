@@ -203,14 +203,14 @@ def simulate_causal_eqtl_effect_sizes_across_tissues_shell(n_cis_snps, fraction_
 
 
 def simulate_causal_eqtl_effect_sizes_in_single_tissue_shell(n_cis_snps, fraction_genes_cis_h2, gene_ge_h2, eqtl_architecture):
-	min_h2 = 0
-	while min_h2 < .01:
+	E_h2 = 0
+	while E_h2 < .01 or E_h2 > .6:
 		if eqtl_architecture == 'default':
 			causal_eqtl_effects = simulate_causal_eqtl_effect_sizes_in_single_tissue(n_cis_snps, gene_ge_h2)
 		else:
 			print('assumption error: Eqtl architecture: ' + eqtl_architecture + ' not currently implemented')
 			pdb.set_trace()
-		min_h2 = np.min(np.sum(np.square(causal_eqtl_effects),axis=0))
+		E_h2 = np.sum(np.square(causal_eqtl_effects),axis=0)
 	# Make (1.0 - fraction_genes_cis_h2)% of genes not cis heritable
 	gene_cis_h2_boolean = np.random.binomial(n=1, p=fraction_genes_cis_h2)
 	if gene_cis_h2_boolean == 0:

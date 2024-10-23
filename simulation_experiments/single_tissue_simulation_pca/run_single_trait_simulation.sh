@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-1:30                         # Runtime in D-HH:MM format
+#SBATCH -t 0-3:30                         # Runtime in D-HH:MM format
 #SBATCH -p short                           # Partition to run in
 #SBATCH --mem=11GB                         # Memory total in MiB (for all cores)
 
@@ -33,7 +33,6 @@ module load gcc/9.2.0
 module load python/3.9.14
 module load cuda/12.1
 source /n/groups/price/ben/environments/tf_new/bin/activate
-
 
 #######################################################
 # Step 1: Simulate gene expression causal eqtl effects
@@ -73,10 +72,23 @@ done
 
 
 
+##############################
+# Step 6: learn multivariate expression models
+##############################
+echo "Simulation Step 6"
+eqtl_sample_size_arr=( "100" "300" "500" "1000" "10000")
+
+source /home/bes710/.bash_profile
+module load python/3.7.4
+module load R/4.0.1
+for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
+do
+	echo $eqtl_sample_size
+	python3 learn_multivariate_gene_models.py $simulation_number $simulated_learned_gene_models_dir $simulation_name_string $eqtl_sample_size
+done
+
 
 date
-
-
 
 
 

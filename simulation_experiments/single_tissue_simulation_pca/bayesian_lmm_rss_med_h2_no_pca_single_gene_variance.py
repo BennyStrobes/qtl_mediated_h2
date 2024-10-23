@@ -94,6 +94,7 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 				#self.sampled_eqtl_resid_var.append(np.mean(eqtl_resid_vars))
 
 				print('######################################')
+				print('Iteration ' + str(itera))
 				print('NM: ' + str(nm_h2))
 				print('NM2: ' + str(nm_h2_ld_depen))
 				print('MED: ' + str(med_h2))
@@ -165,7 +166,7 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 		tmp_eqtl_h2s = []
 		tmp_eqtl_h2s2 = []
 		for gene in self.genes:
-			tmp_eqtl_h2s.append(self.delta_vars[gene]*self.gene_info[gene]['n_cis_snps'])
+			tmp_eqtl_h2s.append(self.delta_var*self.gene_info[gene]['n_cis_snps'])
 			tmp_eqtl_h2s2.append(self.gene_vars[gene])
 		return np.asarray(tmp_eqtl_h2s), np.asarray(tmp_eqtl_h2s2)
 
@@ -209,16 +210,20 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 
 	def update_delta_vars(self, v0=0.0, s_sq=0.0, cc=1e-6):
 		# Loop through genes
+		vv = 0.0
+		tau_sq = 0.0
 		for gene in self.genes:
 		
 			delta = self.deltas[gene]
-			vv = len(delta) + v0
-			tau_sq = np.sum(np.square(delta)) + s_sq
+			vv = vv + len(delta) 
+			tau_sq = tau_sq + np.sum(np.square(delta)) 
 
-			# Initialize inverse gamma distribution
-			invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
-			# Sample from it
-			self.delta_vars[gene] = invgamma_dist.rvs(size=1)[0]
+		vv = vv + v0
+		tau_sq = tau_sq + s_sq
+		# Initialize inverse gamma distribution
+		invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
+		# Sample from it
+		self.delta_var = invgamma_dist.rvs(size=1)[0]
 		
 		return
 
@@ -347,7 +352,7 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 			eqtl_gene_beta_resid = self.eqtl_beta_resid[gene]
 
 			# Compute update for single gene
-			delta, window_gwas_beta_resid, eqtl_gene_beta_resid = self.update_delta_for_single_gene(gene_gwas_ld, gene_eqtl_ld, delta, window_gwas_beta_resid, eqtl_gene_beta_resid, self.alpha[gene], self.delta_vars[gene], self.eqtl_resid_vars[gene], window_gwas_resid_var, window_cis_indices, delta_updates)
+			delta, window_gwas_beta_resid, eqtl_gene_beta_resid = self.update_delta_for_single_gene(gene_gwas_ld, gene_eqtl_ld, delta, window_gwas_beta_resid, eqtl_gene_beta_resid, self.alpha[gene], self.delta_var, self.eqtl_resid_vars[gene], window_gwas_resid_var, window_cis_indices, delta_updates)
 
 			self.eqtl_beta_resid[gene] = eqtl_gene_beta_resid
 			self.deltas[gene] = delta
@@ -534,7 +539,7 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 		# Initialize causal gene effects
 		self.alpha = {}
 		self.deltas = {}
-		self.delta_vars = {}
+		self.delta_var = 1e-1
 		self.eqtl_resid_vars = {}
 		self.eqtl_beta_resid = {}
 		self.gene_vars = {}
@@ -554,12 +559,12 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 
 			# Initialize
 			self.deltas[gene] = np.mean(gene_mod.sampled_gammas,axis=0)
-			self.delta_vars[gene] = np.mean(gene_mod.sampled_gamma_vars)
+			#self.delta_vars[gene] = np.mean(gene_mod.sampled_gamma_vars)
 			#self.eqtl_resid_vars[gene] = np.mean(gene_mod.sampled_resid_vars)
 			self.eqtl_resid_vars[gene] = 1.0
 			self.eqtl_beta_resid[gene] = gene_beta - np.dot(gene_LD, self.deltas[gene])
 
-			self.gene_vars[gene] = self.delta_vars[gene]*np.sum(gene_cis_snp_indices)
+			self.gene_vars[gene] = self.delta_var*np.sum(gene_cis_snp_indices)
 
 
 		# Initialize variance parameters

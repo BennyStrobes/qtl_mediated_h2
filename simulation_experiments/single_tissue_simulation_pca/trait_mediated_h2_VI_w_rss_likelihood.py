@@ -5,7 +5,7 @@ import os
 import pdb
 from scipy.stats import invgamma
 import statsmodels.api as sm
-import bayesian_lmm_rss_med_h2
+import bayesian_VI_lmm_rss_med_h2
 
 
 
@@ -323,12 +323,12 @@ f.close()
 '''
 
 if resid_var_bool == 'True':
-	tmp_output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_' + str(N_eqtl) + '_' + window_version+ '_resid_var_variable_rss_tmp_res.txt'
-	mod = bayesian_lmm_rss_med_h2.Bayesian_LMM_RSS_med_h2_inference(window_info, gene_info, N_gwas, N_eqtl, tmp_output_file)
+	tmp_output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_' + str(N_eqtl) + '_' + window_version+ '_resid_var_variable_rss_VI_tmp_res.txt'
+	mod = bayesian_VI_lmm_rss_med_h2.Bayesian_LMM_RSS_med_h2_inference(window_info, gene_info, N_gwas, N_eqtl, tmp_output_file)
 	mod.fit(burn_in_iterations=1, total_iterations=10000, update_resid_var_bool=True)
 elif resid_var_bool == 'False':
-	tmp_output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_' + str(N_eqtl) + '_' + window_version + '_resid_var_const_rss_tmp_res.txt'
-	mod = bayesian_lmm_rss_med_h2.Bayesian_LMM_RSS_med_h2_inference(window_info, gene_info, N_gwas, N_eqtl, tmp_output_file)
+	tmp_output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_' + str(N_eqtl) + '_' + window_version + '_resid_var_const_rss_VI_tmp_res.txt'
+	mod = bayesian_VI_lmm_rss_med_h2.Bayesian_LMM_RSS_med_h2_inference(window_info, gene_info, N_gwas, N_eqtl, tmp_output_file)
 	mod.fit(burn_in_iterations=1, total_iterations=10000, update_resid_var_bool=False)
 
 

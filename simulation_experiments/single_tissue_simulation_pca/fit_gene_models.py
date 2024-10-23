@@ -332,7 +332,29 @@ def simulate_gene_expression(G, sim_beta):
 	gene_heritability = np.var(genetic_pred_ge)
 	if gene_heritability > 1:
 		gene_heritability = .99
-	ge = np.random.normal(loc=genetic_pred_ge, scale=np.sqrt(1.0-gene_heritability))
+		print('assumption eroorr')
+		pdb.set_trace()
+
+	noise = np.random.normal(loc=0, scale=np.sqrt(1.0-gene_heritability), size=len(genetic_pred_ge))
+
+	# Find right amount of noise such that variance is 1.0
+	scale_factors = np.arange(0,3.0,.0001)
+	diffs = []
+	for scale_factor in scale_factors:
+		diff = np.abs(1.0 - np.std(genetic_pred_ge + (scale_factor*noise)))
+		diffs.append(diff)
+	diffs = np.asarray(diffs)
+	best_index = np.argmin(diffs)
+	best_scale_factor = scale_factors[best_index]
+
+	# Get gene expression
+	# Should have variance really close to 1.0
+	ge = genetic_pred_ge + (best_scale_factor*noise)
+
+	if np.abs(np.std(ge) - 1.0) > .025:
+		print('assumption eroror')
+		pdb.set_trace()
+	#ge = np.random.normal(loc=genetic_pred_ge, scale=np.sqrt(1.0-gene_heritability))
 	return ge
 
 
@@ -716,14 +738,14 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 	G_obj_geno_stand = standardize_genotype_dosage_matrix(genotype_dosage)
 
 
-
-
 	# Open output file handles
 	# Sumstats
 	if version == 'big':
 		sumstat_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_big_window_eqtl_sumstats.txt'
+		gene_model_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_big_window_gene_model_info.txt'
 	else:
 		sumstat_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
+		gene_model_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_gene_model_info.txt'
 	t = open(sumstat_output_file,'w')
 	t.write('gene_id\tvariant_id\twindow_name\tcis_snp\teffect_size\teffect_size_se\n')
 
@@ -733,6 +755,7 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 	head_count = 0
 	counter = 0
 	used_genes = {}
+	aa = []
 	for line in f:
 		line = line.rstrip()
 		data = line.split('\t')
@@ -804,6 +827,16 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 		# Standardize simulated gene expression
 		sim_stand_expr = (sim_expr - np.mean(sim_expr))/np.std(sim_expr)
 
+
+		# Save expression and genotype to output file 
+		expr_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_' + version + '_' + ensamble_id + '_expression.npy' 
+		genotype_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_' + version + '_' + ensamble_id + '_genotype.npy' 
+		cis_snp_names_output = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_' + version + '_' + ensamble_id + '_genotype_cis_snp_names.npy' 
+		np.save(expr_output_file, sim_stand_expr)
+		np.save(genotype_output_file, gene_geno)
+		np.save(cis_snp_names_output, cis_rsids)
+
+
 		# Compute marginal association statistics for this gene
 		marginal_effects, marginal_effects_se = compute_marginal_regression_coefficients(sim_stand_expr, gene_geno_big)
 
@@ -835,7 +868,6 @@ def simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_ca
 		t3.write(ensamble_id + '\t' + str(obs_h2) + '\t' + str(ldsc_h2) + '\n')
 		t3.flush()
 		'''
-
 
 	f.close()
 	t.close()
@@ -1204,7 +1236,7 @@ simulated_causal_eqtl_effect_summary_file = simulated_gene_expression_dir + simu
 # Simulate Gene expression and fit gene models for each data-set (eqtl sample-size), tissue
 ############################
 simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_causal_eqtl_effect_summary_file, int(eqtl_sample_size), simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num, version='small')
-simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_causal_eqtl_effect_summary_file, int(eqtl_sample_size), simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num, version='big')
+#simulate_gene_expression_and_fit_gene_model_for_all_genes_shell(simulated_causal_eqtl_effect_summary_file, int(eqtl_sample_size), simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_num, version='big')
 
 
 

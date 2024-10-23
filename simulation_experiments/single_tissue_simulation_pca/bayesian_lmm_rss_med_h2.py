@@ -66,15 +66,11 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 			# Update resid var
 			if update_resid_var_bool:
 				gwas_resid_vars = self.update_gwas_resid_var()
-				#self.update_eqtl_resid_vars()
+				self.update_eqtl_resid_vars()
 
 			# Update iteration number
 			self.itera = self.itera + 1
 
-
-			if self.itera == 100:
-				self.check_resid_vars()
-				print('done')
 	
 
 			if itera > burn_in_iterations:
@@ -85,6 +81,8 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 				avg_eqtl_h2 = np.mean(eqtl_h2s)
 				eqtl_resid_vars = self.get_eqtl_resid_vars()
 
+				nm_h2_ld_depen, med_h2_ld_depen = self.get_ld_dependent_h2s()
+
 
 				self.sampled_nm_h2.append(nm_h2)
 				self.sampled_med_h2.append(med_h2)
@@ -94,12 +92,14 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 				self.sampled_eqtl_resid_var.append(np.mean(eqtl_resid_vars))
 
 				print('NM: ' + str(nm_h2))
+				print('NM2: ' + str(nm_h2_ld_depen))
 				print('MED: ' + str(med_h2))
 				print('MED2: ' + str(med_h2_alt))
 				print('MED3 ' + str(med_h2_alt2))
+				print('MED4 ' + str(med_h2_ld_depen))
 
 
-				#self.tt.write(str(itera) + '\t' + str(nm_h2) + '\t' + str(med_h2) + '\t' + str(med_h2_alt) + '\t' + str(avg_eqtl_h2) + '\t' + str(np.mean(gwas_resid_vars)) + '\t' + str(np.mean(eqtl_resid_vars)) + '\n')
+				self.tt.write(str(itera) + '\t' + str(nm_h2) + '\t' + str(nm_h2_ld_depen) + '\t' + str(med_h2) + '\t' + str(med_h2_alt) + '\t' + str(med_h2_ld_depen) + '\t' + str(avg_eqtl_h2) + '\t' + str('NA') + '\n')
 				self.tt.flush()
 
 
@@ -112,6 +112,14 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 		self.tt.close()
 
 		return
+
+	def get_ld_dependent_h2s(self):
+		med = 0.0
+		nm = 0.0
+		for window in self.windows:
+			med = med + self.window_med_h2[window]
+			nm = nm + self.window_nm_h2[window]
+		return nm, med
 
 	def check_resid_vars(self):
 		for window in self.windows:
@@ -218,7 +226,7 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 
 		return
 
-	def update_gwas_resid_var(self, v0=0.0, s_sq=0.0, cc=1e-6, window_specific_variance=True):
+	def update_gwas_resid_var(self, v0=0.0, s_sq=0.0, cc=1e-6, window_specific_variance=False):
 		gwas_resid_vars = []
 		if window_specific_variance == False:
 			all_resids = []
@@ -287,7 +295,30 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 			# Update gamma and alpha in single window
 			self.update_gamma_and_alpha_in_single_window(window_name, window_Q)		
 
+
+		window_ld = np.load(self.window_info[window_name]['LD_file'])
+		self.update_window_genetic_var(window_name, window_ld)
+
 		return
+
+
+	def update_window_genetic_var(self, window_name, LD_mat):
+
+		window_genes = self.window_info[window_name]['genes']
+
+		window_med_causal_effects = np.zeros(self.window_info[window_name]['n_snps'])
+		window_nm_causal_effects = np.copy(self.gamma[window_name])
+
+		for gene in window_genes:
+			window_cis_indices = self.gene_info[gene]['cis_snps']
+			window_med_causal_effects[window_cis_indices] = window_med_causal_effects[window_cis_indices] + (self.deltas[gene]*self.alpha[gene])
+
+		self.window_med_h2[window_name] = np.dot(np.dot(window_med_causal_effects, LD_mat), window_med_causal_effects)
+		self.window_nm_h2[window_name] = np.dot(np.dot(window_nm_causal_effects, LD_mat), window_nm_causal_effects)
+
+		return
+
+
 
 	def update_delta_in_single_window(self, window_name, window_Q):
 		# Get list of genes in this window
@@ -435,6 +466,8 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 		self.gamma = {}
 		self.gwas_beta_resid = {}
 		self.gwas_resid_var = {}
+		self.window_med_h2 = {}
+		self.window_nm_h2 = {}
 		for window_name in self.windows:
 			self.gamma[window_name] = np.zeros(self.window_info[window_name]['n_snps'])
 			self.gwas_beta_resid[window_name] = np.copy(self.window_info[window_name]['beta_pc'])
@@ -444,6 +477,11 @@ class Bayesian_LMM_RSS_med_h2_inference(object):
 			self.window_info[window_name]['Q_sum_sq'] = np.sum(np.square(window_Q),axis=0)
 
 			self.gwas_resid_var[window_name] = 1.0
+
+			self.window_med_h2[window_name] = 0.0
+			self.window_nm_h2[window_name] = 0.0
+
+
 
 
 		# Create list of genetic elements in each window

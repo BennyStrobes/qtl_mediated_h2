@@ -269,7 +269,6 @@ def construct_variant_ld_mat_based_on_quasi_windows(genotype_stem, output_stem, 
 		window_global_positions = np.where(window_position_indices==True)[0]
 
 
-		'''
 		# EIG value decomp
 		lambdas_full, U_full = np.linalg.eig(ld_mat)
 		non_negative_components = lambdas_full > 0.0
@@ -291,13 +290,11 @@ def construct_variant_ld_mat_based_on_quasi_windows(genotype_stem, output_stem, 
 		U = U[:, thresh_components]
 
 
-
 		# Note that reconstruction of ld_mat is achieved with np.dot(np.dot(U, np.diag(lambdas)), np.transpose(U))
 
 		# Compute some relevent quantities
 		Q_mat = np.dot(np.diag(lambdas**(.5)), np.transpose(U))
 		w_premult = np.dot(np.diag(lambdas**(-.5)), np.transpose(U))
-		'''
 
 		# Start saving things to output file
 		window_name = 'window_' + str(int(outer_window_start_pos)) + '_' + str(int(outer_window_end_pos))
@@ -319,14 +316,14 @@ def construct_variant_ld_mat_based_on_quasi_windows(genotype_stem, output_stem, 
 		np.save(window_position_file, window_global_positions)
 
 		# Save Q_mat to output
-		#Q_mat_file = output_stem + '_' + window_name + '_Q_mat.npy'
-		#np.save(Q_mat_file, Q_mat)
+		Q_mat_file = output_stem + '_' + window_name + '_Q_mat.npy'
+		np.save(Q_mat_file, Q_mat)
 		
 		# Save w_premult to output
-		#w_premult_file = output_stem + '_' + window_name + '_w_premult_mat.npy'
-		#np.save(w_premult_file, w_premult)
+		w_premult_file = output_stem + '_' + window_name + '_w_premult_mat.npy'
+		np.save(w_premult_file, w_premult)
 
-		t.write(window_name + '\t' + str(int(outer_window_start_pos)) + '\t' + str(int(outer_window_end_pos)) + '\t' + ld_mat_file + '\t' + window_position_file + '\t' + rsid_file + '\t' + middle_boolean_file + '\t' + 'NA' + '\t' + 'NA' + '\n')	
+		t.write(window_name + '\t' + str(int(outer_window_start_pos)) + '\t' + str(int(outer_window_end_pos)) + '\t' + ld_mat_file + '\t' + window_position_file + '\t' + rsid_file + '\t' + middle_boolean_file + '\t' + Q_mat_file + '\t' + w_premult_file + '\n')	
 
 	t.close()
 	return

@@ -7,7 +7,7 @@ from scipy.stats import invgamma
 import statsmodels.api as sm
 import bayesian_lmm_rss_med_h2
 import bayesian_lmm_rss_med_h2_no_pca
-
+import bayesian_lmm_rss_med_h2_no_pca_single_gene_variance
 
 
 
@@ -197,6 +197,10 @@ N_eqtl = int(sys.argv[8])
 trait_med_h2_inference_dir = sys.argv[9]
 window_version = sys.argv[10]
 delta_updates = sys.argv[11]
+cc_hyperparam_str = sys.argv[12]
+
+cc_hyperparam = float(cc_hyperparam_str)
+
 
 
 # Load in true simulated data parameters
@@ -206,6 +210,7 @@ sim_med_h2 = np.var(np.loadtxt(genetic_trait_expr_med_file))
 sim_nm_h2 = np.var(np.loadtxt(genetic_trait_nm_file))
 sim_h2 = np.var(np.loadtxt(genetic_trait_nm_file) + np.loadtxt(genetic_trait_expr_med_file))
 
+print(sim_h2)
 print(sim_nm_h2)
 print(sim_med_h2)
 # Load in GWAS summary statistics
@@ -250,7 +255,19 @@ gene_info = pickle.load(f)
 f.close()
 '''
 
-tmp_output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_' + str(N_eqtl) + '_' + window_version + '_' + delta_updates + '_resid_var_variable_rss_tmp_res_big_windows_no_pca.txt'
+'''
+# Default option
+tmp_output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_' + str(N_eqtl) + '_' + window_version + '_' + delta_updates + '_' + cc_hyperparam_str + '_resid_var_variable_rss_tmp_res_big_windows_no_pca.txt'
 mod = bayesian_lmm_rss_med_h2_no_pca.Bayesian_LMM_RSS_med_h2_inference(window_info, gene_info, N_gwas, N_eqtl, tmp_output_file)
-mod.fit(burn_in_iterations=1, total_iterations=40000, update_resid_var_bool=False, delta_updates=delta_updates)
+mod.fit(burn_in_iterations=2000, total_iterations=40000, update_resid_var_bool=False, delta_updates=delta_updates,cc=cc_hyperparam)
+'''
+
+
+# single variant-gene variance parameter
+tmp_output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_' + str(N_eqtl) + '_' + window_version + '_' + delta_updates + '_' + cc_hyperparam_str + '_resid_var_variable_rss_tmp_res_big_windows_no_pca_single_gene_variance.txt'
+mod = bayesian_lmm_rss_med_h2_no_pca_single_gene_variance.Bayesian_LMM_RSS_med_h2_inference(window_info, gene_info, N_gwas, N_eqtl, tmp_output_file)
+mod.fit(burn_in_iterations=2000, total_iterations=40000, update_resid_var_bool=False, delta_updates=delta_updates,cc=cc_hyperparam)
+
+
+
 
