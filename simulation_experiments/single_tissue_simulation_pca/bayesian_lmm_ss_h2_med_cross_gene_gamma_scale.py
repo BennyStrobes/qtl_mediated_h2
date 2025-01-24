@@ -40,7 +40,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		return
 
 
-	def fit(self, total_iterations=15000, burn_in_iterations=10000, update_resid_var=True, v0=2.0, s_sq=0.0, cc=0.0, gene_gamma_shape=1.0):
+	def fit(self, total_iterations=15000, burn_in_iterations=10000, update_resid_var=True, v0=0.0, s_sq=0.0, cc=0.0, gene_gamma_shape=1.0):
 		""" Fit the model.
 		"""
 		# Initialize model params
@@ -83,6 +83,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 	
 
 
+
 			if itera > burn_in_iterations:
 
 				nm_h2 = self.gamma_var*self.n_gwas_snps
@@ -93,32 +94,29 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 				eqtl_h2s = np.asarray(tmp_eqtl_h2)
 				eqtl_h2 = np.mean(eqtl_h2s)
 				med_h2 = np.sum(eqtl_h2s*self.alpha_var)
-				alt_med_h2, alt2_med_h2, total_h2, alt_nm_h2 = self.compute_overlapping_med_h2()
+				alt_med_h2, alt_nm_h2, total_h2, alt_eqtl_h2s = self.compute_overlapping_med_h2()
 
 				self.sampled_iters.append(itera)
 				self.sampled_nm_h2_v1.append(nm_h2)
 				self.sampled_nm_h2_v2.append(alt_nm_h2)
 				self.sampled_med_h2_v1.append(med_h2)
 				self.sampled_med_h2_v2.append(alt_med_h2)
-				self.sampled_med_h2_v3.append(alt2_med_h2)
 				self.sampled_total_h2.append(total_h2)
-				self.sampled_eqtl_h2s.append(eqtl_h2)
+				self.sampled_eqtl_h2s_v1.append(eqtl_h2)
+				self.sampled_eqtl_h2s_v2.append(np.mean(alt_eqtl_h2s))
 
 
-				if np.mod(itera, 50) == 0.0:
+				if np.mod(itera, 500) == 0.0:
 
 					print('ITERA ' + str(itera))
-					print('med: ' + str(med_h2))
 					print('alt_med: ' + str(alt_med_h2))
-					print('alt_med2: ' + str(alt2_med_h2))
-					print('nm: ' + str(nm_h2))
 					print('alt_nm: ' + str(alt_nm_h2))
 					print('total: ' + str(total_h2))
-					print('eqtl: ' + str(eqtl_h2))
+					print('alt eqtl: ' + str(np.mean(alt_eqtl_h2s)))
 					print('resid_var: ' + str(self.gwas_resid_var))
 					print('eqtl_resid_var: ' + str(np.mean(self.eqtl_resid_vars)))
-					print(print(self.gene_gamma_scale/(self.gene_gamma_shape-1.0)))
 					print(np.sort(eqtl_h2s))
+
 
 
 		self.sampled_iters = np.asarray(self.sampled_iters)
@@ -126,26 +124,32 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		self.sampled_nm_h2_v2 = np.asarray(self.sampled_nm_h2_v2)
 		self.sampled_med_h2_v1 = np.asarray(self.sampled_med_h2_v1)
 		self.sampled_med_h2_v2 = np.asarray(self.sampled_med_h2_v2)
-		self.sampled_med_h2_v3 = np.asarray(self.sampled_med_h2_v3)
 		self.sampled_total_h2 = np.asarray(self.sampled_total_h2)
-		self.sampled_eqtl_h2s = np.asarray(self.sampled_eqtl_h2s)
-		
+		self.sampled_eqtl_h2s_v1 = np.asarray(self.sampled_eqtl_h2s_v1)
+		self.sampled_eqtl_h2s_v2 = np.asarray(self.sampled_eqtl_h2s_v2)
+
 		return
+
 
 	def update_gwas_resid_var(self, v0=0.0, s_sq=0.0, cc=1e-6):
 		vv = len(self.gwas_beta_resid) + v0
 		tau_sq = np.sum(np.square(self.gwas_beta_resid)/self.gwas_beta_var) + s_sq
 
 		# Initialize inverse gamma distribution
-		invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
+		#invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
 		# Sample from it
-		self.gwas_resid_var = invgamma_dist.rvs(size=1)[0]
+		#self.gwas_resid_var = invgamma_dist.rvs(size=1)[0]
+
+		self.gwas_resid_var = (1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1))[0]
 
 		return
 
 	def update_delta_vars(self, v0=0.0, s_sq=0.0, cc=1e-6):
 		# Loop through genes
-		for gg in np.random.permutation(range(self.GG)):
+		param1 = []
+		param2 = []
+
+		for gg in range(self.GG):
 
 
 			vv = len(self.deltas[gg]) + v0
@@ -159,10 +163,15 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			# Initialize inverse gamma distribution
 			# Shape (alpha) stays same
 			# Scale (beta) gets update cross genes
-			invgamma_dist = invgamma((vv/2) + self.gene_gamma_shape, scale=(tau_sq/2) + self.gene_gamma_scale)
+			#invgamma_dist = invgamma((vv/2) + self.gene_gamma_shape, scale=(tau_sq/2) + self.gene_gamma_scale)
 			# Sample from it
-			self.delta_vars[gg] = invgamma_dist.rvs(size=1)[0]
+			#self.delta_vars[gg] = invgamma_dist.rvs(size=1)[0]
 			#self.delta_vars[gg] = np.sum(weights*np.square(self.deltas[gg][tmp_indices])/self.eqtl_ldscore[gg][tmp_indices])/np.sum(weights)
+
+			param1.append((vv/2) + self.gene_gamma_shape)
+			param2.append(1.0/((tau_sq/2) + self.gene_gamma_scale))
+		self.delta_vars = 1.0/np.random.gamma(shape=param1, scale=param2)
+
 		return
 
 	def update_gene_gamma_scale_param(self, beta0=0.0, alpha0=0.0):
@@ -183,33 +192,31 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			tau_sq = np.sum(np.square(resid_vec)/self.eqtl_beta_var) + s_sq
 
 			# Initialize inverse gamma distribution
-			invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
+			#invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
 			# Sample from it
-			self.eqtl_resid_vars[gg] = invgamma_dist.rvs(size=1)[0]
-		
+			#self.eqtl_resid_vars[gg] = invgamma_dist.rvs(size=1)[0]
+			
+			# Sample from inverse gamma using numpy
+			self.eqtl_resid_vars[gg] = 1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1)
 		return
 
 	def compute_overlapping_med_h2(self):
 		genome_delta_alpha = np.zeros(self.KK)
-		eqtl_ld_scores = np.zeros(self.KK)
-		v1 = 0
-		total_eqtl_snps = 0
+		eqtl_alt = []
+		genome_delta_alpha_sq = np.zeros(self.KK)
+		#genome_delta_alpha2 = np.zeros(self.KK)
 		for gg in range(self.GG):
 			genome_delta_alpha[self.eqtl_position[gg]] = genome_delta_alpha[self.eqtl_position[gg]] + (self.deltas[gg]*self.alpha[gg])
-			v1 = v1 + np.sum(np.square((self.deltas[gg]*self.alpha[gg])))
-			eqtl_ld_scores[self.eqtl_position[gg]] = eqtl_ld_scores[self.eqtl_position[gg]] + self.eqtl_ldscore[gg]
-			total_eqtl_snps = total_eqtl_snps + self.n_eqtl_snps[gg]
+			eqtl_alt.append(np.sum(np.square(self.deltas[gg])))
 
 
-		v2 = np.sum(np.square(genome_delta_alpha))
-		weighted = np.square(genome_delta_alpha)/eqtl_ld_scores
-		v3 = np.mean(weighted[np.isnan(weighted) == False])*total_eqtl_snps
+		med_alt = np.sum(np.square(genome_delta_alpha))
 
 		total = np.sum(np.square(genome_delta_alpha + self.gamma))
 
 		nm_alt = np.sum(np.square(self.gamma))
 		
-		return v2, v3, total, nm_alt
+		return med_alt, nm_alt, total, np.asarray(eqtl_alt)
 
 	def update_deltas(self):
 		# Loop through genes
@@ -261,9 +268,10 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		tau_sq = np.sum(weights*np.square(self.gamma)/self.var_ldscores) + s_sq
 
 		# Initialize inverse gamma distribution
-		invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
+		#invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
 		# Sample from it
-		self.gamma_var = invgamma_dist.rvs(size=1)[0]
+		#self.gamma_var = invgamma_dist.rvs(size=1)[0]
+		self.gamma_var = (1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1))[0]
 
 		return
 
@@ -275,9 +283,11 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		tau_sq = np.sum(weights*np.square(self.alpha)) + s_sq
 
 		# Initialize inverse gamma distribution
-		invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2)+cc)
+		#invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2)+cc)
 		# Sample from it
-		self.alpha_var = invgamma_dist.rvs(size=1)[0]
+		#self.alpha_var = invgamma_dist.rvs(size=1)[0]
+
+		self.alpha_var = (1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1))[0]
 		#self.alpha_var = np.sum(weights*np.square(self.alpha))/np.sum(weights)
 
 		return
@@ -327,6 +337,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		for gene_iter in range(self.GG):
 			self.gwas_beta_resid[self.eqtl_position[gene_iter]] = self.gwas_beta_resid[self.eqtl_position[gene_iter]] - (self.alpha[gene_iter]*self.deltas[gene_iter])
 
+		self.genome_delta_alphas = []
 		# Keep track of sampled gamma_vars
 		self.sampled_nm_h2_v1 = []
 		self.sampled_nm_h2_v2 = []
@@ -334,8 +345,10 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		self.sampled_med_h2_v2 = []
 		self.sampled_med_h2_v3 = []
 		self.sampled_total_h2 = []
-		self.sampled_eqtl_h2s = []
+		self.sampled_eqtl_h2s_v1 = []
+		self.sampled_eqtl_h2s_v2 = []
 		self.sampled_iters = []
+		self.eqtl_tracker = {}
 
 		return
 

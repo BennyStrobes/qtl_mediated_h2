@@ -23,24 +23,21 @@ source ~/.bash_profile
 # Extract list of variants in ldsc baseline analysis
 ###############################
 hm3_rs_id_file=${processed_genotype_data_root_dir}"hm3_rsids_chr"${chrom_num}".txt"
-if false; then
 python3 extract_list_of_hm3_rs_ids.py $hm3_snp_list_dir $chrom_num $kg_genotype_dir $hm3_rs_id_file
-fi
+
 
 ###############################
 # Make genotype subdirectory for this gwas sample size
 ###############################
 processed_genotype_data_dir=${processed_genotype_data_root_dir}"hm3_gwas_sample_size_"${n_gwas_individuals}"/"
-if false; then
 mkdir $processed_genotype_data_dir
 echo $processed_genotype_data_dir
-fi
+
 
 
 ###############################
 # Filter UKBB genotype data to only include those variants in ldsc baseline analysis
 ###############################
-if false; then
 plink2 \
     --bgen /n/groups/price/UKBiobank/download_500K/ukb_imp_chr"${chrom_num}"_v3.bgen ref-unknown\
     --sample /n/groups/price/UKBiobank/download_500K/ukb14048_imp_chr1_v3_s487395.sample\
@@ -58,7 +55,7 @@ plink2 \
 
 plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr"${chrom_num}"_tmper" --hwe .01 --extract ${hm3_rs_id_file} --maf .05 --keep-allele-order --threads 1 --make-pgen --out ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num}"_double_tmper"
 plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num}"_double_tmper" --chr 1 --from-bp 10585 --to-bp 25897727 --keep-allele-order --threads 1 --make-pgen --out ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num}
-fi
+
 
 ###############################
 # extract lists of Individuals for each data set
@@ -66,14 +63,12 @@ fi
 gwas_individual_file=${processed_genotype_data_dir}"gwas_individuals.txt"
 eqtl_individual_stem=${processed_genotype_data_dir}"eqtl_individuals_"
 ref_genotype_individual_file=${processed_genotype_data_dir}"ref_genotype_individuals.txt"
-if false; then
 python3 extract_lists_of_simulated_individuals.py ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} $n_gwas_individuals $gwas_individual_file $eqtl_individual_stem $ref_genotype_individual_file
-fi
+
 
 ###############################
 # Filter UKBB genotype data to only include individuals in simulated gwas data set 
 ###############################
-if false; then
 plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${gwas_individual_file} --make-pgen --keep-allele-order --threads 1 --out ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num}
 
 
@@ -119,7 +114,7 @@ eqtl_sample_size="1000"
 plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --export bgen-1.2 --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
 eqtl_sample_size="10000"
 plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --export bgen-1.2 --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
-fi
+
 
 
 
@@ -131,14 +126,13 @@ module load python/3.9.14
 module load cuda/12.1
 source /n/groups/price/ben/environments/tf_new/bin/activate
 
-if false; then
 python3 get_quasi_independent_ld_matrices.py ${processed_genotype_data_dir} $quasi_independent_dir
-fi
 
 
 
 
 
+if false; then
 echo "START"
 
 python3 get_ld_matrices.py ${processed_genotype_data_dir}
@@ -153,7 +147,7 @@ echo "MID"
 python3 get_variant_ld_scores.py ${processed_genotype_data_dir}
 
 echo "DONE"
-
+fi
 
 
 

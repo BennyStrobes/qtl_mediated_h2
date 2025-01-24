@@ -127,13 +127,7 @@ def simulate_expression_mediated_gene_causal_effect_sizes(simulated_expression_s
 
 	return
 
-def simulate_expression_mediated_gene_causal_effect_sizes_with_selection(simulated_expression_summary_file, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, expression_mediated_causal_effects_output, gene_trait_architecture, simulated_gt_selection_summary_file):
-	if gene_trait_architecture == '2_caus_t':
-		simulate_expression_mediated_gene_causal_effect_sizes_two_causal_tissues_with_selection(simulated_expression_summary_file, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, expression_mediated_causal_effects_output, simulated_gt_selection_summary_file)
-	else:
-		print('assumption eroororr: gene trait archicture not currently implemented')
-		pdb.set_trace()
-	return
+
 
 
 
@@ -165,26 +159,28 @@ def simulate_expression_mediated_gene_causal_effect_sizes_one_causal_tissues(sim
 	# Get average ge_h2 
 	avg_ge_h2 = ((ge_h2/2.0) + ge_h2 + (2.0*ge_h2))/3.0
 
-
+	# Number of tissues
+	n_tiss = cis_h2_gene_boolean_matrix.shape[1]
 
 	# Initialize matrix of gene causal effect sizes
-	gene_causal_effect_sizes = np.zeros(total_genes)
+	gene_causal_effect_sizes = np.zeros((total_genes, n_tiss))
 
 
 	# Extract indices of mediated causal genes for this causal tissue
-	cis_h2_genes = np.where(cis_h2_gene_boolean_matrix[:] == 1.0)[0]
+	cis_h2_genes = np.where(cis_h2_gene_boolean_matrix[:,0] == 1.0)[0]
+
 	tissue_med_causal_gene_indices = np.random.choice(cis_h2_genes, size=n_causal_genes_per_causal_tissue, replace=False)
 	# Randomly sample gene causal effect sizes at causal indices
-	gene_causal_effect_sizes[tissue_med_causal_gene_indices] = np.random.normal(loc=0.0, scale=np.sqrt(per_element_heritability/avg_ge_h2),size=n_causal_genes_per_causal_tissue)
+	gene_causal_effect_sizes[tissue_med_causal_gene_indices, 0] = np.random.normal(loc=0.0, scale=np.sqrt(per_element_heritability/avg_ge_h2),size=n_causal_genes_per_causal_tissue)
 
 	# Quick error check
-	if np.array_equal(cis_h2_gene_boolean_matrix[tissue_med_causal_gene_indices], np.ones(n_causal_genes_per_causal_tissue)) == False:
+	if np.array_equal(cis_h2_gene_boolean_matrix[tissue_med_causal_gene_indices,0], np.ones(n_causal_genes_per_causal_tissue)) == False:
 		print('assumption eroror')
 
 	# Print to output file
 	t = open(expression_mediated_causal_effects_output,'w')
 	for gene_iter in range(total_genes):
-		t.write(ordered_gene_names[gene_iter] + '\t' + str(gene_causal_effect_sizes[gene_iter]) + '\n')
+		t.write(ordered_gene_names[gene_iter] + '\t' + '\t'.join(gene_causal_effect_sizes[gene_iter,:].astype(str)) + '\n')
 	t.close()
 
 	return
@@ -411,7 +407,7 @@ def compute_expression_mediated_trait_values_for_single_gene(genotype_obj, ref_a
 		standardized_genetically_predicted_gene_expression = genetically_predicted_gene_expression/genetically_predicted_gene_expression_sdev
 		'''
 		# Get expression mediated trait values
-		expr_med_trait_for_current_gene = genetically_predicted_gene_expression*(gene_trait_effect_size_vec[0])
+		expr_med_trait_for_current_gene = np.dot(genetically_predicted_gene_expression, gene_trait_effect_size_vec)
 	else:
 		print('assumption eroror')
 		pdb.set_trace()
@@ -445,6 +441,7 @@ def compute_non_mediated_variant_mediated_trait_values(non_mediated_variant_caus
 	f.close()
 	ordered_rsids = np.asarray(ordered_rsids)
 	var_trait_effect_sizes = np.asarray(var_trait_effect_sizes)
+
 
 
 	# Loop through variants
@@ -596,16 +593,13 @@ def simulate_trait_values(expression_mediated_trait_values_file, variant_mediate
 	# Calculate total genetic variance
 	expr_med_var = np.var(expr_med_trait)
 	non_med_var = np.var(non_med_trait)
-	#total_genetic_var = np.var(expr_med_trait + non_med_trait)
-	total_genetic_var = np.var(non_med_trait)
-
+	total_genetic_var = np.var(expr_med_trait + non_med_trait)
 
 	# Residual variance
 	residual_var = 1.0 - total_genetic_var
 
 	# Draw trait values
-	#trait_values = np.random.normal(loc=(expr_med_trait + non_med_trait), scale=np.sqrt(residual_var))
-	trait_values = np.random.normal(loc=(non_med_trait), scale=np.sqrt(residual_var))
+	trait_values = np.random.normal(loc=(expr_med_trait + non_med_trait), scale=np.sqrt(residual_var))
 
 	# Standardize trait values
 	standardized_trait_values = (trait_values - np.mean(trait_values))/np.std(trait_values)
@@ -644,7 +638,6 @@ expression_mediated_causal_effects_output = simulated_trait_dir + simulation_nam
 simulate_expression_mediated_gene_causal_effect_sizes(simulated_expression_summary_file, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, expression_mediated_causal_effects_output, ge_h2)
 
 
-
 ####################################################
 # Simulate non-mediated variant causal effect sizes
 ####################################################
@@ -681,4 +674,3 @@ expression_mediated_trait_values_file = simulated_trait_dir + simulation_name_st
 variant_mediated_trait_values_file = simulated_trait_dir + simulation_name_string + '_non_mediated_variant_mediated_trait_values.txt'  # Now an input file
 trait_values_output = simulated_trait_dir + simulation_name_string + '_trait_values.txt'  # Output file
 simulate_trait_values(expression_mediated_trait_values_file, variant_mediated_trait_values_file, trait_values_output)
-

@@ -2,7 +2,7 @@
 #SBATCH -c 1                               # Request one core
 #SBATCH -t 0-2:30                         # Runtime in D-HH:MM format
 #SBATCH -p short                           # Partition to run in
-#SBATCH --mem=11GB                         # Memory total in MiB (for all cores)
+#SBATCH --mem=2GB                         # Memory total in MiB (for all cores)
 
 
 
@@ -22,7 +22,8 @@ simulated_learned_gene_models_dir="${13}"
 simulated_trait_dir="${14}"
 simulated_gwas_dir="${15}"
 eqtl_architecture="${16}"
-
+n_tissues="${17}"
+alt_simulated_learned_gene_models_dir="${18}"
 
 echo "Simulation"$simulation_number
 date
@@ -38,14 +39,14 @@ source /n/groups/price/ben/environments/tf_new/bin/activate
 # Step 1: Simulate gene expression causal eqtl effects
 #######################################################
 echo "Simulation Step 1"
-python3 simulate_gene_expression.py $simulation_number $chrom_num $cis_window $simulated_gene_position_file $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $ge_h2 $eqtl_architecture $per_element_heritability $total_heritability $fraction_expression_mediated_heritability
+python3 simulate_gene_expression.py $simulation_number $chrom_num $cis_window $simulated_gene_position_file $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $ge_h2 $eqtl_architecture $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $n_tissues
+
 
 #######################################################
 # Step 2: Simulate trait values
 #######################################################
 echo "Simulation Step 2"
 python3 simulate_trait_values.py $simulation_number $chrom_num $cis_window $simulated_gene_expression_dir $simulation_name_string $processed_genotype_data_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $simulated_trait_dir $n_gwas_individuals $eqtl_architecture $ge_h2
-
 
 
 
@@ -56,12 +57,11 @@ echo "Simulation Step 3"
 python3 run_gwas_on_simulated_trait.py $simulation_number $chrom_num $simulation_name_string $processed_genotype_data_dir $simulated_trait_dir $simulated_gwas_dir
 
 
-
 #######################################################
 # Step 5: Simulate gene expression and compute eqtl summary statistics
 #######################################################
-echo "Simulation Step 5"
-eqtl_sample_size_arr=( "100" "300" "500" "1000" "10000")
+echo "Simulation Step 4"
+eqtl_sample_size_arr=( "100" "300" "1000" "10000")
 for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
 do
 	echo $eqtl_sample_size
@@ -70,25 +70,40 @@ done
 
 
 
+
+#######################################################
+# Step 5.5: Simulate gene expression and compute eqtl summary statistics and downsampling
+#######################################################
+eqtl_sample_size_arr=( "100" "300" "1000" "10000")
 if false; then
+for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
+do
+	echo $eqtl_sample_size
+	python3 fit_gene_models_with_subsampling.py $simulation_number $chrom_num $cis_window $simulated_gene_position_file $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $ge_h2 $eqtl_architecture $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $eqtl_sample_size
+done
+fi
+
+
 ##############################
 # Step 6: learn multivariate expression models
 ##############################
-echo "Simulation Step 6"
-eqtl_sample_size_arr=( "100" "300" "500" "1000" "10000")
+echo "Simulation Step 5"
 
 source /home/bes710/.bash_profile
 module load python/3.7.4
 module load R/4.0.1
+eqtl_sample_size_arr=( "100" "300" "1000" "10000")
 for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
 do
 	echo $eqtl_sample_size
-	python3 learn_multivariate_gene_models.py $simulation_number $simulated_learned_gene_models_dir $simulation_name_string $eqtl_sample_size
+	python3 learn_multivariate_gene_models.py $simulation_number $simulated_learned_gene_models_dir $simulation_name_string $eqtl_sample_size $alt_simulated_learned_gene_models_dir
 done
 
 
+
+
+
 date
-fi
 
 
 
@@ -99,21 +114,3 @@ fi
 
 
 
-
-
-
-
-
-##########
-# OLD
-#########
-
-
-
-#######################################################
-# Step 4: Get variant LD-scores
-#######################################################
-if false; then
-echo "Simulation Step 4"
-python3 get_variant_ld_scores.py $simulation_number $chrom_num $simulation_name_string $processed_genotype_data_dir $simulated_gwas_dir
-fi

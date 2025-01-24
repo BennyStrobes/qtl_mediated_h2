@@ -70,7 +70,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			# Update residual variances
 			if update_gwas_resid_var and itera >= 20:
 				self.update_gwas_resid_var(v0=v0, s_sq=s_sq, cc=cc)
-			if update_eqtl_resid_var and itera >= 20:
+			if update_eqtl_resid_var and itera > 20:
 				self.update_eqtl_resid_var_fast(v0=v0, s_sq=s_sq, cc=cc)
 
 
@@ -103,17 +103,13 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 				if np.mod(itera, 500) == 0.0:
 
 					print('ITERA ' + str(itera))
-					print('med: ' + str(med_h2))
 					print('alt_med: ' + str(alt_med_h2))
-					print('nm: ' + str(nm_h2))
 					print('alt_nm: ' + str(alt_nm_h2))
 					print('total: ' + str(total_h2))
-					print('eqtl: ' + str(eqtl_h2))
 					print('alt eqtl: ' + str(np.mean(alt_eqtl_h2s)))
 					print('resid_var: ' + str(self.gwas_resid_var))
 					print('eqtl_resid_var: ' + str(np.mean(self.eqtl_resid_vars)))
-					print(np.sort(eqtl_h2s))
-					print(np.sort(self.eqtl_resid_vars))
+
 
 
 
@@ -137,8 +133,8 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		# Sample from it
 		#self.gwas_resid_var = invgamma_dist.rvs(size=1)[0]
 
-		self.gwas_resid_var = (1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1))[0]
-
+		#self.gwas_resid_var = (1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1))[0]
+		self.gwas_resid_var = tau_sq/vv
 		return
 
 	def update_delta_vars(self, v0=0.0, s_sq=0.0, cc=1e-6, weighted=False):
@@ -180,8 +176,8 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 				vv = np.sum(self.eqtl_ldscore[gg]) + v0
 				tau_sq = np.sum(np.square(self.deltas[gg])) + s_sq
 
-			param1.append((vv/2) + cc)
-			param2.append(1.0/((tau_sq/2) + cc))
+			param1.append(vv + 1e-25)
+			param2.append(tau_sq + 1e-25)
 
 			#indices = self.eqtl_ldscore[gg] > .1		
 			#vv = np.sum(indices)
@@ -194,7 +190,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			
 			# Sample from inverse gamma using numpy
 			#self.delta_vars[gg] = 1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1)
-		self.delta_vars = 1.0/np.random.gamma(shape=param1, scale=param2)
+		self.delta_vars = np.asarray(param2)/np.asarray(param1)
 		return
 
 
@@ -223,8 +219,8 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			vv = len(resid_vec) + v0
 			tau_sq = np.sum(np.square(resid_vec)/self.eqtl_beta_var) + s_sq
 
-			param1.append((vv/2) + cc)
-			param2.append(1.0/((tau_sq/2) + cc))
+			param1.append(vv)
+			param2.append(tau_sq)
 
 			# Initialize inverse gamma distribution
 			#invgamma_dist = invgamma((vv/2) + cc, scale=(tau_sq/2) + cc)
@@ -232,7 +228,8 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			#self.eqtl_resid_vars[gg] = invgamma_dist.rvs(size=1)[0]
 			
 			# Sample from inverse gamma using numpy
-		self.eqtl_resid_vars = 1.0/np.random.gamma(shape=param1, scale=param2)
+		#self.eqtl_resid_vars = 1.0/np.random.gamma(shape=param1, scale=param2)
+		self.eqtl_resid_vars = np.asarray(param2)/np.asarray(param1)
 		return
 
 
@@ -244,7 +241,6 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		for gg in range(self.GG):
 			genome_delta_alpha[self.eqtl_position[gg]] = genome_delta_alpha[self.eqtl_position[gg]] + (self.deltas[gg]*self.alpha[gg])
 			eqtl_alt.append(np.sum(np.square(self.deltas[gg])))
-
 
 		med_alt = np.sum(np.square(genome_delta_alpha))
 
@@ -312,7 +308,8 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		#self.gamma_var = invgamma_dist.rvs(size=1)[0]
 
 		# Inverse gamma distribution in numpy
-		self.gamma_var = (1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1))[0]
+		self.gamma_var = tau_sq/vv
+		#self.gamma_var = (1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1))[0]
 
 		return
 
@@ -329,7 +326,8 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		#self.alpha_var = invgamma_dist.rvs(size=1)[0]
 
 		# Inverse gamma distribution in numpy
-		self.alpha_var = (1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1))[0]
+		self.alpha_var = tau_sq/vv
+		#self.alpha_var = (1.0/np.random.gamma(shape=(vv/2) + cc, scale=1.0/((tau_sq/2) + cc),size=1))[0]
 
 		#self.alpha_var = np.sum(weights*np.square(self.alpha))/np.sum(weights)
 

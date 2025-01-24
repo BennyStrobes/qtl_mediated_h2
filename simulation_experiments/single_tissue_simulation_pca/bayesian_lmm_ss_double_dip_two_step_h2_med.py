@@ -70,7 +70,7 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			# Update residual variances
 			if update_gwas_resid_var and itera >= 20:
 				self.update_gwas_resid_var(v0=v0, s_sq=s_sq, cc=cc)
-			if update_eqtl_resid_var and itera >= 20:
+			if update_eqtl_resid_var and itera > 20:
 				self.update_eqtl_resid_var_fast(v0=v0, s_sq=s_sq, cc=cc)
 
 
@@ -125,6 +125,19 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 		self.sampled_total_h2 = np.asarray(self.sampled_total_h2)
 		self.sampled_eqtl_h2s_v1 = np.asarray(self.sampled_eqtl_h2s_v1)
 		self.sampled_eqtl_h2s_v2 = np.asarray(self.sampled_eqtl_h2s_v2)
+
+		genome_delta_sq = np.zeros(self.KK)
+		eqtl_hs2 = []
+		for gg in range(self.GG):
+			eqtl_distr = np.asarray(self.eqtl_tracker[gg])
+			eqtl_mean = np.mean(eqtl_distr,axis=0)
+			eqtl_var = np.var(eqtl_distr,axis=0)
+			genome_delta_sq[self.eqtl_position[gg]] = genome_delta_sq[self.eqtl_position[gg]] + np.square(eqtl_mean) + eqtl_var
+
+		model = sm.OLS(np.square(self.gwas_beta) - (self.gwas_beta_var), np.transpose(np.vstack((genome_delta_sq,self.var_ldscores)))).fit()
+
+		self.two_step_med_h2_est = model.params[0]*np.mean(alt_eqtl_h2s)*self.GG
+		self.two_step_nm_h2_est = model.params[1]*np.sum(self.var_ldscores)
 
 		return
 
@@ -245,6 +258,23 @@ class Bayesian_LMM_SS_h2_med_inference(object):
 			genome_delta_alpha[self.eqtl_position[gg]] = genome_delta_alpha[self.eqtl_position[gg]] + (self.deltas[gg]*self.alpha[gg])
 			eqtl_alt.append(np.sum(np.square(self.deltas[gg])))
 
+			if gg not in self.eqtl_tracker:
+				self.eqtl_tracker[gg] = []
+			self.eqtl_tracker[gg].append(self.deltas[gg])
+			#genome_delta_alpha_sq[self.eqtl_position[gg]] = genome_delta_alpha_sq[self.eqtl_position[gg]] + np.square(self.deltas[gg])
+
+		'''
+		if self.itera == 15000:
+			for gg in range(self.GG):
+				eqtl_distr = np.asarray(self.eqtl_tracker[gg])
+				eqtl_mean = np.mean(eqtl_distr,axis=0)
+				eqtl_var = np.var(eqtl_distr,axis=0)
+				genome_delta_alpha_sq[self.eqtl_position[gg]] = genome_delta_alpha_sq[self.eqtl_position[gg]] + np.square(eqtl_mean) + eqtl_var
+
+			pdb.set_trace()
+			# This is not right. specifically the self.gwas_beta_resid
+			model = sm.OLS(np.square(self.gwas_beta) - (self.gwas_beta_resid), np.transpose(np.vstack((genome_delta_alpha_sq,self.var_ldscores)))).fit()
+		'''
 
 		med_alt = np.sum(np.square(genome_delta_alpha))
 

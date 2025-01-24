@@ -134,7 +134,7 @@ fi
 # 1 causal tissue
 #################################
 n_sims="10"
-gwas_ss="10000"
+gwas_ss="20000"
 n_snps="40000"
 n_genes="100"
 snps_per_gene="200"
@@ -186,6 +186,29 @@ fi
 sim_iter="1"
 frac_causal_genes="0.5"
 mean_cis_h2="0.05"
+eqtl_ss="500"
+if false; then
+for sim_iter in $(seq 1 100); do 
+	output_stem=${med_h2_simulation_dir}"proportional_med_h2_simulation_"${sim_iter}"_gwas_ss_"${gwas_ss}"_eqtl_ss_"${eqtl_ss}"_med_h2_"${med_h2}"_nm_h2_"${nm_h2}"_mean_cis_h2_"${mean_cis_h2}"_gene_frac_"${frac_causal_genes}"_arch_"$eqtl_arch
+	sbatch run_proportional_med_h2_no_ld_simulation.sh $sim_iter $n_sims $gwas_ss $n_snps $n_genes $snps_per_gene $med_h2 $nm_h2 $eqtl_ss $eqtl_arch $mean_cis_h2 $frac_causal_genes $output_stem
+done
+fi
+
+sim_iter="1"
+frac_causal_genes="0.5"
+mean_cis_h2="0.05"
+eqtl_ss="5000"
+if false; then
+for sim_iter in $(seq 1 100); do 
+	output_stem=${med_h2_simulation_dir}"proportional_med_h2_simulation_"${sim_iter}"_gwas_ss_"${gwas_ss}"_eqtl_ss_"${eqtl_ss}"_med_h2_"${med_h2}"_nm_h2_"${nm_h2}"_mean_cis_h2_"${mean_cis_h2}"_gene_frac_"${frac_causal_genes}"_arch_"$eqtl_arch
+	sbatch run_proportional_med_h2_no_ld_simulation.sh $sim_iter $n_sims $gwas_ss $n_snps $n_genes $snps_per_gene $med_h2 $nm_h2 $eqtl_ss $eqtl_arch $mean_cis_h2 $frac_causal_genes $output_stem
+done
+fi
+
+
+sim_iter="1"
+frac_causal_genes="0.5"
+mean_cis_h2="0.05"
 med_h2="0.03"
 eqtl_ss="50"
 eqtl_ss_arr=("50" "100" "300")
@@ -214,10 +237,10 @@ done
 done
 fi
 
-if false; then
 python3 organize_proportional_med_h2_results.py $med_h2_simulation_dir
 
 
+if false; then
 
 Rscript visualize_proportional_med_h2_results.R $med_h2_simulation_dir
 fi

@@ -13,7 +13,7 @@ def create_mapping_from_simulation_number_to_simulated_h2_parameters(trait_med_h
 	mapping = {}
 
 	for sim_num in sim_nums:
-		filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_eqtl_SS_100_med_h2_marginal_gibbs_sampler_resid_var_True_cc_0.0.txt'
+		filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_eqtl_SS_100_med_h2_marginal_gibbs_sampler_resid_var_True_cc_0.0_wrong_eqtls.txt'
 		f = open(filer)
 		head_count = 0
 		for line in f:
@@ -130,8 +130,11 @@ def generate_per_iteration_results_summary_file(sim_nums, trait_med_h2_inference
 
 			###########################################
 			# First do method of marginal PCA gibbs sampler
-			marginal_gibbs_sampler_file = trait_med_h2_inference_dir + 'simulation_' + str(sim_iter) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_resid_var_True_cc_0.0_alt_.txt'
+			marginal_gibbs_sampler_file = trait_med_h2_inference_dir + 'simulation_' + str(sim_iter) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_resid_var_True_cc_0.0_wrong_eqtls.txt'
 			
+			if os.path.isfile(marginal_gibbs_sampler_file) == False:
+				print(sim_iter)
+				continue
 			# Extract distributions
 			est_nm_h2, alt_est_nm_h2, est_med_h2, alt_est_med_h2, est_total_h2 = extract_sampled_params_from_marginal_gibbs_sampler_file(marginal_gibbs_sampler_file, burn_in_lb=iteration_lb, burn_in_ub=iteration_ub)
 
@@ -318,7 +321,7 @@ visualize_trait_med_h2_dir = sys.argv[2]
 
 
 # Simulation params
-raw_sim_nums = np.arange(1,101)
+raw_sim_nums = np.arange(1,51)
 eqtl_sample_sizes = np.asarray([100,300,1000,10000])
 
 sim_nums = []
@@ -334,17 +337,22 @@ sim_num_to_sim_h2_params = create_mapping_from_simulation_number_to_simulated_h2
 
 
 # Standard averaging
-iteration_lb = 950000
-iteration_ub = 1020000
+iteration_lb = 580000
+iteration_ub = 620000
+
+
 # Organize results to per iteration summary
-results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_results_summary.txt'
+results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_results_summary_wrong_eqtls.txt'
 generate_per_iteration_results_summary_file(sim_nums, trait_med_h2_inference_dir, results_summary_file,eqtl_sample_sizes, sim_num_to_sim_h2_params, iteration_lb, iteration_ub)
+print(results_summary_file)
 
 # average results across per iterations
-avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_results_summary_averaged.txt'
+avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_results_summary_averaged_wrong_eqtls.txt'
 methods = np.asarray(['marginal_pca_sumstat_gibbs_0.0'])
 average_results_across_simulations(results_summary_file, avg_results_summary_file, eqtl_sample_sizes,methods)
 
+
+'''
 # Averaging across various windows
 windows = np.arange(0, 1002000, 25000)
 
@@ -363,7 +371,7 @@ for ii,window_ub in enumerate(windows):
 	avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_results_summary_averaged' + str(window_lb) + ':' + str(window_ub) + '.txt'
 	methods = np.asarray(['marginal_pca_sumstat_gibbs_0.0'])
 	average_results_across_simulations(results_summary_file, avg_results_summary_file, eqtl_sample_sizes,methods)
-
+'''
 
 
 

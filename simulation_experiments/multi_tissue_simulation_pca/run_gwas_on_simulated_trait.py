@@ -64,7 +64,6 @@ def load_in_ref_alt_allele_arr(pvar_file):
 	return ref_alt_alleles
 
 
-
 # Run GWAS on all snps
 def run_gwas_on_all_snps(trait_values_file, gwas_plink_stem, gwas_output_file, batch_size=1000):
 	# Load in trait vector
@@ -141,6 +140,8 @@ trait_values_file = simulated_trait_dir + simulation_name_string + '_trait_value
 gwas_plink_stem = processed_genotype_data_dir + 'simulated_gwas_data_' + str(chrom_num)  # Genotype files
 gwas_output_file = simulated_gwas_dir + simulation_name_string + '_simualated_gwas_results.txt'
 run_gwas_on_all_snps(trait_values_file, gwas_plink_stem, gwas_output_file)
+
+
 
 
 

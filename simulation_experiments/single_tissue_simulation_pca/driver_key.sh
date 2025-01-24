@@ -103,6 +103,7 @@ ge_h2="05"
 eqtl_architecture="default"
 
 
+
 ############################
 # Run main single simulation of simulating the trait data
 ############################
@@ -121,7 +122,7 @@ cc_hyper_param_arr=( "0")
 if false; then
 for cc_hyper_param in "${cc_hyper_param_arr[@]}"
 do
-for simulation_number in $(seq 1 100); do 
+for simulation_number in $(seq 3 50); do 
 	eqtl_sample_size="100"
 	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_num}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}
 	sbatch trait_mediated_h2_inference.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $eqtl_sample_size $trait_med_h2_inference_dir $cc_hyper_param
@@ -142,16 +143,6 @@ done
 fi
 
 
-cc_hyper_param="0"
-eqtl_sample_size="100"
-if false; then
-for simulation_number in $(seq 1 100); do 
-	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_num}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}
-	sbatch trait_mediated_h2_inference.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $eqtl_sample_size $trait_med_h2_inference_dir $cc_hyper_param
-done
-fi
-
-
 ########################
 # TGLR trait mediated inference
 ###############################
@@ -162,6 +153,28 @@ for simulation_number in $(seq 101 200); do
 done
 fi
 
+
+########################
+# Mediated trait h2 inference with PCA-marginal likelihood
+###############################
+if false; then
+for simulation_number in $(seq 1 100); do 
+simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_num}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}
+sbatch trait_mediated_h2_inference_no_pca_joint_reml.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir
+done
+fi
+
+if false; then
+for simulation_number in $(seq 1 100); do 
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_num}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}
+	sbatch trait_mediated_h2_inference_no_pca_joint_ldsc.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir
+done
+fi
+if false; then
+simulation_number="104"
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_num}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}
+	sh trait_mediated_h2_inference_no_pca_joint_ldsc.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir
+fi
 
 ##############################
 # Variance of true marginal effects simulation

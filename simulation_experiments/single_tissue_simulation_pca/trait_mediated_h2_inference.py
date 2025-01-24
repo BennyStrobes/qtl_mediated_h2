@@ -12,6 +12,9 @@ import bayesian_multivariate_lmm_ss_h2_med
 import bayesian_lmm_ss_h2_med_shared_gene_variance
 import bayesian_lmm_ss_h2_med_cross_gene_gamma_scale
 import bayesian_lmm_ss_h2_med_seperated_ld_scores
+import bayesian_lmm_ss_two_step_h2_med
+import bayesian_lmm_ss_double_dip_two_step_h2_med
+import bayesian_lmm_ss_h2_med_vi_variance
 
 def load_in_gwas_data(gwas_summary_file):
 	rsids = []
@@ -333,14 +336,42 @@ eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string +
 #eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_big_window_eqtl_sumstats.txt'
 genes, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_n_cis_snps = load_in_eqtl_data(eqtl_sumstat_file, pc_snp_name_to_position, window_name_to_q_mat_and_w_mat_files,eqtl_sample_size, eqtl_ld='out_of_sample')
 
+
+
 ####################
-# Compute h2 using bayesian lmm
+# Compute mediated h2 using bayesian lmm
 ####################
+'''
 # Equal weights
 print('start')
-output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_resid_var_True_cc_' + str(cc_hyperparam) + '_alt_.txt'
+output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_resid_var_True_cc_' + str(cc_hyperparam) + '_alt_3.txt'
 mod = bayesian_lmm_ss_h2_med.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
-mod.fit(burn_in_iterations=10000, total_iterations=1000000, update_gwas_resid_var=True, update_eqtl_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
+mod.fit(burn_in_iterations=100, total_iterations=1000000, update_gwas_resid_var=True, update_eqtl_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
+t = open(output_file,'w')
+t.write('sim_h2\tsim_nm_h2\tsim_med_h2\titer\tnm_h2_v1\tnm_h2_v2\tmed_h2_v1\tmed_h2_v2\ttotal_h2\teqtl_h2_v1\teqtl_h2_v2\n')
+for ii, itera in enumerate(mod.sampled_iters):
+	t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(itera) + '\t' + str(mod.sampled_nm_h2_v1[ii]) + '\t' + str(mod.sampled_nm_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v1[ii]) + '\t' + str(mod.sampled_med_h2_v2[ii]) + '\t' + str(mod.sampled_total_h2[ii]) + '\t' + str(mod.sampled_eqtl_h2s_v1[ii]) + '\t' + str(mod.sampled_eqtl_h2s_v2[ii]) + '\n')
+t.close()
+'''
+
+
+####################
+# Compute mediated h2 using bayesian lmm (but with wrong eqtl data)
+####################
+# load in eqtl data
+# Out of sample eqtl ld
+info_str = simulation_name_string.split('_chrom')
+simulation_number = info_str[0].split('_')[1]
+new_simulation_name_string = 'simulation_' + str(int(simulation_number) + 1) + '_chrom' + info_str[1]
+eqtl_sumstat_file = simulated_learned_gene_models_dir + new_simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
+
+genes, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_n_cis_snps = load_in_eqtl_data(eqtl_sumstat_file, pc_snp_name_to_position, window_name_to_q_mat_and_w_mat_files,eqtl_sample_size, eqtl_ld='out_of_sample')
+
+# Equal weights
+print('start')
+output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_resid_var_True_cc_' + str(cc_hyperparam) + '_wrong_eqtls.txt'
+mod = bayesian_lmm_ss_h2_med.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
+mod.fit(burn_in_iterations=10000, total_iterations=600000, update_gwas_resid_var=True, update_eqtl_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
 t = open(output_file,'w')
 t.write('sim_h2\tsim_nm_h2\tsim_med_h2\titer\tnm_h2_v1\tnm_h2_v2\tmed_h2_v1\tmed_h2_v2\ttotal_h2\teqtl_h2_v1\teqtl_h2_v2\n')
 for ii, itera in enumerate(mod.sampled_iters):
@@ -348,182 +379,181 @@ for ii, itera in enumerate(mod.sampled_iters):
 t.close()
 
 
-
-
 '''
-# load in eqtl data
-# Out of sample eqtl ld
-eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
-#eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_big_window_eqtl_sumstats.txt'
-genes, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_n_cis_snps = load_in_eqtl_data(eqtl_sumstat_file, pc_snp_name_to_position, window_name_to_q_mat_and_w_mat_files,eqtl_sample_size, eqtl_ld='out_of_sample')
-
 ####################
 # Compute h2 using bayesian lmm
+# with VI variance updates
 ####################
 # Equal weights
 print('start')
-output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_gwas_resid_var_True_eqtl_resid_var_False_cc_' + str(cc_hyperparam) + '.txt'
-mod = bayesian_lmm_ss_h2_med.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
-mod.fit(burn_in_iterations=5000, total_iterations=20000, update_gwas_resid_var=True, update_eqtl_resid_var=False, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
+output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_resid_var_True_cc_' + str(cc_hyperparam) + '_vi_variance_alt.txt'
+mod = bayesian_lmm_ss_h2_med_vi_variance.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
+mod.fit(burn_in_iterations=200, total_iterations=600000, update_gwas_resid_var=True, update_eqtl_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
 t = open(output_file,'w')
-t.write('sim_h2\tsim_nm_h2\tsim_med_h2\titer\tnm_h2_v1\tnm_h2_v2\tmed_h2_v1\tmed_h2_v2\ttotal_h2\teqtl_h2\n')
+t.write('sim_h2\tsim_nm_h2\tsim_med_h2\titer\tnm_h2_v1\tnm_h2_v2\tmed_h2_v1\tmed_h2_v2\ttotal_h2\teqtl_h2_v1\teqtl_h2_v2\n')
 for ii, itera in enumerate(mod.sampled_iters):
-	t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(itera) + '\t' + str(mod.sampled_nm_h2_v1[ii]) + '\t' + str(mod.sampled_nm_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v1[ii]) + '\t' + str(mod.sampled_med_h2_v2[ii]) + '\t' + str(mod.sampled_total_h2[ii]) + '\t' + str(mod.sampled_eqtl_h2s[ii]) + '\n')
+	t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(itera) + '\t' + str(mod.sampled_nm_h2_v1[ii]) + '\t' + str(mod.sampled_nm_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v1[ii]) + '\t' + str(mod.sampled_med_h2_v2[ii]) + '\t' + str(mod.sampled_total_h2[ii]) + '\t' + str(mod.sampled_eqtl_h2s_v1[ii]) + '\t' + str(mod.sampled_eqtl_h2s_v2[ii]) + '\n')
 t.close()
+'''
 
 
-
+'''
 ####################
 # Compute h2 using bayesian lmm
+# with VI variance updates
 ####################
 # Equal weights
 print('start')
-output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_gwas_resid_var_False_eqtl_resid_var_False_cc_' + str(cc_hyperparam) + '.txt'
-mod = bayesian_lmm_ss_h2_med.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
-mod.fit(burn_in_iterations=5000, total_iterations=20000, update_gwas_resid_var=False, update_eqtl_resid_var=False, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
-t = open(output_file,'w')
-t.write('sim_h2\tsim_nm_h2\tsim_med_h2\titer\tnm_h2_v1\tnm_h2_v2\tmed_h2_v1\tmed_h2_v2\ttotal_h2\teqtl_h2\n')
-for ii, itera in enumerate(mod.sampled_iters):
-	t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(itera) + '\t' + str(mod.sampled_nm_h2_v1[ii]) + '\t' + str(mod.sampled_nm_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v1[ii]) + '\t' + str(mod.sampled_med_h2_v2[ii]) + '\t' + str(mod.sampled_total_h2[ii]) + '\t' + str(mod.sampled_eqtl_h2s[ii]) + '\n')
-t.close()
-
-
-
-####################
-# Compute h2 using bayesian lmm
-####################
-# Equal weights
-print('start')
-output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_gwas_resid_var_False_eqtl_resid_var_True_cc_' + str(cc_hyperparam) + '.txt'
-mod = bayesian_lmm_ss_h2_med.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
-mod.fit(burn_in_iterations=5000, total_iterations=20000, update_gwas_resid_var=False, update_eqtl_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
-t = open(output_file,'w')
-t.write('sim_h2\tsim_nm_h2\tsim_med_h2\titer\tnm_h2_v1\tnm_h2_v2\tmed_h2_v1\tmed_h2_v2\ttotal_h2\teqtl_h2\n')
-for ii, itera in enumerate(mod.sampled_iters):
-	t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(itera) + '\t' + str(mod.sampled_nm_h2_v1[ii]) + '\t' + str(mod.sampled_nm_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v1[ii]) + '\t' + str(mod.sampled_med_h2_v2[ii]) + '\t' + str(mod.sampled_total_h2[ii]) + '\t' + str(mod.sampled_eqtl_h2s[ii]) + '\n')
-t.close()
-'''
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-'''
-# load in eqtl data
-eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
-#eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_big_window_eqtl_sumstats.txt'
-genes, eqtl_beta, eqtl_ldscore, eqtl_ldscore_ratios, eqtl_position, eqtl_n_cis_snps = load_in_eqtl_data_and_ratio_between_two_data_sets(eqtl_sumstat_file, pc_snp_name_to_position, window_name_to_q_mat_and_w_mat_files, eqtl_sample_size)
-
-
-####################
-# Compute h2 using bayesian lmm
-# While assuming different variance for eqtl deltas and gwas deltas
-####################
-# Equal weights
-print('start')
-output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_resid_var_True_seperate_ldscores_cc_' + str(cc_hyperparam) + '.txt'
-mod = bayesian_lmm_ss_h2_med_seperated_ld_scores.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_ldscore_ratios, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
-mod.fit(burn_in_iterations=5000, total_iterations=20000, update_gwas_resid_var=True, update_eqtl_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
-t = open(output_file,'w')
-t.write('sim_h2\tsim_nm_h2\tsim_med_h2\titer\tnm_h2_v1\tnm_h2_v2\tmed_h2_v1\tmed_h2_v2\ttotal_h2\teqtl_h2\n')
-for ii, itera in enumerate(mod.sampled_iters):
-	t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(itera) + '\t' + str(mod.sampled_nm_h2_v1[ii]) + '\t' + str(mod.sampled_nm_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v1[ii]) + '\t' + str(mod.sampled_med_h2_v2[ii]) + '\t' + str(mod.sampled_total_h2[ii]) + '\t' + str(mod.sampled_eqtl_h2s[ii]) + '\n')
-t.close()
-'''
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-'''
-output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_resid_var_False_cc_' + str(cc_hyperparam) + '.txt'
-mod = bayesian_lmm_ss_h2_med.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
-mod.fit(burn_in_iterations=5000, total_iterations=40000, update_resid_var=False, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
-t = open(output_file,'w')
-t.write('sim_h2\tsim_nm_h2\tsim_med_h2\titer\tnm_h2_v1\tnm_h2_v2\tmed_h2_v1\tmed_h2_v2\tmed_h2_v3\ttotal_h2\teqtl_h2\n')
-for ii, itera in enumerate(mod.sampled_iters):
-	t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(itera) + '\t' + str(mod.sampled_nm_h2_v1[ii]) + '\t' + str(mod.sampled_nm_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v1[ii]) + '\t' + str(mod.sampled_med_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v3[ii]) + '\t' + str(mod.sampled_total_h2[ii]) + '\t' + str(mod.sampled_eqtl_h2s[ii]) + '\n')
-t.close()
-'''
-
-
-'''
-mod = bayesian_lmm_ss_h2_med.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
-mod.fit(burn_in_iterations=10, total_iterations=40000, update_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
-'''
-'''
+gene_gamma_shape_param=1e-5
+output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_resid_var_True_cc_' + str(cc_hyperparam) + '_cross_gene_gamma_scale_' + str(gene_gamma_shape_param) + '.txt'
 mod = bayesian_lmm_ss_h2_med_cross_gene_gamma_scale.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
-mod.fit(burn_in_iterations=1, total_iterations=40000, update_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam, gene_gamma_shape=2.0)
-'''
-
-'''
-output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_multivariate_sampler_resid_var_True_cc_' + str(cc_hyperparam) + '.txt'
-print(output_file)
-mod = bayesian_multivariate_lmm_ss_h2_med.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
-mod.fit(burn_in_iterations=2000, total_iterations=5000, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
+mod.fit(burn_in_iterations=10000, total_iterations=600000, update_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam, gene_gamma_shape=gene_gamma_shape_param)
 t = open(output_file,'w')
-t.write('sim_h2\tsim_nm_h2\tsim_med_h2\titer\tnm_h2_v1\tnm_h2_v2\tmed_h2_v1\tmed_h2_v2\tmed_h2_v3\ttotal_h2\teqtl_h2\n')
+t.write('sim_h2\tsim_nm_h2\tsim_med_h2\titer\tnm_h2_v1\tnm_h2_v2\tmed_h2_v1\tmed_h2_v2\ttotal_h2\teqtl_h2_v1\teqtl_h2_v2\n')
 for ii, itera in enumerate(mod.sampled_iters):
-	t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(itera) + '\t' + str(mod.sampled_nm_h2_v1[ii]) + '\t' + str(mod.sampled_nm_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v1[ii]) + '\t' + str(mod.sampled_med_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v3[ii]) + '\t' + str(mod.sampled_total_h2[ii]) + '\t' + str(mod.sampled_eqtl_h2s[ii]) + '\n')
+	t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(itera) + '\t' + str(mod.sampled_nm_h2_v1[ii]) + '\t' + str(mod.sampled_nm_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v1[ii]) + '\t' + str(mod.sampled_med_h2_v2[ii]) + '\t' + str(mod.sampled_total_h2[ii]) + '\t' + str(mod.sampled_eqtl_h2s_v1[ii]) + '\t' + str(mod.sampled_eqtl_h2s_v2[ii]) + '\n')
 t.close()
-'''
 
-
-
-
-
-#mod = bayesian_lmm_VI_ss_h2_med.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
-#mod.fit(total_iterations=12000, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
-
-'''
-output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_' + str(eqtl_sample_size) + '_' + cc_hyperparam_str + '_med_h2_results.txt'
+gene_gamma_shape_param=1e-3
+output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_resid_var_True_cc_' + str(cc_hyperparam) + '_cross_gene_gamma_scale_' + str(gene_gamma_shape_param) + '.txt'
+mod = bayesian_lmm_ss_h2_med_cross_gene_gamma_scale.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
+mod.fit(burn_in_iterations=10000, total_iterations=600000, update_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam, gene_gamma_shape=gene_gamma_shape_param)
 t = open(output_file,'w')
-t.write('iter\tobs_med_h2\tobs_nm_h2\tmed_h2\talt_med_h2\tnm_h2\teqtl_h2\n')
-
-for sample_iter in range(len(mod.sampled_med_h2)):
-	t.write(str(sample_iter) + '\t' + str(sim_med_h2) + '\t' + str(sim_nm_h2) + '\t' + str(mod.sampled_med_h2[sample_iter]) + '\t' + str(mod.sampled_alt_med_h2[sample_iter]) + '\t' + str(mod.sampled_nm_h2[sample_iter]) + '\t' + str(mod.sampled_eqtl_h2s[sample_iter]) + '\n')
+t.write('sim_h2\tsim_nm_h2\tsim_med_h2\titer\tnm_h2_v1\tnm_h2_v2\tmed_h2_v1\tmed_h2_v2\ttotal_h2\teqtl_h2_v1\teqtl_h2_v2\n')
+for ii, itera in enumerate(mod.sampled_iters):
+	t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(itera) + '\t' + str(mod.sampled_nm_h2_v1[ii]) + '\t' + str(mod.sampled_nm_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v1[ii]) + '\t' + str(mod.sampled_med_h2_v2[ii]) + '\t' + str(mod.sampled_total_h2[ii]) + '\t' + str(mod.sampled_eqtl_h2s_v1[ii]) + '\t' + str(mod.sampled_eqtl_h2s_v2[ii]) + '\n')
 t.close()
 
+gene_gamma_shape_param=1e-1
+output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_resid_var_True_cc_' + str(cc_hyperparam) + '_cross_gene_gamma_scale_' + str(gene_gamma_shape_param) + '.txt'
+mod = bayesian_lmm_ss_h2_med_cross_gene_gamma_scale.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
+mod.fit(burn_in_iterations=10000, total_iterations=600000, update_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam, gene_gamma_shape=gene_gamma_shape_param)
+t = open(output_file,'w')
+t.write('sim_h2\tsim_nm_h2\tsim_med_h2\titer\tnm_h2_v1\tnm_h2_v2\tmed_h2_v1\tmed_h2_v2\ttotal_h2\teqtl_h2_v1\teqtl_h2_v2\n')
+for ii, itera in enumerate(mod.sampled_iters):
+	t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(itera) + '\t' + str(mod.sampled_nm_h2_v1[ii]) + '\t' + str(mod.sampled_nm_h2_v2[ii]) + '\t' + str(mod.sampled_med_h2_v1[ii]) + '\t' + str(mod.sampled_med_h2_v2[ii]) + '\t' + str(mod.sampled_total_h2[ii]) + '\t' + str(mod.sampled_eqtl_h2s_v1[ii]) + '\t' + str(mod.sampled_eqtl_h2s_v2[ii]) + '\n')
+t.close()
+
+'''
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# OLD. didn't seem to work
+
+'''
+####################
+# LDSC h2 stuff
+####################
+h2_v1 = np.sum(np.square(gwas_beta_pc) - (1.0/N_gwas))
+model = sm.OLS(np.square(gwas_beta_pc) - (1.0/N_gwas), var_ld_score_pc).fit()
+h2_v2 = model.params[0]*np.sum(var_ld_score_pc)
+
+mod = bayesian_lmm_ss_two_step_h2_med.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
+mod.fit(burn_in_iterations=100000, total_iterations=110000, update_eqtl_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
+output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_two_step_resid_var_True_cc_' + str(cc_hyperparam) + '_alt_2.txt'
+t = open(output_file,'w')
+t.write('sim_h2\tsim_nm_h2\tsim_med_h2\tnm_h2\tmed_h2\ttotal_h2_v1\ttotal_h2_v2\teqtl_h2\n')
+t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(mod.est_nm_h2) + '\t' + str(mod.est_med_h2) + '\t' + str(h2_v1) + '\t' + str(h2_v2) + '\t' + str(mod.eqtl_h2) + '\n')
+t.close()
+print(output_file)
+
+
+
+
+####################
+# Compute h2 using bayesian lmm two step
+####################
+# Equal weights
+print('start')
+mod = bayesian_lmm_ss_double_dip_two_step_h2_med.Bayesian_LMM_SS_h2_med_inference(gwas_beta_pc, var_ld_score_pc, N_gwas, n_gwas_snps, eqtl_beta, eqtl_ldscore, eqtl_position, eqtl_sample_size, eqtl_n_cis_snps)
+mod.fit(burn_in_iterations=590000, total_iterations=600000, update_gwas_resid_var=True, update_eqtl_resid_var=True, v0=0.0, s_sq=0.0, cc=cc_hyperparam)
+output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_med_h2_marginal_gibbs_sampler_double_dip_two_step_resid_var_True_cc_' + str(cc_hyperparam) + '_alt_2.txt'
+
+t = open(output_file,'w')
+t.write('sim_h2\tsim_nm_h2\tsim_med_h2\tnm_h2\tmed_h2\tnm_h2_bayes\tmed_h2_bayes\n')
+t.write(str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(mod.two_step_nm_h2_est) + '\t' + str(mod.two_step_med_h2_est) + '\t' + str(np.mean(mod.sampled_med_h2_v2)) + '\t' + str(np.mean(mod.sampled_nm_h2_v2)) + '\n')
+t.close()
 print(output_file)
 '''
-
-
-
 

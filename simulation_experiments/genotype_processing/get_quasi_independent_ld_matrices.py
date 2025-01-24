@@ -390,6 +390,7 @@ eqtl_sample_sizes = ['100','300', '500', '1000', '10000']
 chrom1_quasi_independent_ld_blocks_file = quasi_independent_dir + 'EUR/' + 'fourier_ls-chr1.bed'
 quasi_windows = get_quasi_windows(chrom1_quasi_independent_ld_blocks_file)
 
+
 in_sample_genotype_stem = processed_genotype_data_dir +'simulated_gwas_data_1'
 output_stem = processed_genotype_data_dir + 'variant_ref_geno_gwas_quasi_independent_windows_ld'
 construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, quasi_windows)
@@ -400,6 +401,16 @@ for eqtl_ss in eqtl_sample_sizes:
 	output_stem = processed_genotype_data_dir + 'variant_ref_geno_eqtl_' + eqtl_ss + '_quasi_independent_windows_ld'
 	construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, quasi_windows)
 
+# Make on full region
+starter = quasi_windows[0][0]
+ender = quasi_windows[-1][1]
+biggest_quasi_windows = [(starter, ender)]
+
+in_sample_genotype_stem = processed_genotype_data_dir +'simulated_gwas_data_1'
+output_stem = processed_genotype_data_dir + 'variant_ref_geno_gwas_full_space_ld_ld'
+construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, biggest_quasi_windows)
+
+print('done')
 
 chrom1_quasi_independent_ld_blocks_file = quasi_independent_dir + 'EUR/' + 'fourier_ls-chr1.bed'
 big_quasi_windows = get_big_quasi_windows(chrom1_quasi_independent_ld_blocks_file)

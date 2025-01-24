@@ -7,13 +7,11 @@ from scipy.stats import invgamma
 import statsmodels.api as sm
 import bayesian_lmm_rss_med_h2_no_pca
 
-'''
 import tensorflow as tf
 import gzip
 import time
 import statsmodels.api as sm
 import tensorflow_probability as tfp
-'''
 
 
 
@@ -64,6 +62,7 @@ def simulate_data(gwas_ss, n_snps, eqtl_ss_1, med_h2_1, ge_h2_options, n_genes, 
 	gwas_geno = np.random.normal(loc=0,scale=1.0,size=(gwas_ss,n_snps))
 	for snp_iter in range(n_snps):
 		gwas_geno[:,snp_iter] = (gwas_geno[:,snp_iter] - np.mean(gwas_geno[:,snp_iter]))/np.std(gwas_geno[:,snp_iter])
+
 
 	# Simulate Gene trait value
 	Es = []
@@ -182,10 +181,12 @@ def sumstat_proportional_joint_reml_chunked_no_ld_loss(gwas_beta, gwas_beta_var,
 
 def sumstat_proportional_joint_reml_no_ld_loss(gwas_beta, gwas_beta_var, eqtl_beta, eqtl_beta_var,eqtl_mask, alpha_sq_variable, eqtl_beta_sq_variable, beta_sq_variable, n_snps, per_snp_eqtl_h2_est_lb, per_snp_gwas_h2_est_lb):
 
-	eqtl_beta_sq_variable_scaled = tf.nn.relu(eqtl_beta_sq_variable) + (per_snp_eqtl_h2_est_lb)
+	# Currently working
+	#eqtl_beta_sq_variable_scaled = tf.nn.relu(eqtl_beta_sq_variable) + (per_snp_eqtl_h2_est_lb)
+	#big_eqtl_beta_sq_variable = tf.tile(tf.reshape(eqtl_beta_sq_variable_scaled, [-1, 1]), [1,n_snps])
 
+	eqtl_beta_sq_variable_scaled = eqtl_beta_sq_variable + (per_snp_eqtl_h2_est_lb)
 	big_eqtl_beta_sq_variable = tf.tile(tf.reshape(eqtl_beta_sq_variable_scaled, [-1, 1]), [1,n_snps])
-
 
 
 	pred_per_snp_gwas_h2 = beta_sq_variable + alpha_sq_variable*(tf.math.reduce_sum((big_eqtl_beta_sq_variable)*eqtl_mask,axis=0))
@@ -226,7 +227,7 @@ def sumstat_proportional_joint_reml_per_snp_no_ld_loss(gwas_beta, gwas_beta_var,
 	return loss
 
 
-def med_h2_with_sumstat_reml_no_ld_two_step(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se, max_epochs=60000, conv_thresh=1e-12):
+def med_h2_with_sumstat_two_step_reml_no_ld_two_step(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se, max_epochs=60000, conv_thresh=1e-12):
 	# dimensionality of system
 	n_genes = eqtl_beta.shape[0]
 	n_snps = len(gwas_beta)
@@ -262,6 +263,7 @@ def med_h2_with_sumstat_reml_no_ld_two_step(gwas_beta, gwas_beta_se, eqtl_beta, 
 		gene_eqtl_beta_var2 = gene_eqtl_beta_var[indices]
 		eqtl_beta_sq_init.append(np.mean(np.square(gene_eqtl_beta2/np.sqrt(gene_eqtl_beta_var2)) - 1.0)*np.mean(gene_eqtl_beta_var2))
 	eqtl_beta_sq_init = np.asarray(eqtl_beta_sq_init)
+
 
 
 	# Initialize variables to optimize over
@@ -419,13 +421,13 @@ def med_h2_with_sumstat_reml_chunked_no_ld(gwas_beta, gwas_beta_se, eqtl_beta, e
 	return med_h2, nm_h2, gene_cis_h2
 
 
-def med_h2_with_sumstat_reml_no_ld(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se, max_epochs=80000, conv_thresh=1e-12):
+def med_h2_with_sumstat_reml_no_ld(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se, max_epochs=25000, conv_thresh=1e-12):
 	# dimensionality of system
 	n_genes = eqtl_beta.shape[0]
 	n_snps = len(gwas_beta)
 
 
-	optimizer = tf.keras.optimizers.Adam(learning_rate=1e-5)
+	optimizer = tf.keras.optimizers.Adam(learning_rate=1e-6)
 
 	# Create mask matrix
 	eqtl_mask = 1.0*(eqtl_beta!=0.0)
@@ -441,7 +443,6 @@ def med_h2_with_sumstat_reml_no_ld(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta
 
 	per_snp_eqtl_h2_est_lb = -np.min(eqtl_beta_var[eqtl_mask==1])*.99
 	per_snp_gwas_h2_est_lb = -np.min(gwas_beta_var)*.99
-
 
 
 	# Initialize variables to optimize over
@@ -469,26 +470,32 @@ def med_h2_with_sumstat_reml_no_ld(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta
 		cur_est = np.asarray(alpha_sq_variable)*1.0
 
 		diff = np.abs(prev_est_alpha_sq -cur_est)
+		'''
 		if diff < conv_thresh:
 			converged = True
 			break
+		'''
 
 		prev_est_alpha_sq = cur_est
 
-		print(cur_est)
-		print(loss_value)
+
+		if np.mod(epoch_iter, 100) == 0.0:
+			eqtl_beta_sq_variable_scaled = eqtl_beta_sq_variable + (per_snp_eqtl_h2_est_lb)
+			gene_cis_h2 = eqtl_beta_sq_variable_scaled*snps_per_gene_arr
+			med_h2 = np.sum(alpha_sq_variable*gene_cis_h2)
+			nm_h2 = np.sum(beta_sq_variable)*n_snps
+			print(epoch_iter)
+			print('med: ' + str(med_h2))
+			print('nm: ' + str(nm_h2))
 
 	if converged == False:
 		print('did not converge')
 		print(diff)
 
-	eqtl_beta_sq_variable_scaled = tf.nn.relu(eqtl_beta_sq_variable) + (per_snp_eqtl_h2_est_lb)
-	big_eqtl_beta_sq_variable = tf.tile(tf.reshape(eqtl_beta_sq_variable_scaled, [-1, 1]), [1,n_snps])
-
-	med_h2 = np.sum(alpha_sq_variable*(tf.math.reduce_sum((big_eqtl_beta_sq_variable)*eqtl_mask,axis=0)))
-	nm_h2 = np.sum(beta_sq_variable)*n_snps
-
+	eqtl_beta_sq_variable_scaled = eqtl_beta_sq_variable + (per_snp_eqtl_h2_est_lb)
 	gene_cis_h2 = eqtl_beta_sq_variable_scaled*snps_per_gene_arr
+	med_h2 = np.sum(alpha_sq_variable*gene_cis_h2)
+	nm_h2 = np.sum(beta_sq_variable)*n_snps
 
 
 
@@ -826,17 +833,24 @@ for sim_iter in range(n_sims):
 	# Simulate data
 	Y, Es, Y_geno, E_geno, gene_causal_eqtl_effects, nm_var_causal_effects, gene_trait_effects, gene_snp_indices_arr, sim_ge_h2s, gene_window_based_ld_score = simulate_data(gwas_ss, n_snps, eqtl_ss, med_h2, ge_h2_options, n_genes, snps_per_gene, nm_h2, eqtl_architecture, frac_causal_genes)
 
-
 	# Next get summary statistics
 	gwas_beta, gwas_beta_se = get_marginal_summary_statistics(Y, Y_geno)
 	eqtl_beta, eqtl_beta_se = get_marginal_summary_statistics_across_genes(Es, E_geno, gene_snp_indices_arr)
 
+	'''
+	###****
+	# Probably don't include
+	gwas_beta_se = gwas_beta_se*0.0 + np.sqrt(1.0/gwas_ss)
+	eqtl_beta_se = eqtl_beta_se*0.0 + np.sqrt(1.0/eqtl_ss)
+	'''
+
+	'''
 	# Temp loading of data
 	np.save('gwas_beta.npy',gwas_beta)
 	np.save('gwas_beta_se.npy',gwas_beta_se)
 	np.save('eqtl_beta.npy',eqtl_beta)
 	np.save('eqtl_beta_se.npy',eqtl_beta_se)
-	
+	'''
 	'''
 	gwas_beta = np.load('gwas_beta.npy')
 	gwas_beta_se = np.load('gwas_beta_se.npy')
@@ -847,24 +861,28 @@ for sim_iter in range(n_sims):
 	sim_nm_h2 = np.sum(np.square(nm_var_causal_effects))
 	sim_eqtl_h2 = np.sum(np.square(gene_causal_eqtl_effects),axis=1)
 
+	print(sim_med_h2)
+	print(sim_nm_h2)
+	print(sim_eqtl_h2)
+	'''
 	# Bayesian approach
 	# REASONABLE WORKING
 	med_h2_sumstat_bayesian, nm_h2_sumstat_bayesian, eqtl_h2_sumstat_bayesian = med_h2_with_sumstat_bayesian_no_ld(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se)
 	t.write(str(sim_iter) + '\t' + 'sumstat_bayesian\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(np.mean(sim_eqtl_h2)) + '\t' + str(nm_h2_sumstat_bayesian) + '\t' + str(med_h2_sumstat_bayesian) + '\t' +  str(np.mean(eqtl_h2_sumstat_bayesian)) + '\n')
-
+	'''
 	# Alt bayesian approach
 	#med_h2_with_sumstat_bayesian_no_ld_alt(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se, gwas_ss, eqtl_ss)
 
 
 	'''
-	med_h2_sumstat_reml_two_step, nm_h2_sumstat_reml_two_step, eqtl_h2_sumstat_reml_two_step = med_h2_with_sumstat_reml_no_ld_two_step(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se)
+	med_h2_sumstat_reml_two_step, nm_h2_sumstat_reml_two_step, eqtl_h2_sumstat_reml_two_step = med_h2_with_sumstat_two_step_reml_no_ld_two_step(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se)
+	'''
 	med_h2_sumstat_reml, nm_h2_sumstat_reml, eqtl_h2_sumstat_reml = med_h2_with_sumstat_reml_no_ld(gwas_beta, gwas_beta_se, eqtl_beta, eqtl_beta_se)
 
 	t.write(str(sim_iter) + '\t' + 'sumstat_reml\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(np.mean(sim_eqtl_h2)) + '\t' + str(nm_h2_sumstat_reml) + '\t' + str(med_h2_sumstat_reml) + '\t' +  str(np.mean(eqtl_h2_sumstat_reml)) + '\n')
-	t.write(str(sim_iter) + '\t' + 'sumstat_reml_two_step\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(np.mean(sim_eqtl_h2)) + '\t' + str(nm_h2_sumstat_reml_two_step) + '\t' + str(med_h2_sumstat_reml_two_step) + '\t' +  str(np.mean(eqtl_h2_sumstat_reml_two_step)) + '\n')
+	#t.write(str(sim_iter) + '\t' + 'sumstat_reml_two_step\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(np.mean(sim_eqtl_h2)) + '\t' + str(nm_h2_sumstat_reml_two_step) + '\t' + str(med_h2_sumstat_reml_two_step) + '\t' +  str(np.mean(eqtl_h2_sumstat_reml_two_step)) + '\n')
 
 	t.flush()
-	'''
 
 t.close()
 
