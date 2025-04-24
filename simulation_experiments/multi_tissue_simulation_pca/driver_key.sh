@@ -20,6 +20,7 @@ quasi_independent_dir="/n/groups/price/ben/quasi_independent_ld_blocks/"
 # Output directories
 ############################
 output_root_dir="/n/scratch/users/b/bes710/qtl_mediated_h2/simulation_experiments/multi_tissue_simulation_pca/"
+perm_output_root_dir="/n/groups/price/ben/qtl_mediated_h2/simulation_experiments/multi_tissue_simulation_pca/"
 
 # Directory containing simulated gene positions
 simulated_gene_position_dir=$output_root_dir"simulated_gene_positions/"
@@ -47,11 +48,13 @@ trait_med_h2_inference_dir=$output_root_dir"trait_mediated_h2_inference/"
 # Directory containing results of expression trait h2 inference
 expr_trait_h2_inference_dir=$output_root_dir"expression_trait_h2_inference/"
 
+# Directory containing organized results
+organized_trait_med_h2_results_dir=${perm_output_root_dir}"organized_trait_med_h2_results/"
 
 # Expression trait h2 visualization dir
 visualize_expression_trait_h2=$output_root_dir"visualize_expression_trait_h2/"
 
-visualize_trait_med_h2_dir=$output_root_dir"visualize_trait_med_h2/"
+visualize_trait_med_h2_dir=$perm_output_root_dir"visualize_trait_med_h2/"
 
 
 
@@ -109,11 +112,93 @@ eqtl_architecture="default"
 # Run main single simulation of simulating the trait data
 ############################
 if false; then
-for simulation_number in $(seq 2 201); do 
+for simulation_number in $(seq 1 200); do 
 	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_num}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
 	sbatch run_single_trait_simulation.sh $simulation_number $chrom_num $cis_window $n_gwas_individuals $simulation_name_string $simulated_gene_position_file $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
 done
 fi
+
+
+
+
+
+###############################
+# Joint LDSC approach
+###############################
+if false; then
+for simulation_number in $(seq 1 200); do 
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_num}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+	sbatch trait_mediated_h2_inference_no_pca_joint_ldsc.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir
+done
+fi
+
+
+###############################
+# Joint LDSC approach (relying on pca)
+###############################
+if false; then
+for simulation_number in $(seq 4 200); do 
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_num}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+	sbatch trait_mediated_h2_inference_joint_ldsc.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir
+done
+fi
+
+####################
+# Organize results
+####################
+if false; then
+python3 organize_trait_med_h2_results.py $trait_med_h2_inference_dir $organized_trait_med_h2_results_dir
+fi
+
+
+if false; then
+module load R/3.5.1
+fi
+if false; then
+Rscript visualize_trait_med_h2_results.R $trait_med_h2_inference_dir $organized_trait_med_h2_results_dir $visualize_trait_med_h2_dir
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+############
+# OLDER
+############
+
+
+
+
+
+
+
+
+
+
+########################
+# GECS trait mediated inference
+###############################
+if false; then
+for simulation_number in $(seq 1 400); do 
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_num}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+	sbatch gecs_trait_mediated_h2_inference.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $alt_simulated_learned_gene_models_dir
+done
+fi
+
+
 
 
 

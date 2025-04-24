@@ -44,8 +44,11 @@ chrom_num="1"
 # Needs to be 200GB and 25 h
 n_gwas_individuals="100000"
 if false; then
-sbatch prepare_ukbb_hm3_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir
+sh prepare_ukbb_hm3_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir
 fi
+
+
+
 
 
 

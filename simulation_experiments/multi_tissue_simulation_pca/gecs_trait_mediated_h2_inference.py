@@ -371,8 +371,35 @@ def create_mapping_form_gene_name_to_multivariate_gene_model_info(multivariate_g
 
 	return mapping
 
+def compute_susie_expected_delta_t_delta(susie_mu, susie_alpha, susie_mu2,susie_pmces):
+	n_comp, n_snp = susie_mu.shape
 
-def load_in_eqtl_data3(eqtl_sumstat_file, snp_name_to_position, window_name_to_ld_files, eqtl_sample_size, num_snps, alt_simulated_learned_gene_models_dir, simulation_name_string, gene_model_type='susie', eqtl_ld='out_of_sample', ldsc_variance=False, single_tissue=False):
+	# Sampler
+	'''
+	n_samp = 100000
+	samp_delta_cross = np.zeros((n_snp, n_snp))
+	for samp_iter in range(n_samp):
+		delta_samp = np.zeros(n_snp)
+
+		for comp_iter in range(n_comp):
+			index = np.random.choice(np.arange(n_snp), p=susie_alpha[comp_iter,:])
+			delta_samp[index] = delta_samp[index] + susie_mu[comp_iter, index]
+		delta_cross = np.dot(delta_samp.reshape(-1,1), delta_samp.reshape(1,-1))
+		samp_delta_cross = samp_delta_cross + delta_cross
+	samp_delta_cross = samp_delta_cross/n_samp
+	'''
+
+	# Compute expected value
+	e_delta_cross = np.dot(susie_pmces.reshape(-1,1), susie_pmces.reshape(1,-1))
+	for comp_iter in range(n_comp):
+		component_pmces = susie_alpha[comp_iter,:]*susie_mu[comp_iter,:]
+		e_delta_cross = e_delta_cross - np.dot(component_pmces.reshape(-1,1), component_pmces.reshape(1,-1))
+		e_delta_cross = e_delta_cross + np.diag(susie_alpha[comp_iter,:]*np.square(susie_mu[comp_iter,:]))
+
+	return e_delta_cross
+
+
+def load_in_eqtl_data3(gwas_z, eqtl_sumstat_file, snp_name_to_position, window_name_to_ld_files, eqtl_sample_size, num_snps, alt_simulated_learned_gene_models_dir, simulation_name_string, cross_delta_version='pmces', eqtl_ld='out_of_sample', ldsc_variance=False, single_tissue=False):
 	# First get list of gene names
 	gene_names = []
 	gene_classes = []
@@ -399,79 +426,139 @@ def load_in_eqtl_data3(eqtl_sumstat_file, snp_name_to_position, window_name_to_l
 		index_to_gene_h2[ii] = []
 
 
-	# Initialize matrix of eQTL ld scores
-	eqtl_ld_scores = np.zeros((num_snps, len(unique_gene_classes)))
-	n_genes = np.zeros(len(unique_gene_classes))
-
-
 	# Create mapping from gene name to multivariate gene model info
 	multivariate_gene_model_summary_file = alt_simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_small_multivariate_gene_model_output.txt'
 	gene_name_to_multivariate_gene_model = create_mapping_form_gene_name_to_multivariate_gene_model_info(multivariate_gene_model_summary_file)
 
 
+	# first create mapping from window to gene names
+	window_to_gene_names = {}
 	# Now loop through genes
 	for gg_iter, gene_name in enumerate(gene_names):
 		# Extract summary stats for specific gene
 		eqtl_gene_beta, eqtl_gene_beta_se, gene_cis_snp_indices, gene_window_name, gene_rsids, gene_class_name = extract_eqtl_sumstats_for_specific_gene(eqtl_sumstat_file, gene_name)
 		gene_class_index = class_name_to_class_index[gene_class_name]
+		if gene_window_name not in window_to_gene_names:
+			window_to_gene_names[gene_window_name] = []
+		window_to_gene_names[gene_window_name].append(gene_name)
 
+
+	windows = np.asarray([*window_to_gene_names])
+
+	# Initialize output data
+	cross_z_scores = []
+	cross_ld_scores = []
+	cross_eqtl_ld_scores = []
+	n_genes = np.zeros(len(unique_gene_classes))
+	for gene_class_iter in range(len(unique_gene_classes)):
+		cross_eqtl_ld_scores.append([])
+
+	for window_name in windows:
+		booler = False
 		# Load in q_mat and w_mat for this window
-		ld_file = window_name_to_ld_files[gene_window_name]
+		ld_file = window_name_to_ld_files[window_name]
 		if eqtl_ld == 'out_of_sample':
 			ld_mat = np.load(ld_file)
 		elif eqtl_ld == 'in_sample_adjusted':
 			new_ld_file = ld_file.split('ref_geno_gwas_')[0] + 'ref_geno_eqtl_' + str(eqtl_sample_size) + '_' + ld_file.split('ref_geno_gwas_')[1]
 			ld_mat = np.load(new_ld_file)
 
-		# SKip genes with no gene model
-		if gene_model_type == 'susie' and gene_name not in gene_name_to_multivariate_gene_model:
-			continue
-
-			
-
-		# Get names of snps in gene
-		gene_snp_positions = []
-		for gene_rsid in gene_rsids:
-			gene_snp_positions.append(snp_name_to_position[gene_rsid])
-		gene_snp_positions = np.asarray(gene_snp_positions)
+		ld_t_ld = np.dot(ld_mat, ld_mat)
+		upper_triangle_indices = np.triu_indices(ld_t_ld.shape[0], k=1)
 
 
-		if gene_model_type == 'susie':
-			#extract gene model info
-			gene_model_file, gene_snp_name_file, gene_ldsc_h2, gene_pred_h2 = gene_name_to_multivariate_gene_model[gene_name]
+		window_genes = np.asarray(window_to_gene_names[window_name])
 
-			# load in gene model
-			gene_model = np.load(gene_model_file)
+		delta_t_deltas = []
+		for gene_class_iter in range(len(unique_gene_classes)):
+			delta_t_deltas.append(np.zeros((ld_mat.shape[0], ld_mat.shape[0])))
+
+		for gene_name in window_genes:
+
+
+			eqtl_gene_beta, eqtl_gene_beta_se, gene_cis_snp_indices, gene_window_name, gene_rsids, gene_class_name = extract_eqtl_sumstats_for_specific_gene(eqtl_sumstat_file, gene_name)
+			gene_class_index = class_name_to_class_index[gene_class_name]
+
+
+
+			# Get names of snps in gene
+			gene_snp_positions = []
+			for gene_rsid in gene_rsids:
+				gene_snp_positions.append(snp_name_to_position[gene_rsid])
+			gene_snp_positions = np.asarray(gene_snp_positions)
+
+			if cross_delta_version == 'pmces' or cross_delta_version == 'expected_value':
+				#extract gene model info
+				if gene_name not in gene_name_to_multivariate_gene_model:
+					continue
+				gene_model_file, gene_snp_name_file, gene_ldsc_h2, gene_pred_h2 = gene_name_to_multivariate_gene_model[gene_name]
+
+
+
+			if cross_delta_version == 'pmces':
+				# load in gene model
+				gene_model = np.load(gene_model_file)
+				pred_marginal_delta = np.dot(ld_mat[:, gene_cis_snp_indices==1], gene_model)
+				delta_t_deltas[gene_class_index] = delta_t_deltas[gene_class_index] + np.dot(pred_marginal_delta.reshape(-1,1), pred_marginal_delta.reshape(1,-1))
+			elif cross_delta_version == 'expected_value':
+				# Start adding here: 
+				gene_model = np.load(gene_model_file)
+				susie_file_stem = gene_model_file.split('susie_pmces')[0]
+				susie_mu_file = susie_file_stem + 'susie_mu.npy'
+				susie_mu = np.load(susie_mu_file)
+				susie_alpha_file = susie_file_stem + 'susie_alpha.npy'
+				susie_alpha = np.load(susie_alpha_file)
+				susie_mu2_file = susie_file_stem + 'susie_mu2.npy'
+				susie_mu2 = np.load(susie_mu2_file)
+				e_delta_t_delta = compute_susie_expected_delta_t_delta(susie_mu, susie_alpha, susie_mu2,gene_model)
+				delta_t_deltas[gene_class_index] = delta_t_deltas[gene_class_index] + np.dot(np.dot(ld_mat[:, gene_cis_snp_indices==1], e_delta_t_delta), ld_mat[gene_cis_snp_indices==1,:])
+			elif cross_delta_version == 'summary_stats':
+				standardized_eqtl_gene_beta = (eqtl_gene_beta/eqtl_gene_beta_se)/(np.sqrt(float(eqtl_sample_size)))
+				delta_t_deltas[gene_class_index] = delta_t_deltas[gene_class_index] + np.dot(standardized_eqtl_gene_beta.reshape(-1,1), standardized_eqtl_gene_beta.reshape(1,-1)) - (ld_mat/float(eqtl_sample_size))
+			else:
+				print('assumptione rroror')
+				pdb.set_trace()
 
 			# get variance of genetically predicted gene
-			small_ld_mat = ld_mat[gene_cis_snp_indices==1,:][:, gene_cis_snp_indices==1]
-			gene_var = np.dot(np.dot(gene_model, small_ld_mat), gene_model)
+			if cross_delta_version == 'pmces' or cross_delta_version == 'expected_value':
+				small_ld_mat = ld_mat[gene_cis_snp_indices==1,:][:, gene_cis_snp_indices==1]
+				gene_var = np.dot(np.dot(gene_model, small_ld_mat), gene_model)
+			elif cross_delta_version == 'summary_stats':
+				gene_var = 0.05
 
-			# Computed squared correlations
-			snp_gene_squared_correlations = np.square(np.dot(ld_mat[:, gene_cis_snp_indices==1], gene_model))
-		elif gene_model_type == 'summary_stats':
-			snp_gene_squared_correlations = np.square((eqtl_gene_beta/eqtl_gene_beta_se)/np.sqrt(float(eqtl_sample_size))) - (1.0/float(eqtl_sample_size))
-			gene_var = 0.05
+			# Update n_genes matrix
+			n_genes[gene_class_index] = n_genes[gene_class_index] + 1
 
-		# Update eqtl ld scores matrix
-		eqtl_ld_scores[gene_snp_positions, gene_class_index] = eqtl_ld_scores[gene_snp_positions, gene_class_index] + snp_gene_squared_correlations
+			index_to_gene_h2[gene_class_index].append(gene_var)
 
-		# Update n_genes matrix
-		n_genes[gene_class_index] = n_genes[gene_class_index] + 1
+			booler = True
 
-
-		index_to_gene_h2[gene_class_index].append(gene_var)
+		if booler == False:
+			continue
+		window_zs = gwas_z[gene_snp_positions]
+		unbiased_window_z_t_z = np.dot(window_zs.reshape(-1,1), window_zs.reshape(1,-1)) - ld_mat
 
 
+		low_ld_indices = np.abs(ld_t_ld[upper_triangle_indices]) < .5
+		cross_ld_scores.append(ld_t_ld[upper_triangle_indices][low_ld_indices])
 
+		cross_z_scores.append(unbiased_window_z_t_z[upper_triangle_indices][low_ld_indices])
+
+
+		for gene_class_iter in range(len(unique_gene_classes)):
+			cross_eqtl_ld_scores[gene_class_iter].append(delta_t_deltas[gene_class_iter][upper_triangle_indices][low_ld_indices])
+
+	cross_z_scores = np.hstack(cross_z_scores)
+	cross_ld_scores = np.hstack(cross_ld_scores)
 	gene_cis_h2 = np.zeros(len(unique_gene_classes))
 	for ii in range(len(unique_gene_classes)):
 		gene_cis_h2[ii] = np.mean(index_to_gene_h2[ii])
+		cross_eqtl_ld_scores[ii] = np.hstack(cross_eqtl_ld_scores[ii])
+	cross_eqtl_ld_scores = np.transpose(np.vstack(cross_eqtl_ld_scores))
 
 
 
-
-	return eqtl_ld_scores, n_genes, gene_cis_h2
+	return cross_z_scores, cross_ld_scores, cross_eqtl_ld_scores, n_genes, gene_cis_h2
 
 
 
@@ -520,6 +607,7 @@ gwas_variant_ld_scores, window_to_ld_files = get_gwas_variant_ld_scores(gwas_bet
 # Other relevent quantities
 N_gwas = n_gwas_individuals
 gwas_chi_sq = np.square(gwas_beta/gwas_beta_se)
+gwas_z = gwas_beta/gwas_beta_se
 
 
 # Create mapping from rsid to position
@@ -534,7 +622,7 @@ ldsc_h2_est = results.params[0]*len(gwas_rsids)/float(n_gwas_individuals)
 ###################################
 # 5 tissues (Unpermuted eqtls)
 ###################################
-output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_tglr_estimates.txt'
+output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_gecs_estimates.txt'
 t = open(output_file,'w')
 t.write('method\tsim_tot_h2\tsim_nm_h2\tsim_med_h2\test_tot_h2\test_nm_h2\test_total_med_h2\test_per_tissue_med_h2\n')
 
@@ -542,34 +630,74 @@ t.write('method\tsim_tot_h2\tsim_nm_h2\tsim_med_h2\test_tot_h2\test_nm_h2\test_t
 t.write('ldsc\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(ldsc_h2_est) + '\t' + 'NA' + '\t' + 'NA' + '\t' + 'NA' + '\n')
 
 
+
 #####################
 # load in eqtl data
-# Susie PMCES
+# PMCES delta_t_delta
 eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
-eqtl_ld_scores, n_genes, gene_cis_h2 = load_in_eqtl_data3(eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, len(gwas_rsids), alt_simulated_learned_gene_models_dir, simulation_name_string, gene_model_type='susie', eqtl_ld='out_of_sample', ldsc_variance=False)
-# Run TGLR
-joint_ld_scores = np.hstack((np.transpose(gwas_variant_ld_scores.reshape(1,-1)), eqtl_ld_scores))
-model = sm.OLS(gwas_chi_sq -1, joint_ld_scores)
+cross_z_scores, cross_ld_scores, cross_eqtl_ld_scores, n_genes, gene_cis_h2 = load_in_eqtl_data3(gwas_z, eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, len(gwas_rsids), alt_simulated_learned_gene_models_dir, simulation_name_string, cross_delta_version='pmces', eqtl_ld='out_of_sample', ldsc_variance=False)
+
+# Run GECS
+joint_ld_scores = np.hstack((np.transpose(cross_ld_scores.reshape(1,-1)), cross_eqtl_ld_scores))
+model = sm.OLS(cross_z_scores, joint_ld_scores)
 results = model.fit()
 # Extract estimated parameters
 nm_h2 = results.params[0]*len(gwas_rsids)/float(n_gwas_individuals)
 per_tissue_h2 = results.params[1:]*n_genes*gene_cis_h2/float(n_gwas_individuals)
-t.write('tglr\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
+t.write('gecs\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
+# Run without genotype intercept
+model = sm.OLS(cross_z_scores, cross_eqtl_ld_scores)
+results = model.fit()
+# Extract estimated parameters
+nm_h2 = 0.0
+per_tissue_h2 = results.params*n_genes*gene_cis_h2/float(n_gwas_individuals)
+t.write('gecs_no_genotype_intercept\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
 
 
 #####################
 # load in eqtl data
-# sumstats
+# Expected value delta_t_delta
 eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
-eqtl_ld_scores, n_genes, gene_cis_h2 = load_in_eqtl_data3(eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, len(gwas_rsids), alt_simulated_learned_gene_models_dir, simulation_name_string, gene_model_type='summary_stats', eqtl_ld='out_of_sample', ldsc_variance=False)
-# Run TGLR
-joint_ld_scores = np.hstack((np.transpose(gwas_variant_ld_scores.reshape(1,-1)), eqtl_ld_scores))
-model = sm.OLS(gwas_chi_sq -1, joint_ld_scores)
+cross_z_scores, cross_ld_scores, cross_eqtl_ld_scores, n_genes, gene_cis_h2 = load_in_eqtl_data3(gwas_z, eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, len(gwas_rsids), alt_simulated_learned_gene_models_dir, simulation_name_string, cross_delta_version='expected_value', eqtl_ld='out_of_sample', ldsc_variance=False)
+
+# Run GECS
+joint_ld_scores = np.hstack((np.transpose(cross_ld_scores.reshape(1,-1)), cross_eqtl_ld_scores))
+model = sm.OLS(cross_z_scores, joint_ld_scores)
 results = model.fit()
 # Extract estimated parameters
 nm_h2 = results.params[0]*len(gwas_rsids)/float(n_gwas_individuals)
 per_tissue_h2 = results.params[1:]*n_genes*gene_cis_h2/float(n_gwas_individuals)
-t.write('tglr_sumstats\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
+t.write('gecs_expected_value\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
+# Run without genotype intercept
+model = sm.OLS(cross_z_scores, cross_eqtl_ld_scores)
+results = model.fit()
+# Extract estimated parameters
+nm_h2 = 0.0
+per_tissue_h2 = results.params*n_genes*gene_cis_h2/float(n_gwas_individuals)
+t.write('gecs_expected_value_no_genotype_intercept\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
+
+
+#####################
+# load in eqtl data
+# summary stats
+eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
+cross_z_scores, cross_ld_scores, cross_eqtl_ld_scores, n_genes, gene_cis_h2 = load_in_eqtl_data3(gwas_z, eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, len(gwas_rsids), alt_simulated_learned_gene_models_dir, simulation_name_string, cross_delta_version='summary_stats', eqtl_ld='out_of_sample', ldsc_variance=False)
+
+# Run GECS
+joint_ld_scores = np.hstack((np.transpose(cross_ld_scores.reshape(1,-1)), cross_eqtl_ld_scores))
+model = sm.OLS(cross_z_scores, joint_ld_scores)
+results = model.fit()
+# Extract estimated parameters
+nm_h2 = results.params[0]*len(gwas_rsids)/float(n_gwas_individuals)
+per_tissue_h2 = results.params[1:]*n_genes*gene_cis_h2/float(n_gwas_individuals)
+t.write('gecs_sumstats\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
+# Run without genotype intercept
+model = sm.OLS(cross_z_scores, cross_eqtl_ld_scores)
+results = model.fit()
+# Extract estimated parameters
+nm_h2 = 0.0
+per_tissue_h2 = results.params*n_genes*gene_cis_h2/float(n_gwas_individuals)
+t.write('gecs_sumstats_no_genotype_intercept\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
 
 
 
@@ -580,46 +708,81 @@ print(output_file)
 ###################################
 # 5 tissues (Permute eqtls) 
 ###################################
-output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_tglr_estimates_permuted_eqtls.txt'
+output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_gecs_estimates_permuted_eqtls.txt'
 t = open(output_file,'w')
 t.write('method\tsim_tot_h2\tsim_nm_h2\tsim_med_h2\test_tot_h2\test_nm_h2\test_total_med_h2\test_per_tissue_med_h2\n')
 
 # Write LDSC to output
 t.write('ldsc\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(ldsc_h2_est) + '\t' + 'NA' + '\t' + 'NA' + '\t' + 'NA' + '\n')
 
-
-
 #####################
 # load in eqtl data
-# Susie PMCES
+# PMCES delta_t_delta
 perm_simulation_name_string = 'simulation_' + str(int(simulation_number)+1) + '_chrom' + simulation_name_string.split('_chrom')[1]
 eqtl_sumstat_file = simulated_learned_gene_models_dir + perm_simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
-eqtl_ld_scores, n_genes, gene_cis_h2 = load_in_eqtl_data3(eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, len(gwas_rsids), alt_simulated_learned_gene_models_dir, perm_simulation_name_string,gene_model_type='susie', eqtl_ld='out_of_sample', ldsc_variance=False)
-# Run TGLR
-joint_ld_scores = np.hstack((np.transpose(gwas_variant_ld_scores.reshape(1,-1)), eqtl_ld_scores))
-model = sm.OLS(gwas_chi_sq -1, joint_ld_scores)
+cross_z_scores, cross_ld_scores, cross_eqtl_ld_scores, n_genes, gene_cis_h2 = load_in_eqtl_data3(gwas_z, eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, len(gwas_rsids), alt_simulated_learned_gene_models_dir, perm_simulation_name_string, cross_delta_version='pmces', eqtl_ld='out_of_sample', ldsc_variance=False)
+# Run GECS
+joint_ld_scores = np.hstack((np.transpose(cross_ld_scores.reshape(1,-1)), cross_eqtl_ld_scores))
+model = sm.OLS(cross_z_scores, joint_ld_scores)
 results = model.fit()
 # Extract estimated parameters
 nm_h2 = results.params[0]*len(gwas_rsids)/float(n_gwas_individuals)
 per_tissue_h2 = results.params[1:]*n_genes*gene_cis_h2/float(n_gwas_individuals)
-t.write('tglr\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
+t.write('gecs\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
+# Run without genotype intercept
+model = sm.OLS(cross_z_scores, cross_eqtl_ld_scores)
+results = model.fit()
+# Extract estimated parameters
+nm_h2 = 0.0
+per_tissue_h2 = results.params*n_genes*gene_cis_h2/float(n_gwas_individuals)
+t.write('gecs_no_genotype_intercept\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
+
 
 
 #####################
 # load in eqtl data
-# Summary stats
+# expected value delta_t_delta
 perm_simulation_name_string = 'simulation_' + str(int(simulation_number)+1) + '_chrom' + simulation_name_string.split('_chrom')[1]
 eqtl_sumstat_file = simulated_learned_gene_models_dir + perm_simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
-eqtl_ld_scores, n_genes, gene_cis_h2 = load_in_eqtl_data3(eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, len(gwas_rsids), alt_simulated_learned_gene_models_dir, perm_simulation_name_string,gene_model_type='summary_stats', eqtl_ld='out_of_sample', ldsc_variance=False)
-# Run TGLR
-joint_ld_scores = np.hstack((np.transpose(gwas_variant_ld_scores.reshape(1,-1)), eqtl_ld_scores))
-model = sm.OLS(gwas_chi_sq -1, joint_ld_scores)
+cross_z_scores, cross_ld_scores, cross_eqtl_ld_scores, n_genes, gene_cis_h2 = load_in_eqtl_data3(gwas_z, eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, len(gwas_rsids), alt_simulated_learned_gene_models_dir, perm_simulation_name_string, cross_delta_version='expected_value', eqtl_ld='out_of_sample', ldsc_variance=False)
+# Run GECS
+joint_ld_scores = np.hstack((np.transpose(cross_ld_scores.reshape(1,-1)), cross_eqtl_ld_scores))
+model = sm.OLS(cross_z_scores, joint_ld_scores)
 results = model.fit()
 # Extract estimated parameters
 nm_h2 = results.params[0]*len(gwas_rsids)/float(n_gwas_individuals)
 per_tissue_h2 = results.params[1:]*n_genes*gene_cis_h2/float(n_gwas_individuals)
-t.write('tglr_sumstats\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
+t.write('gecs_expected_value\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
+# Run without genotype intercept
+model = sm.OLS(cross_z_scores, cross_eqtl_ld_scores)
+results = model.fit()
+# Extract estimated parameters
+nm_h2 = 0.0
+per_tissue_h2 = results.params*n_genes*gene_cis_h2/float(n_gwas_individuals)
+t.write('gecs_expected_value_no_genotype_intercept\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
 
+
+#####################
+# load in eqtl data
+# sumstats
+perm_simulation_name_string = 'simulation_' + str(int(simulation_number)+1) + '_chrom' + simulation_name_string.split('_chrom')[1]
+eqtl_sumstat_file = simulated_learned_gene_models_dir + perm_simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
+cross_z_scores, cross_ld_scores, cross_eqtl_ld_scores, n_genes, gene_cis_h2 = load_in_eqtl_data3(gwas_z, eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, len(gwas_rsids), alt_simulated_learned_gene_models_dir, perm_simulation_name_string, cross_delta_version='summary_stats', eqtl_ld='out_of_sample', ldsc_variance=False)
+# Run GECS
+joint_ld_scores = np.hstack((np.transpose(cross_ld_scores.reshape(1,-1)), cross_eqtl_ld_scores))
+model = sm.OLS(cross_z_scores, joint_ld_scores)
+results = model.fit()
+# Extract estimated parameters
+nm_h2 = results.params[0]*len(gwas_rsids)/float(n_gwas_individuals)
+per_tissue_h2 = results.params[1:]*n_genes*gene_cis_h2/float(n_gwas_individuals)
+t.write('gecs_sumstats\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
+# Run without genotype intercept
+model = sm.OLS(cross_z_scores, cross_eqtl_ld_scores)
+results = model.fit()
+# Extract estimated parameters
+nm_h2 = 0.0
+per_tissue_h2 = results.params*n_genes*gene_cis_h2/float(n_gwas_individuals)
+t.write('gecs_sumstats_no_genotype_intercept\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' + str(sim_med_h2) + '\t' + str(nm_h2 + np.sum(per_tissue_h2)) + '\t' + str(nm_h2) + '\t' + str(np.sum(per_tissue_h2)) + '\t' + ','.join(per_tissue_h2.astype(str)) + '\n')
 
 
 
@@ -629,10 +792,13 @@ print(output_file)
 
 
 
-'''
+
+
+
 ###################################
 # 1 tissues (Unpermuted eqtls)
 ###################################
+'''
 output_file = trait_med_h2_inference_dir + simulation_name_string + '_eqtl_SS_' + str(eqtl_sample_size) + '_tglr_estimates_single_tissue.txt'
 t = open(output_file,'w')
 t.write('method\tsim_tot_h2\tsim_nm_h2\tsim_med_h2\test_tot_h2\test_nm_h2\test_total_med_h2\test_per_tissue_med_h2\n')
@@ -671,6 +837,8 @@ t.write('tglr_ldsc_h2_reweight\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' +
 t.close()
 print(output_file)
 '''
+
+
 
 ###################################
 # 1 tissues (Permuted eqtls)
@@ -717,6 +885,4 @@ t.write('tglr_ldsc_h2_reweight\t' + str(sim_h2) + '\t' + str(sim_nm_h2) + '\t' +
 t.close()
 print(output_file)
 '''
-
-
 

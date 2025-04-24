@@ -36,7 +36,8 @@ trans_protein_models_dir="/n/groups/price/UKBiobank/proteomics_betas/beta/"
 tglr_code_dir="/n/groups/price/ben/tools/tglr/tglr/"
 
 # Directory containing models of protein dat
-protein_models_dir="/n/groups/price/kangcheng/projects/ukb-ppp-data/protein-model/susie_inf_hm3/"
+#protein_models_dir="/n/groups/price/kangcheng/projects/ukb-ppp-data/protein-model/susie_inf_hm3/"
+protein_models_dir="/n/scratch/users/k/kah3107/UKB-PPP-DATA/finemap/susie_inf_hm3_with_pca/"
 
 # Directory containing file for each gene of cis-snps relative to each gene
 cis_snp_dir="/n/groups/price/ali/proteomic_proj/data/gene_annot/cis_snps_hapmap3/"
@@ -58,11 +59,19 @@ tglr_expression_score_dir=${tmp_output_root}"tglr_expression_scores/"
 # TGLR Trans expression score directory
 tglr_trans_expression_score_dir=${tmp_output_root}"tglr_trans_expression_scores/"
 
+# GECS expression score directory
+gecs_expression_score_dir=${tmp_output_root}"gecs_expression_scores/"
+
+# Results of GECS analysis
+gecs_results_dir=${tmp_output_root}"gecs_results/"
+
 # TGLR results directory
 tglr_results_dir=${tmp_output_root}"tglr_results/"
 
 # Visualize TGLR results directory
 visualize_tglr_results_dir=${tmp_output_root}"visualize_tglr_results/"
+
+visualize_gecs_results_dir=${tmp_output_root}"visualize_gecs_results/"
 
 
 
@@ -73,9 +82,6 @@ visualize_tglr_results_dir=${tmp_output_root}"visualize_tglr_results/"
 if false; then
 sbatch preprocess_variant_annotation_for_tglr.sh $ldsc_code_dir $hapmap3_rsid_file $baselineLD_anno_dir $kg_plink_dir $tglr_variant_annotations_dir
 fi
-
-
-
 
 ###################
 # Estimate TGLR expression scores in each tissue, independently 
@@ -89,13 +95,58 @@ if false; then
 sh estimate_tglr_expression_score_across_tissues.sh $protein_models_dir ${gwas_genotype_stem} ${ldsc_baseline_ld_annotation_stem} ${tglr_expression_score_dir}
 fi
 
-
-
 ###################
 # Run TGLR
 if false; then
 sbatch run_tglr.sh ${ldsc_genotype_intercept_annotation_stem} ${ldsc_baseline_ld_annotation_stem} ${tglr_expression_score_dir} ${tglr_results_dir} $tglr_code_dir $sumstat_dir ${non_redundent_summary_statistics_file} ${sldsc_weights_stem}
 fi
+
+
+
+
+###################
+# Estimate GECS expression scores
+if false; then
+for chrom_num in {1..22}
+do
+	sbatch estimate_gecs_expression_score_across_tissues.sh $protein_models_dir ${gwas_genotype_stem} ${ldsc_baseline_ld_annotation_stem} ${gecs_expression_score_dir} $chrom_num
+done
+fi
+
+if false; then
+chrom_num="1"
+sbatch estimate_gecs_expression_score_across_tissues.sh $protein_models_dir ${gwas_genotype_stem} ${ldsc_baseline_ld_annotation_stem} ${gecs_expression_score_dir} $chrom_num
+chrom_num="9"
+sbatch estimate_gecs_expression_score_across_tissues.sh $protein_models_dir ${gwas_genotype_stem} ${ldsc_baseline_ld_annotation_stem} ${gecs_expression_score_dir} $chrom_num
+chrom_num="16"
+sbatch estimate_gecs_expression_score_across_tissues.sh $protein_models_dir ${gwas_genotype_stem} ${ldsc_baseline_ld_annotation_stem} ${gecs_expression_score_dir} $chrom_num
+fi
+
+if false; then
+chrom_num="11"
+sbatch estimate_gecs_expression_score_across_tissues.sh $protein_models_dir ${gwas_genotype_stem} ${ldsc_baseline_ld_annotation_stem} ${gecs_expression_score_dir} $chrom_num
+
+chrom_num="6"
+sbatch estimate_gecs_expression_score_across_tissues.sh $protein_models_dir ${gwas_genotype_stem} ${ldsc_baseline_ld_annotation_stem} ${gecs_expression_score_dir} $chrom_num
+fi
+
+
+###################
+# Run GECS
+# 60 GB should work
+regresssion_gene_windows="regress_in_gene_windows"
+if false; then
+sh run_gecs.sh ${gecs_expression_score_dir} ${gecs_results_dir} ${sumstat_dir} ${non_redundent_summary_statistics_file} $regresssion_gene_windows ${tglr_expression_score_dir} ${tglr_results_dir}
+fi
+
+
+###################
+# Visualize GECS results
+####################
+if false; then
+module load R/3.5.1
+fi
+Rscript visualize_gecs_results.R ${gecs_results_dir} ${visualize_gecs_results_dir}
 
 
 

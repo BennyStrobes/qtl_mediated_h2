@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-2:30                         # Runtime in D-HH:MM format
+#SBATCH -t 0-4:30                         # Runtime in D-HH:MM format
 #SBATCH -p short                           # Partition to run in
 #SBATCH --mem=2GB                         # Memory total in MiB (for all cores)
 
@@ -74,8 +74,8 @@ done
 #######################################################
 # Step 5.5: Simulate gene expression and compute eqtl summary statistics and downsampling
 #######################################################
-eqtl_sample_size_arr=( "100" "300" "1000" "10000")
 if false; then
+eqtl_sample_size_arr=( "100" "300" "1000" "10000")
 for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
 do
 	echo $eqtl_sample_size
@@ -88,7 +88,6 @@ fi
 # Step 6: learn multivariate expression models
 ##############################
 echo "Simulation Step 5"
-
 source /home/bes710/.bash_profile
 module load python/3.7.4
 module load R/4.0.1

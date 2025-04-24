@@ -279,9 +279,10 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 			est_total_h2 = []
 			est_per_tissue_h2 =[]
 			for sim_num in sim_nums:
-				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + str(eqtl_sample_size) + '_joint_ldsc_multimethod12.txt'
+				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + str(eqtl_sample_size) + '_pca_joint_ldsc_multimethod.txt'
+				#filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + str(eqtl_sample_size) + '_joint_ldsc_multimethod13.txt'
 				if permuted_eqtls:
-					filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + str(eqtl_sample_size) + '_joint_ldsc_multimethod12_permuted_eqtls.txt'
+					filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + str(eqtl_sample_size) + '_joint_ldsc_multimethod13_permuted_eqtls.txt'
 
 				if os.path.isfile(filer) == False:
 					continue
@@ -304,7 +305,7 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 				f.close()
 				aa = np.asarray(arr)
 
-				if aa.shape[0] != 4:
+				if aa.shape[0] != 7:
 					continue
 
 
@@ -339,6 +340,7 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 				t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, simmer, est_single_tissue, 'med_h2_tissue' + str(tissue_num))
 
 	t.close()
+	print(avg_results_summary_file)
 	return	
 
 
@@ -653,7 +655,7 @@ visualize_trait_med_h2_dir = sys.argv[2]
 
 # Simulation params
 sim_nums = np.arange(1,201)
-eqtl_sample_sizes = np.asarray([100,300,1000,10000])
+eqtl_sample_sizes = np.asarray([100,300,1000, 10000])
 
 
 
@@ -664,21 +666,21 @@ eqtl_sample_sizes = np.asarray([100,300,1000,10000])
 
 #####################
 # Joint LDSC analysis
-sim_nums = np.arange(1,501)
+#sim_nums = np.arange(1,501)
 
-'''
 avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_sim_results_joint_ldsc_binned_summary_averaged.txt'
-methods = ['eqtl_5_binned_no_intercept_two_step', 'eqtl_5_binned_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance']
-clean_method_names = ['two_step_ldsc', 'joint_ldsc']
+methods = ['eqtl_5_binned_no_intercept_two_step', 'eqtl_5_binned_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance', 'eqtl_5_binned_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance_cis_window', 'eqtl_pced_no_intercept_two_step', 'eqtl_pced_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance', 'eqtl_pced_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance_cis_window']
+clean_method_names = ['two_step_ldsc', 'joint_ldsc', 'joint_ldsc_cis_var', 'two_step_pca_ldsc', 'joint_pca_ldsc', 'joint_pca_ldsc_cis_var']
 average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names)
 
 # concatenate results
 concat_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_sim_results_joint_ldsc_binned_summary_concatenated.txt'
-methods = ['eqtl_5_binned_no_intercept_two_step', 'eqtl_5_binned_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance']
-clean_method_names = ['two_step_ldsc', 'joint_ldsc']
+methods = ['eqtl_5_binned_no_intercept_two_step', 'eqtl_5_binned_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance', 'eqtl_5_binned_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance_cis_window', 'eqtl_pced_no_intercept_two_step', 'eqtl_pced_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance', 'eqtl_pced_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance_cis_window']
+clean_method_names = ['two_step_ldsc', 'joint_ldsc', 'joint_ldsc_cis_var', 'two_step_pca_ldsc', 'joint_pca_ldsc', 'joint_pca_ldsc_cis_var']
 concatenate_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, concat_results_summary_file, methods, clean_method_names)
 
 
+'''
 #####################
 # Permuted Joint LDSC analysis
 avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_permuted_eqtls_sim_results_joint_ldsc_binned_summary_averaged.txt'
@@ -705,7 +707,7 @@ average_mesc_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_si
 
 #####################
 # Only include single causal tissue
-
+'''
 avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_1_causal_tissue_sim_results_joint_ldsc_binned_summary_averaged.txt'
 methods = ['eqtl_5_binned_no_intercept_two_step', 'eqtl_5_binned_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance']
 clean_method_names = ['two_step_ldsc', 'joint_ldsc']
@@ -718,5 +720,5 @@ methods = ['eqtl_5_binned_no_intercept_two_step', 'eqtl_5_binned_no_intercept_ba
 clean_method_names = ['two_step_ldsc', 'joint_ldsc']
 average_results_across_simulations_1_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names,permuted_eqtls=True)
 print(avg_results_summary_file)
-
+'''
 

@@ -299,7 +299,7 @@ def extract_ld_annotations_for_this_gene_region_with_sample_correlation(pmces, s
 	return ld_scores, adj_ld_scores
 
 
-def compute_gene_level_ld_scores_for_single_gene(gene_info_file, ref_genotype_obj, rsid_to_reference_index, regression_rsid_to_regression_snp_position, gene_level_ld_scores, method):
+def extract_causal_eqtl_effects_for_single_gene(gene_info_file, ref_genotype_obj, rsid_to_reference_index, regression_rsid_to_regression_snp_position, method):
 	gene_rsids = []
 	gene_eqtl_effect_sizes = []
 	gene_ref_positions = []
@@ -342,19 +342,15 @@ def compute_gene_level_ld_scores_for_single_gene(gene_info_file, ref_genotype_ob
 	gene_eqtl_effect_sizes = np.asarray(gene_eqtl_effect_sizes)
 	gene_ref_positions = np.asarray(gene_ref_positions)
 
-	# Get n_ref_panel_samples
-	n_ref_panel_samples = ref_genotype_obj['G'].shape[0]
+	if np.array_equal(gene_ref_positions, np.sort(gene_ref_positions)) == False:
+		print('assumption erororor')
+		pdb.set_trace()
 
-	# Now get ref positions of gene snp id lb and ub
-	ref_pos_gene_snp_lb = np.min(gene_ref_positions)
-	ref_pos_gene_snp_ub = np.max(gene_ref_positions)
 
-	# Gene window cm lb and ub
-	gene_window_cm_lb = ref_genotype_obj['cm'][ref_pos_gene_snp_lb] - 1.0
-	gene_window_cm_ub = ref_genotype_obj['cm'][ref_pos_gene_snp_ub] + 1.0
+	n_snps = len(ref_genotype_obj['rsid'])
+	gene_snp_boolean_arr = np.asarray([False]*n_snps)
+	gene_snp_boolean_arr[gene_ref_positions] = True
 
-	# Get indices corresponding to ref genotype for this gene window
-	ref_genotype_indices_for_window = (ref_genotype_obj['cm'] >= gene_window_cm_lb) & (ref_genotype_obj['cm'] < gene_window_cm_ub)
 
 	# Get pred expression
 	# First need to standardize expression
@@ -364,25 +360,9 @@ def compute_gene_level_ld_scores_for_single_gene(gene_info_file, ref_genotype_ob
 	# Now compute genetically predicted expression
 	pred_expr = np.dot(eqtl_geno, gene_eqtl_effect_sizes)
 
+	standardized_gene_eqtl_effect_sizes = gene_eqtl_effect_sizes/np.sqrt(np.var(pred_expr))
 
-	# Get window rsids and window genotype
-	window_rsids = ref_genotype_obj['rsid'][ref_genotype_indices_for_window]
-	window_geno = ref_genotype_obj['G'][:, ref_genotype_indices_for_window]
-
-	# Loop through window rsids looking for ones that are regression rsids
-	for ii, window_rsid in enumerate(window_rsids):
-		if window_rsid not in regression_rsid_to_regression_snp_position:
-			continue
-		# Get squared correlation
-		sqared_correlation = np.square(np.corrcoef(pred_expr, window_geno[:,ii])[0,1])
-		# Get adjusted squared correlation
-		adj_squared_correlation = sqared_correlation - ((1.0-sqared_correlation)/(n_ref_panel_samples-2.0))
-
-		# Update gene level ld score for this regression snp
-		regression_snp_pos = regression_rsid_to_regression_snp_position[window_rsid]
-		gene_level_ld_scores[regression_snp_pos] = gene_level_ld_scores[regression_snp_pos] + adj_squared_correlation
-
-	return gene_level_ld_scores
+	return standardized_gene_eqtl_effect_sizes, gene_snp_boolean_arr
 
 
 def load_in_regression_snp_ids(variant_level_ld_score_file, rsid_to_snpid, snpid_to_reference_index):
@@ -538,6 +518,42 @@ def extract_protein_to_protein_model_file_mapping(protein_models_dir, chrom_num)
 		mapping[file_name] = fit_file
 	return np.unique(np.asarray(arr)), mapping
 
+def create_mapping_from_rsid_to_annovec(variant_level_annotation_file):
+	f = open(variant_level_annotation_file)
+	mapping = {}
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			header_vec = np.asarray(data[5:])
+			continue
+		if len(data) != 97:
+			print('assumption erororo')
+			pdb.set_trace()
+		rsid = data[2]
+		anno_vec = np.asarray(data[5:]).astype(float)
+		if rsid in mapping:
+			print('repeat variant assumption eroror')
+			pdb.set_trace()
+		mapping[rsid] = anno_vec
+	return mapping, header_vec
+
+def create_snp_annotation_matrix(rsid_to_anno_vec, G_obj_rsids):
+	anno_mat = []
+	for rsid in G_obj_rsids:
+		anno_mat.append(rsid_to_anno_vec[rsid])
+	return np.asarray(anno_mat)
+
+def check_if_variant_pair_in_single_cis_gene(snp_pos1, snp_pos2, gene_windows):
+	per_gene_boolers = (snp_pos1 >= gene_windows[:,0]) & (snp_pos1 <= gene_windows[:,1]) & (snp_pos2 >= gene_windows[:,0]) & (snp_pos2 <= gene_windows[:,1])
+	total_bool = np.sum(per_gene_boolers)
+	final_bool = 'False'
+	if total_bool > 0:
+		final_bool = 'True'
+	return final_bool
+
 
 ####################################################
 # Command line args
@@ -547,7 +563,7 @@ tissue_name = sys.argv[2]
 reference_genotype_stem = sys.argv[3]
 protein_models_dir = sys.argv[4]
 ldsc_baseline_ld_annotation_stem = sys.argv[5]
-tglr_expression_score_dir = sys.argv[6]
+gecs_expression_score_dir = sys.argv[6]
 method = sys.argv[7]
 
 
@@ -556,6 +572,7 @@ print('CHROM' + str(chrom_num))
 
 genotype_stem = reference_genotype_stem + str(chrom_num)
 variant_level_ld_score_file = ldsc_baseline_ld_annotation_stem + str(chrom_num) + '.l2.ldscore.gz'
+variant_level_annotation_file = ldsc_baseline_ld_annotation_stem + str(chrom_num) + '.annot'
 
 
 # Load in Reference Genotype data
@@ -579,6 +596,25 @@ G_obj_cm = np.asarray(G_obj.cm)
 # Put geno into organized dictionary
 genotype_obj = {'G': G_obj_geno, 'rsid': G_obj_rsids, 'position': G_obj_pos, 'cm': G_obj_cm, 'a0': G_obj_a0, 'a1': G_obj_a1}
 
+# Create rsid to ref alleles mapping
+rsid_to_alleles = {}
+rsid_to_pos = {}
+for ii, rsid in enumerate(G_obj_rsids):
+	if rsid in rsid_to_alleles:
+		print('assumption erororo')
+		pdb.set_trace()
+	rsid_to_alleles[rsid] = (G_obj_a0[ii], G_obj_a1[ii])
+	rsid_to_pos[rsid] = G_obj_pos[ii]
+
+# Create mapping from rsid to annotion vector
+rsid_to_anno_vec, anno_header = create_mapping_from_rsid_to_annovec(variant_level_annotation_file)
+
+# Create snp matrix of annotations
+anno_mat = create_snp_annotation_matrix(rsid_to_anno_vec, G_obj_rsids)
+
+# Add intercept to anno_vec
+anno_mat = np.hstack((np.ones((anno_mat.shape[0],1)), anno_mat))
+anno_header = np.hstack((['genotype_intercept'], anno_header))
 
 # Create mapping from rsid to reference index
 rsid_to_reference_index = create_mapping_rsid_to_reference_index(genotype_obj['rsid'])
@@ -586,10 +622,24 @@ rsid_to_reference_index = create_mapping_rsid_to_reference_index(genotype_obj['r
 
 # Get regression rsids
 regression_rsids, regression_rsid_to_regression_snp_position = load_in_regression_rsids(variant_level_ld_score_file)
-n_regression_snps = len(regression_rsids)
 
-# Initialize vector to keep track of gene level ld scores for regression snps on this chromosome
-gene_level_ld_scores = np.zeros(n_regression_snps)
+# Fill in regression snps
+regression_snp_boolean = []
+for rsid in G_obj_rsids:
+	if rsid in regression_rsid_to_regression_snp_position:
+		regression_snp_boolean.append(True)
+	else:
+		regression_snp_boolean.append(False)
+regression_snp_boolean = np.asarray(regression_snp_boolean)
+genotype_obj['regression_snp_boolean'] = regression_snp_boolean
+
+
+# Get snp index corresponding to first regression snp
+window_start = np.where(genotype_obj['position'] == np.min(genotype_obj['position'][regression_snp_boolean]))[0]
+if len(window_start) != 1:
+	print('assumption errror')
+active_window_start_position = genotype_obj['position'][window_start[0]] -1 
+
 
 # Create dictionary of genes (proteins)
 # Also filter to proteins on this chromosome
@@ -597,20 +647,194 @@ protein_arr, protein_to_model_file = extract_protein_to_protein_model_file_mappi
 
 # Loop through genes
 n_genes = len(protein_arr)
+gene_arr = []
+gene_windows = []
 for g_counter, gene_name in enumerate(protein_arr):
-	print(gene_name)
 	# Load in causal eqtls for this gene
 	gene_info_file = protein_to_model_file[gene_name]
-	# Get gene level ld scores
-	gene_level_ld_scores = compute_gene_level_ld_scores_for_single_gene(gene_info_file, genotype_obj, rsid_to_reference_index, regression_rsid_to_regression_snp_position, gene_level_ld_scores, method)
+	# Extract causal eQTL effect sizes for this gene
+	gene_pmces, gene_snp_indices = extract_causal_eqtl_effects_for_single_gene(gene_info_file, genotype_obj, rsid_to_reference_index, regression_rsid_to_regression_snp_position, method)
+	gene_start = np.min(G_obj_pos[gene_snp_indices])
+	gene_end = np.max(G_obj_pos[gene_snp_indices])
+	gene_arr.append((gene_name, gene_pmces, gene_snp_indices))
+	gene_windows.append([gene_start, gene_end])
+gene_windows = np.asarray(gene_windows)
 
+
+# Initialize list of data to save
+snp_pair_names = []
+pairwise_ld_scores = []
+pairwise_anno_ld_scores = []
+pairwise_eqtl_ld_scores = []
+pairwise_ld = []
+
+
+
+# Size of active windows
+active_window_size = 1000000
+interaction_window_size = 2000000
+
+counter = 0
+# Loop through genomic windows
+while active_window_start_position < np.max(genotype_obj['position']):
+
+	print(active_window_start_position)
+	# Extract active window snps
+	active_window_end_position = active_window_start_position + active_window_size
+	active_window_snp_indices = (G_obj_pos >= active_window_start_position) & (G_obj_pos < active_window_end_position)
+
+	# Extract interaction window snps
+	interaction_window_start_position = active_window_end_position + 0
+	interaction_window_end_position = interaction_window_start_position + interaction_window_size
+	interaction_window_snp_indices = (G_obj_pos >= interaction_window_start_position) & (G_obj_pos < interaction_window_end_position)
+
+	# Joint active plus interaction window
+	active_plus_interaction_window_snp_indices = active_window_snp_indices + interaction_window_snp_indices
+	
+	# Skip windows without active window snp indices
+	if len(active_plus_interaction_window_snp_indices) == 0 or len(active_window_snp_indices) == 0:
+		active_window_start_position = active_window_start_position + active_window_size
+		continue
+	if np.sum(active_plus_interaction_window_snp_indices) == 0:
+		active_window_start_position = active_window_start_position + active_window_size
+		continue	
+
+
+	# Extract left flanking window snps
+	left_flanking_window_end_cm_value = np.min(G_obj_cm[active_plus_interaction_window_snp_indices])
+	left_flanking_window_start_cm_value = left_flanking_window_end_cm_value - 1.0
+	left_flanking_window_snp_indices = (G_obj_cm > left_flanking_window_start_cm_value) & (G_obj_cm < left_flanking_window_end_cm_value)
+	
+	# Extract right flanking window snps
+	right_flanking_window_start_cm_value = np.max(G_obj_cm[active_plus_interaction_window_snp_indices])
+	right_flanking_window_end_cm_value = right_flanking_window_start_cm_value + 1.0
+	right_flanking_window_snp_indices = (G_obj_cm > right_flanking_window_start_cm_value) & (G_obj_cm < right_flanking_window_end_cm_value)
+
+	# Quick error checking
+	if np.sum(1.0*active_window_snp_indices + 1.0*interaction_window_snp_indices + 1.0*left_flanking_window_snp_indices+ 1.0*right_flanking_window_snp_indices > 1.0) != 0.0:
+		print('assumption error')
+		pdb.set_trace()
+
+	counter = counter + 1
+
+	# Get window snp indices
+	window_snp_indices = left_flanking_window_snp_indices + active_window_snp_indices + interaction_window_snp_indices + right_flanking_window_snp_indices
+
+	# Extract genotype of window
+	window_geno = G_obj_geno[:, window_snp_indices]
+	window_rsid = G_obj_rsids[window_snp_indices]
+	window_snp_cm = G_obj_cm[window_snp_indices]
+	window_snp_pos = G_obj_pos[window_snp_indices]
+	window_snp_a0 = G_obj_a0[window_snp_indices]
+	window_snp_a1 = G_obj_a1[window_snp_indices]
+	window_regression_snps = regression_snp_boolean[window_snp_indices]
+	window_anno_mat = anno_mat[window_snp_indices,:]
+
+	# get window subsets
+	window_active_indices = active_window_snp_indices[window_snp_indices]
+	window_interaction_indices = interaction_window_snp_indices[window_snp_indices]
+	window_active_regression_indices = window_active_indices*window_regression_snps
+	window_active_plus_interaction_regression_indices = (window_active_indices + window_interaction_indices)*window_regression_snps
+
+
+	# Skip window cause no interaction
+	if np.sum(window_active_regression_indices) == 0 or np.sum(window_active_plus_interaction_regression_indices) <= 1:
+		active_window_start_position = active_window_start_position + active_window_size
+		continue
+
+	# Get window LD
+	window_LD = np.corrcoef(np.transpose(window_geno))
+
+	# Create matrix of dimension n_snpsXn_snps where each element contains the CM difference between snp pairs
+	window_cm_diff_mat = np.abs(window_snp_cm[:, None] - window_snp_cm)
+	# Use matrix to set LD between snp-pairs with CM > 1 to 0.0
+	window_LD[window_cm_diff_mat > 1.0] = 0.0
+	# Delete window_cm_diff_mat for memory purposes
+
+	# Compute ld_t_ld for pairwise combo of window_active_regression_indices and window_active_plus_interaction_regression_indices
+	window_ld_t_ld = np.dot(window_LD[window_active_regression_indices, :], window_LD[:, window_active_plus_interaction_regression_indices])
+	# Compute ld for subset
+	window_LD_subset = window_LD[window_active_regression_indices, :][:, window_active_plus_interaction_regression_indices]
+	# Compute pairwise distance between snps
+	window_snp_pair_pos_diff_subset = np.abs(window_snp_pos[:, None] - window_snp_pos)[window_active_regression_indices,:][:, window_active_plus_interaction_regression_indices]
+	window_snp_pair_cm_diff_subset = window_cm_diff_mat[window_active_regression_indices,:][:, window_active_plus_interaction_regression_indices]
+
+
+	window_eqtl_eqtl_LD_subset = np.copy(window_LD_subset)*0.0
+	for gene_tuple in gene_arr:
+		gene_pmces = gene_tuple[1]
+		gene_snp_indices = gene_tuple[2]
+		# Skip genes with no overlap with the window
+		if np.sum(np.sum(gene_snp_indices[window_snp_indices])) == 0:
+			continue
+		n_snps = len(G_obj_rsids)
+		causal_eqtl_effects = np.zeros(n_snps)
+		causal_eqtl_effects[gene_snp_indices] = gene_pmces
+		window_causal_eqtl_effects = causal_eqtl_effects[window_snp_indices]
+		marginal_term_a = np.dot(window_LD[window_active_regression_indices, :], window_causal_eqtl_effects)
+		marginal_term_b = np.dot(window_causal_eqtl_effects, window_LD[:, window_active_plus_interaction_regression_indices])
+		window_eqtl_eqtl_LD_subset = window_eqtl_eqtl_LD_subset + np.dot(marginal_term_a.reshape(-1,1), marginal_term_b.reshape(1,-1))
+
+
+	# Compute matrices into vectors
+	# Get upper triangle indices 
+	upper_triangle_indices = np.triu_indices(window_ld_t_ld.shape[0], k=1, m=window_ld_t_ld.shape[1])
+	# Use to conver to vectors
+	window_ld_t_ld_vec = window_ld_t_ld[upper_triangle_indices]
+	window_ld_vec = window_LD_subset[upper_triangle_indices]
+	window_snp_pair_pos_diff_vec = window_snp_pair_pos_diff_subset[upper_triangle_indices]
+	window_snp_pair_cm_diff_vec = window_snp_pair_cm_diff_subset[upper_triangle_indices]
+	window_eqtl_ld_vec = window_eqtl_eqtl_LD_subset[upper_triangle_indices]
+	window_snp_pairs = window_rsid[window_active_regression_indices][upper_triangle_indices[0]] + ':' + window_rsid[window_active_plus_interaction_regression_indices][upper_triangle_indices[1]]
+	
+	# Filter
+	filtered_snp_pairs = (np.abs(window_snp_pair_pos_diff_vec) < interaction_window_size) & (np.abs(window_snp_pair_cm_diff_vec) < 1.0) & (np.abs(window_ld_t_ld_vec) < 1.0) & (np.abs(window_ld_vec) < .1)
+
+	snp_pair_names.append(window_snp_pairs[filtered_snp_pairs])
+	pairwise_ld_scores.append(window_ld_t_ld_vec[filtered_snp_pairs])
+	pairwise_ld.append(window_ld_vec[filtered_snp_pairs])
+	pairwise_eqtl_ld_scores.append(window_eqtl_ld_vec[filtered_snp_pairs])
+
+	# Run analysis for annotation weighted ld scores
+	tmp_pairwise_anno_ld_scores = []
+	for anno_iter in range(len(anno_header)):
+		anno_ld_ld_t = np.dot(np.transpose(np.transpose((window_LD[window_active_regression_indices, :]))*((anno_mat[window_snp_indices,anno_iter])[:, np.newaxis])), window_LD[:, window_active_plus_interaction_regression_indices])
+		tmp_pairwise_anno_ld_scores.append(anno_ld_ld_t[upper_triangle_indices][filtered_snp_pairs])
+	tmp_pairwise_anno_ld_scores = np.transpose(np.asarray(tmp_pairwise_anno_ld_scores))
+	pairwise_anno_ld_scores.append(tmp_pairwise_anno_ld_scores)
+
+
+	# Start next iter
+	active_window_start_position = active_window_start_position + active_window_size
+
+	'''
+	if counter > 5:
+		break
+	'''
+
+snp_pair_names = np.hstack(snp_pair_names)
+pairwise_ld_scores = np.hstack(pairwise_ld_scores)
+pairwise_ld = np.hstack(pairwise_ld)
+pairwise_eqtl_ld_scores = np.hstack(pairwise_eqtl_ld_scores)
+pairwise_anno_ld_scores = np.vstack(pairwise_anno_ld_scores)
 
 # Save gene level ld scores to output to output file
-output_file = tglr_expression_score_dir + tissue_name + '_' + method + '_' + chrom_num + '_' + 'tglr_gene_ld_scores.txt'
-np.savetxt(output_file, gene_level_ld_scores, fmt="%s")
+output_file = gecs_expression_score_dir + tissue_name + '_' + method + '_' + chrom_num + '_' + 'gecs_scores.txt'
+t = open(output_file,'w')
+t.write('snp_pair\tsnp1\tsnp2\tsnp1_A1\tsnp1_A2\tsnp2_A1\tsnp2_A2\tsnp_pair_in_cis_gene\tLD\teqtl_LD_score\t' + '\t'.join(anno_header) + '\n')
 
-# Save number of genes to output also
-output_file2 = tglr_expression_score_dir + tissue_name + '_' + method + '_' + chrom_num + '_' + 'tglr_n_genes.txt'
-t = open(output_file2,'w')
-t.write(str(n_genes) + '\n')
+
+for ii, snp_pair_name in enumerate(snp_pair_names):
+	snp_name_info = snp_pair_name.split(':')
+	if len(snp_name_info) != 2:
+		print('assumption eororor')
+		pdb.set_trace()
+	snp1 = snp_name_info[0]
+	snp2 = snp_name_info[1]
+	allele_string = '\t'.join(rsid_to_alleles[snp1]) + '\t' + '\t'.join(rsid_to_alleles[snp2])
+
+	variant_pair_in_single_cis_gene = check_if_variant_pair_in_single_cis_gene(rsid_to_pos[snp1], rsid_to_pos[snp2], gene_windows)
+
+	t.write(snp_pair_name + '\t' + snp1 + '\t' + snp2 + '\t' + allele_string + '\t' + variant_pair_in_single_cis_gene + '\t' + str(pairwise_ld[ii]) + '\t' + str(pairwise_eqtl_ld_scores[ii]) + '\t' + '\t'.join(pairwise_anno_ld_scores[ii,:].astype(str)) + '\n')
 t.close()
+print(output_file)

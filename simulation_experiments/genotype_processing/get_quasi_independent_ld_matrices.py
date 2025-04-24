@@ -211,7 +211,7 @@ def compute_lambda_thresh(lambdas, rho_thresh):
 
 
 
-def construct_variant_ld_mat_based_on_quasi_windows(genotype_stem, output_stem, quasi_windows):
+def construct_variant_ld_mat_based_on_quasi_windows(genotype_stem, output_stem, quasi_windows, save_geno=False):
 	# Load in ref-alt alleles
 	ref_alt_alleles = load_in_ref_alt_allele_arr(genotype_stem + '.pvar')
 
@@ -226,7 +226,7 @@ def construct_variant_ld_mat_based_on_quasi_windows(genotype_stem, output_stem, 
 
 	output_file = output_stem + '_summary.txt'
 	t = open(output_file,'w')
-	t.write('window_name\twindow_start\twindow_end\tld_file\twindow_snp_position_file\trsid_file\tmiddle_boolean_file\tQ_mat_file\tw_premult_file\n')
+	t.write('window_name\twindow_start\twindow_end\tld_file\twindow_snp_position_file\trsid_file\tmiddle_boolean_file\tQ_mat_file\tw_premult_file\tgeno_mat_file\n')
 
 	window_counter = 0
 
@@ -323,7 +323,13 @@ def construct_variant_ld_mat_based_on_quasi_windows(genotype_stem, output_stem, 
 		w_premult_file = output_stem + '_' + window_name + '_w_premult_mat.npy'
 		np.save(w_premult_file, w_premult)
 
-		t.write(window_name + '\t' + str(int(outer_window_start_pos)) + '\t' + str(int(outer_window_end_pos)) + '\t' + ld_mat_file + '\t' + window_position_file + '\t' + rsid_file + '\t' + middle_boolean_file + '\t' + Q_mat_file + '\t' + w_premult_file + '\n')	
+		if save_geno:
+			save_geno_file = output_stem + '_' + window_name + '_genotype_dosage_mat.npy'
+			np.save(save_geno_file, std_genotype_dosage)
+		else:
+			save_geno_file = 'NA'
+
+		t.write(window_name + '\t' + str(int(outer_window_start_pos)) + '\t' + str(int(outer_window_end_pos)) + '\t' + ld_mat_file + '\t' + window_position_file + '\t' + rsid_file + '\t' + middle_boolean_file + '\t' + Q_mat_file + '\t' + w_premult_file + '\t' + save_geno_file + '\n')	
 
 	t.close()
 	return
@@ -383,6 +389,8 @@ def get_big_quasi_windows(chrom1_quasi_independent_ld_blocks_file):
 processed_genotype_data_dir = sys.argv[1]
 quasi_independent_dir = sys.argv[2]
 
+print('start')
+
 window_size = 1
 
 eqtl_sample_sizes = ['100','300', '500', '1000', '10000']
@@ -393,13 +401,14 @@ quasi_windows = get_quasi_windows(chrom1_quasi_independent_ld_blocks_file)
 
 in_sample_genotype_stem = processed_genotype_data_dir +'simulated_gwas_data_1'
 output_stem = processed_genotype_data_dir + 'variant_ref_geno_gwas_quasi_independent_windows_ld'
-construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, quasi_windows)
+construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, quasi_windows, save_geno=True)
 
 
 for eqtl_ss in eqtl_sample_sizes:
 	in_sample_genotype_stem = processed_genotype_data_dir +'simulated_eqtl_' + eqtl_ss + '_data_1'
 	output_stem = processed_genotype_data_dir + 'variant_ref_geno_eqtl_' + eqtl_ss + '_quasi_independent_windows_ld'
-	construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, quasi_windows)
+	construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, quasi_windows, save_geno=False)
+
 
 # Make on full region
 starter = quasi_windows[0][0]
@@ -408,7 +417,7 @@ biggest_quasi_windows = [(starter, ender)]
 
 in_sample_genotype_stem = processed_genotype_data_dir +'simulated_gwas_data_1'
 output_stem = processed_genotype_data_dir + 'variant_ref_geno_gwas_full_space_ld_ld'
-construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, biggest_quasi_windows)
+construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, biggest_quasi_windows, save_geno=False)
 
 print('done')
 
@@ -417,10 +426,9 @@ big_quasi_windows = get_big_quasi_windows(chrom1_quasi_independent_ld_blocks_fil
 
 in_sample_genotype_stem = processed_genotype_data_dir +'simulated_gwas_data_1'
 output_stem = processed_genotype_data_dir + 'variant_ref_geno_gwas_big_quasi_independent_windows_ld'
-construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, big_quasi_windows)
+construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, big_quasi_windows, save_geno=False)
 
 for eqtl_ss in eqtl_sample_sizes:
 	in_sample_genotype_stem = processed_genotype_data_dir +'simulated_eqtl_' + eqtl_ss + '_data_1'
 	output_stem = processed_genotype_data_dir + 'variant_ref_geno_eqtl_' + eqtl_ss + '_big_quasi_independent_windows_ld'
-	construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, big_quasi_windows)
-
+	construct_variant_ld_mat_based_on_quasi_windows(in_sample_genotype_stem, output_stem, big_quasi_windows, save_geno=False)

@@ -110,6 +110,13 @@ for ensamble_id in gene_names:
 
 		susie_pmces_file = alt_simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_' + version + '_' + ensamble_id + '_susie_pmces.npy' 
 		np.save(susie_pmces_file,pmces)
+		susie_alpha_file = alt_simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_' + version + '_' + ensamble_id + '_susie_alpha.npy' 
+		np.save(susie_alpha_file,susie_fitted.rx2('alpha'))
+		susie_mu_file = alt_simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_' + version + '_' + ensamble_id + '_susie_mu.npy' 
+		np.save(susie_mu_file,susie_fitted.rx2('mu'))
+		susie_mu2_file = alt_simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_' + version + '_' + ensamble_id + '_susie_mu2.npy' 
+		np.save(susie_mu2_file,susie_fitted.rx2('mu2'))
+
 		t.write(ensamble_id + '\t' + booler + '\t' + str(cis_h2_est) + '\t' + susie_pmces_file + '\t' + cis_snp_names_output + '\t' + str(pred_var) + '\n')
 
 	else:

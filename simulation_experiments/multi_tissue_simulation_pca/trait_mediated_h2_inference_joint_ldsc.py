@@ -1,15 +1,11 @@
 import sys
 import numpy as np 
-import pandas as pd
 import os
 import pdb
-import tensorflow as tf
 import gzip
 import time
-import statsmodels.api as sm
-import tensorflow_probability as tfp
-import time
 import pickle
+import statsmodels.api as sm
 
 
 
@@ -80,6 +76,7 @@ def get_gwas_variant_ld_scores(gwas_beta, gwas_rsids, quasi_ld_window_summary_fi
 	var_ld_score = []
 	f = open(quasi_ld_window_summary_file)
 	window_to_ld_files = {}
+	window_to_geno_files = {}
 	head_count = 0
 	tmp_rsids = []
 	for line in f:
@@ -96,6 +93,7 @@ def get_gwas_variant_ld_scores(gwas_beta, gwas_rsids, quasi_ld_window_summary_fi
 			print('assumption eroror')
 			pdb.set_trace()
 		ld_file = data[3]
+		geno_dosage_file = data[9]
 		ld_mat = np.load(ld_file)
 		tmp_rsids.append(window_rsids)
 
@@ -110,6 +108,7 @@ def get_gwas_variant_ld_scores(gwas_beta, gwas_rsids, quasi_ld_window_summary_fi
 			print('assumption eororor')
 			pdb.set_trace()
 		window_to_ld_files[window_name] = (ld_file)
+		window_to_geno_files[window_name] = geno_dosage_file
 
 
 	if np.array_equal(np.hstack(tmp_rsids), gwas_rsids) == False:
@@ -118,7 +117,7 @@ def get_gwas_variant_ld_scores(gwas_beta, gwas_rsids, quasi_ld_window_summary_fi
 
 
 
-	return np.hstack(var_ld_score), window_to_ld_files
+	return np.hstack(var_ld_score), window_to_ld_files, window_to_geno_files
 
 def create_mapping_from_rsid_to_position(rsids):
 	rsid_to_position = {}
@@ -165,6 +164,22 @@ def extract_eqtl_sumstats_for_specific_gene(sumstats_file, gene_name):
 
 	return np.asarray(sumstats).astype(float), np.asarray(sumstat_ses).astype(float), np.asarray(cis_snps).astype(float), gene_window_name, np.asarray(rsids), class_names[0]
 
+def compute_lambda_thresh(lambdas, rho_thresh):
+	totaler = np.sum(lambdas)
+	cur_total = 0
+	lambda_thresh = -1
+	for lambda_val in -np.sort(-lambdas):
+		cur_total = cur_total + lambda_val
+		if cur_total/totaler > rho_thresh:
+			if lambda_thresh == -1:
+				lambda_thresh = lambda_val
+
+
+	if lambda_thresh == -1:
+		print('assumption eroror')
+		pdb.set_trace()
+
+	return lambda_thresh
 
 def load_in_eqtl_data_with_bins_per_gene(eqtl_sumstat_file, snp_name_to_position, window_name_to_ld_files, eqtl_sample_size, eqtl_ld='out_of_sample', n_bins=5):
 	# First get list of gene names
@@ -186,6 +201,7 @@ def load_in_eqtl_data_with_bins_per_gene(eqtl_sumstat_file, snp_name_to_position
 	gene_arr = []
 	beta_arr = []
 	gene_class_arr = []
+	window_names_arr = []
 
 	beta_se_arr = []
 	ldscore_arr = []
@@ -223,6 +239,7 @@ def load_in_eqtl_data_with_bins_per_gene(eqtl_sumstat_file, snp_name_to_position
 		temp_vec = np.arange(len(gene_cis_snp_indices))
 		snp_chunks = np.array_split(temp_vec[cis_snps_boolean],n_bins)
 
+
 		for bin_iter in range(n_bins):
 			gene_bin_cis_snp_indices = np.zeros(len(gene_cis_snp_indices))
 			gene_bin_cis_snp_indices[snp_chunks[bin_iter]] = 1
@@ -237,11 +254,144 @@ def load_in_eqtl_data_with_bins_per_gene(eqtl_sumstat_file, snp_name_to_position
 			beta_se_arr.append(eqtl_gene_beta_se)
 			ldscore_arr.append(eqtl_ld_scores)
 			index_arr.append(gene_snp_positions)
-			cis_snp_index_arr.append(gene_snp_positions[gene_bin_cis_snp_indices==1])
+			cis_snp_index_arr.append(gene_snp_positions[cis_snps_boolean])
 			n_cis_snp_arr.append(np.sum(gene_bin_cis_snp_indices))
 			gene_indexes.append(gg_iter)
+			window_names_arr.append(gene_window_name)
 
-	return np.asarray(gene_arr), beta_arr, beta_se_arr, ldscore_arr, index_arr, cis_snp_index_arr, np.asarray(n_cis_snp_arr), np.asarray(gene_class_arr), np.asarray(gene_indexes)
+	return np.asarray(gene_arr), beta_arr, beta_se_arr, ldscore_arr, index_arr, cis_snp_index_arr, np.asarray(n_cis_snp_arr), np.asarray(gene_class_arr), np.asarray(gene_indexes), np.asarray(window_names_arr)
+
+
+def pairwise_correlations(Z, X):
+	X_centered = X - X.mean(axis=1, keepdims=True)
+	Z_centered = Z - Z.mean(axis=1, keepdims=True)
+
+	# Normalize to unit variance (L2 norm)
+	X_norm = np.linalg.norm(X_centered, axis=1, keepdims=True)
+	Z_norm = np.linalg.norm(Z_centered, axis=1, keepdims=True)
+
+	# Compute dot product and divide by norms to get Pearson correlation
+	# Result: (K x L) matrix of correlations
+	correlations = (X_centered @ Z_centered.T) / (X_norm * Z_norm.T)
+
+	return correlations
+
+
+
+def load_in_eqtl_data_with_pcs_per_gene(eqtl_sumstat_file, snp_name_to_position, window_name_to_ld_files, window_name_to_geno_files, eqtl_sample_size, eqtl_ld='out_of_sample', n_bins=5):
+	# First get list of gene names
+	gene_names = []
+	f = open(eqtl_sumstat_file)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		gene_names.append(data[0])
+	f.close()
+	gene_names = np.unique(gene_names)
+
+	print(len(gene_names))
+
+	gene_arr = []
+	beta_arr = []
+	gene_class_arr = []
+	window_arr = []
+	cis_snp_pos_arr = []
+
+	beta_se_arr = []
+	ldscore_arr = []
+	index_arr = []
+	cis_snp_index_arr = []
+	n_cis_snp_arr = []
+	gene_indexes = []
+	# Now loop through genes
+	for gg_iter, gene_name in enumerate(gene_names):
+		# Extract summary stats for specific gene
+		eqtl_gene_beta, eqtl_gene_beta_se, gene_cis_snp_indices, gene_window_name, gene_rsids, gene_class_name = extract_eqtl_sumstats_for_specific_gene(eqtl_sumstat_file, gene_name)
+
+		# Load in q_mat and w_mat for this window
+		ld_file = window_name_to_ld_files[gene_window_name]
+		geno_file = window_name_to_geno_files[gene_window_name]
+		if eqtl_ld == 'out_of_sample':
+			ld_mat = np.load(ld_file)
+			squared_ld_mat = np.square(ld_mat)
+			squared_adj_ld_mat = squared_ld_mat - ((1.0 - squared_ld_mat)/(100000.0-2.0))
+			eqtl_ld_scores = np.sum(squared_adj_ld_mat[gene_cis_snp_indices==1,:], axis=0)
+			geno_mat = np.load(geno_file)
+		elif eqtl_ld == 'in_sample_adjusted':
+			new_ld_file = ld_file.split('ref_geno_gwas_')[0] + 'ref_geno_eqtl_' + str(eqtl_sample_size) + '_' + ld_file.split('ref_geno_gwas_')[1]
+			ld_mat = np.load(new_ld_file)
+			squared_ld_mat = np.square(ld_mat)
+			squared_adj_ld_mat = squared_ld_mat - ((1.0 - squared_ld_mat)/(eqtl_sample_size-2.0))
+			eqtl_ld_scores = np.sum(squared_adj_ld_mat[gene_cis_snp_indices==1,:], axis=0)
+			pdb.set_trace()
+
+
+		# Get names of snps in gene
+		gene_snp_positions = []
+		for gene_rsid in gene_rsids:
+			gene_snp_positions.append(snp_name_to_position[gene_rsid])
+		gene_snp_positions = np.asarray(gene_snp_positions)
+
+		cis_snps_boolean = gene_cis_snp_indices == 1
+		temp_vec = np.arange(len(gene_cis_snp_indices))
+		snp_chunks = np.array_split(temp_vec[cis_snps_boolean],n_bins)
+
+
+
+		# TEMPER
+		small_ld = ld_mat[:, cis_snps_boolean][cis_snps_boolean,:]
+		lambdas_full, U_full = np.linalg.eig(small_ld)
+		non_negative_components = lambdas_full > 0.0
+		lambdas = lambdas_full[non_negative_components]
+		U = U_full[:, non_negative_components]
+		real_components = np.iscomplex(lambdas) == False
+		lambdas = lambdas[real_components]
+		U = U[:, real_components]
+		if np.sum(np.iscomplex(lambdas)) > 0:
+			print('assumption eroror')
+			pdb.set_trace()
+		lambdas = lambdas.astype(float)
+		U = U.astype(float)
+		rho_thresh = 0.95
+		lambda_thresh = compute_lambda_thresh(lambdas, rho_thresh)
+		thresh_components = lambdas >= lambda_thresh
+		lambdas = lambdas[thresh_components]
+		U = U[:, thresh_components]
+
+		# PC sample loadings
+		Z = np.dot(np.transpose(U),np.transpose(geno_mat[:, cis_snps_boolean]))
+
+
+		squared_ld_pc_snps = np.square(pairwise_correlations(Z, np.transpose(geno_mat)))
+
+		n_window_snps, n_gene_pc_snps = squared_ld_pc_snps.shape
+
+		# cis_snp_pos_arr
+		for bin_iter in range(n_gene_pc_snps):
+			# compute eqtl ld scores for just this bin
+			eqtl_ld_scores = squared_ld_pc_snps[:, bin_iter]
+
+			# Add to global array
+			gene_class_arr.append(gene_class_name)
+			gene_arr.append(gene_name + ';' + 'bin' + str(bin_iter))
+			beta_arr.append(eqtl_gene_beta)
+			beta_se_arr.append(eqtl_gene_beta_se)
+			ldscore_arr.append(eqtl_ld_scores)
+			index_arr.append(gene_snp_positions)
+			n_cis_snp_arr.append(1)
+			gene_indexes.append(gg_iter)
+			window_arr.append(gene_window_name)
+			cis_snp_pos_arr.append(gene_snp_positions[cis_snps_boolean])
+
+	return np.asarray(gene_arr), beta_arr, beta_se_arr, ldscore_arr, index_arr, np.asarray(n_cis_snp_arr), np.asarray(gene_class_arr), np.asarray(gene_indexes), np.asarray(window_arr), cis_snp_pos_arr
+
+
+
+
 
 
 
@@ -2263,9 +2413,30 @@ def med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate(gwas_beta, gwas_beta_se
 
 	return avg_total_med_h2, avg_per_class_med_h2, avg_nm_h2, avg_gene_cis_h2
 
+def extract_block_diag_indices(precomputed_xt_x, ordered_window_names):
+	indices_arr = []
+	for window_name in np.unique(ordered_window_names):
+		indices = np.where(ordered_window_names==window_name)[0]
+		indices_arr.append(indices)
+	n_windows = len(indices_arr)
+	for ii in range(n_windows):
+		for jj in range(n_windows):
+			if ii == jj:
+				continue
+			if np.max(precomputed_xt_x[indices_arr[ii], :][:, indices_arr[jj]]) > 0:
+				print('assumptino eroror')
+				pdb.set_trace()
+	return indices_arr
+
+def block_diag_inverse(xt_x_term, block_diag_indices):
+	inv = np.zeros(xt_x_term.shape)
+	for indices in block_diag_indices:
+		#inv[indices, :][:, indices] = np.linalg.inv(xt_x_term[indices,:][:,indices])
+		inv[np.ix_(indices, indices)] = np.linalg.inv(xt_x_term[np.ix_(indices, indices)])
+	return inv
 
 
-def med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_variance(gwas_beta, gwas_beta_se, gwas_ld_scores, eqtl_beta, eqtl_beta_se, eqtl_ld_scores, eqtl_n_cis_snps, eqtl_classes, gene_indexer, eqtl_sample_size, eqtl_cis_snp_position, nm_snp_count, burn_in_iters=4600, total_iters=5000,gibbs=True, eqtl_only=False):
+def med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_variance(gwas_beta, gwas_beta_se, gwas_ld_scores, eqtl_beta, eqtl_beta_se, eqtl_ld_scores, eqtl_n_cis_snps, eqtl_classes, gene_indexer, eqtl_sample_size, eqtl_cis_snp_position, ordered_window_names, nm_snp_count, burn_in_iters=4600, total_iters=5000,gibbs=True, eqtl_only=False):
 	# dimensionality of system
 	n_genes = eqtl_beta.shape[0]
 	n_snps = len(gwas_beta)
@@ -2312,6 +2483,7 @@ def med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_
 
 
 	precomputed_xt_x = np.dot(eqtl_ld_scores, np.transpose(eqtl_ld_scores))
+	block_diag_indices = extract_block_diag_indices(precomputed_xt_x, ordered_window_names)
 
 	gwas_resid_var = np.square(1/100000.0)
 	eqtl_resid_var = np.ones(n_eqtl_classes)*np.square(1.0/eqtl_sample_size)
@@ -2336,6 +2508,7 @@ def med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_
 		# First update sig_sq and alpha_sq (based on only gwas block)
 		###############################################################
 		# Prepare data
+		#t1 = time.time()
 		Y = gwas_block_beta_sq - gwas_block_intercept
 		X = []
 		X.append(gwas_ld_scores)
@@ -2352,6 +2525,7 @@ def med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_
 		n_nm_vars = gwas_ld_scores.shape[1]
 		sig_sq = params[0:n_nm_vars]
 		alpha_sq = params[n_nm_vars:]
+		#t2 = time.time()
 		#sig_sq = params[0]
 		#alpha_sq = params[1:]
 
@@ -2369,7 +2543,7 @@ def med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_
 
 		gwas_beta_sq_resid = gwas_block_beta_sq - gwas_block_intercept - np.dot(gwas_ld_scores, sig_sq)
 
-
+		#t3 = time.time()
 		for gene_iter, gene_bin_pair_indices in enumerate(gene_index_to_gene_bin_pair_indices):
 			representative_gene_bin_pair_index = gene_bin_pair_indices[0] # Doesn't have to be zero index all the same
 
@@ -2391,8 +2565,10 @@ def med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_
 			#xt_y_term[gene_iter] = (np.dot(eqtl_beta_sq_resid, eqtl_beta_sq_X)/eqtl_resid_var) + np.dot(gwas_beta_sq_resid, alpha_weighted_eqtl_ld_scores[gene_iter,:])/gwas_resid_var
 			#xt_y_term[gene_bin_pair_indices] = (np.dot(eqtl_beta_sq_X, eqtl_beta_sq_resid)/eqtl_resid_var) + np.dot(gwas_beta_sq_resid, alpha_weighted_eqtl_ld_scores[gene_bin_pair_indices,:])/gwas_resid_var
 			xt_y_term[gene_bin_pair_indices] = (np.dot(eqtl_beta_sq_X, eqtl_beta_sq_resid)/eqtl_resid_var[tmp_eqtl_class]) + np.dot(alpha_weighted_eqtl_ld_scores[gene_bin_pair_indices,:], gwas_beta_sq_resid)/gwas_resid_var
-
-		S = np.linalg.inv(xt_x_term)
+		#t4 = time.time()
+		S = block_diag_inverse(xt_x_term, block_diag_indices)
+		#S_old = np.linalg.inv(xt_x_term)
+		t4b = time.time()
 		mean = np.dot(S, xt_y_term)
 
 		if gibbs:
@@ -2402,6 +2578,7 @@ def med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_
 		###############################################################
 		# Update residual variances
 		###############################################################
+		#t5 = time.time()
 		for gene_iter in np.arange(n_genes):
 			gene_alpha_sq = alpha_sq[gene_to_class_index[gene_iter]]
 			# Re-include current effect
@@ -2416,7 +2593,8 @@ def med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_
 				if eqtl_class_index != tmp_eqtl_class:
 					continue
 				if eqtl_only:
-					variant_indices = np.sum(cis_eqtl_mask[gene_bin_pair_indices,:],axis=0) == 1.0
+					#variant_indices = np.sum(cis_eqtl_mask[representative_gene_bin_pair_index,:],axis=0) == 1.0
+					variant_indices = cis_eqtl_mask[representative_gene_bin_pair_index,:] != 0.0
 				else:
 					variant_indices = eqtl_beta[representative_gene_bin_pair_index,:] != 0.0
 				tmp_eqtl_resid = (np.square(eqtl_beta[representative_gene_bin_pair_index, :]) - np.square(eqtl_beta_se[representative_gene_bin_pair_index, :])) - np.dot(np.transpose(eqtl_ld_scores[gene_bin_pair_indices,:]), psi_g[gene_bin_pair_indices])
@@ -2431,7 +2609,7 @@ def med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_
 		nm_h2 = np.dot(nm_snp_count, sig_sq)
 		total_med_h2 = np.sum(per_gene_med_h2)
 
-
+		#t6 = time.time()
 		if np.mod(itera, 1) ==0:
 			print('Iteration: ' + str(itera))
 			print('med: ' + str(total_med_h2))
@@ -2454,6 +2632,7 @@ def med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_
 	avg_per_class_med_h2 = np.mean(np.asarray(sampled_per_tissue_med),axis=0)
 	avg_nm_h2 = np.mean(sampled_nm)
 	avg_gene_cis_h2 = np.mean(sampled_eqtl_h2, axis=0)
+
 
 
 	return avg_total_med_h2, avg_per_class_med_h2, avg_nm_h2, avg_gene_cis_h2, X
@@ -4556,6 +4735,12 @@ simulated_gene_expression_dir=sys.argv[10]
 
 N_gwas = n_gwas_individuals
 
+#burn_in_iter=5
+#total_iter=10
+burn_in_iter=695
+total_iter=700
+
+
 ####################
 # Load in data
 ####################
@@ -4571,32 +4756,110 @@ print(sim_med_h2)
 print(sim_nm_h2)
 # Load in GWAS summary statistics
 gwas_summary_file = simulated_gwas_dir + simulation_name_string + '_simualated_gwas_results.txt'
-print(gwas_summary_file)
 gwas_rsids, gwas_beta, gwas_beta_se = load_in_gwas_data(gwas_summary_file)
+print(len(gwas_rsids))
 
 # Get variant ld scores
 #quasi_ld_window_summary_file = simulation_genotype_dir + 'variant_ref_geno_gwas_full_space_ld_ld_summary.txt'
 quasi_ld_window_summary_file = simulation_genotype_dir + 'variant_ref_geno_gwas_quasi_independent_windows_ld_summary.txt'
 #quasi_ld_window_summary_file = simulation_genotype_dir + 'variant_ref_geno_gwas_big_quasi_independent_windows_ld_summary.txt'
-gwas_variant_ld_scores, window_to_ld_files = get_gwas_variant_ld_scores(gwas_beta, gwas_rsids, quasi_ld_window_summary_file)
+gwas_variant_ld_scores, window_to_ld_files, window_to_geno_files = get_gwas_variant_ld_scores(gwas_beta, gwas_rsids, quasi_ld_window_summary_file)
 
 # Create mapping from rsid to position
 snp_name_to_position = create_mapping_from_rsid_to_position(gwas_rsids)
 
-# Load in gene window variant ld scores file
-eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
-single_bin_genes, eqtl_beta, eqtl_beta_se, eqtl_ldscore, eqtl_position, eqtl_cis_snp_position_single_bin, eqtl_n_cis_snps, eqtl_classes, gene_indexer = load_in_eqtl_data_with_bins_per_gene(eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, eqtl_ld='out_of_sample', n_bins=1)
-gwas_gene_window_variant_ld_scores, gwas_gene_window_variant_anno_vec = get_gwas_gene_window_variant_ld_scores(gwas_beta, gwas_rsids, quasi_ld_window_summary_file, single_bin_genes, eqtl_cis_snp_position_single_bin)
 
+#######################
+# PCA version
+#######################
 # load in eqtl data
 # Out of sample eqtl ld
 eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
-genes, eqtl_beta, eqtl_beta_se, eqtl_ldscore, eqtl_position, eqtl_cis_snp_position, eqtl_n_cis_snps, eqtl_classes, gene_indexer = load_in_eqtl_data_with_bins_per_gene(eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, eqtl_ld='out_of_sample', n_bins=5)
+genes, eqtl_beta, eqtl_beta_se, eqtl_ldscore, eqtl_position, eqtl_n_cis_snps, eqtl_classes, gene_indexer, ordered_window_names, eqtl_cis_snp_position = load_in_eqtl_data_with_pcs_per_gene(eqtl_sumstat_file, snp_name_to_position, window_to_ld_files, window_to_geno_files ,eqtl_sample_size, eqtl_ld='out_of_sample', n_bins=5)
+
+
 # Generate matrix form of eqtl data
 eqtl_beta_mat = get_matrix_form_of_eqtl_data(eqtl_beta, eqtl_position, 0.0, len(gwas_variant_ld_scores))
 eqtl_beta_se_mat = get_matrix_form_of_eqtl_data(eqtl_beta_se, eqtl_position, 1.0/np.sqrt(eqtl_sample_size), len(gwas_variant_ld_scores))
 eqtl_ld_score_mat = get_matrix_form_of_eqtl_data(eqtl_ldscore, eqtl_position, 0.0, len(gwas_variant_ld_scores))
 
+'''
+##########################
+# Temp saving
+np.save('gwas_beta.npy', gwas_beta)
+np.save('gwas_beta_se.npy', gwas_beta_se)
+np.save('gwas_variant_ld_scores.npy', gwas_variant_ld_scores)
+np.save('eqtl_beta_mat.npy', eqtl_beta_mat)
+np.save('eqtl_beta_se_mat.npy', eqtl_beta_se_mat)
+np.save('eqtl_ld_score_mat.npy', eqtl_ld_score_mat)
+np.save('eqtl_n_cis_snps.npy', eqtl_n_cis_snps)
+np.save('eqtl_classes.npy', eqtl_classes)
+np.save('gene_indexer.npy', gene_indexer)
+np.save('window_names.npy', ordered_window_names)
+np.save('eqtl_cis_snp_pos.npy', eqtl_cis_snp_position)
+'''
+'''
+##########################
+# temp loading
+gwas_beta = np.load('gwas_beta.npy')
+gwas_beta_se = np.load('gwas_beta_se.npy')
+gwas_variant_ld_scores = np.load('gwas_variant_ld_scores.npy')
+eqtl_beta_mat = np.load('eqtl_beta_mat.npy')
+eqtl_beta_se_mat = np.load('eqtl_beta_se_mat.npy')
+eqtl_ld_score_mat = np.load('eqtl_ld_score_mat.npy')
+eqtl_n_cis_snps = np.load('eqtl_n_cis_snps.npy')
+eqtl_classes = np.load('eqtl_classes.npy')
+gene_indexer = np.load('gene_indexer.npy')
+ordered_window_names = np.load('window_names.npy')
+eqtl_cis_snp_position='NA'
+'''
+
+# Run standard S-LDSC
+X = sm.add_constant(gwas_variant_ld_scores)
+Y = np.square(gwas_beta/gwas_beta_se)
+model = sm.OLS(Y,X).fit()
+model_constrained_intercept = sm.OLS(Y-1, gwas_variant_ld_scores).fit()
+ldsc_snp_h2 = len(gwas_beta)*(model.params[1]/N_gwas)
+ldsc_constrained_intercept_snp_h2 = len(gwas_beta)*(model_constrained_intercept.params[0]/N_gwas)
+
+
+output_file = trait_med_h2_inference_dir + simulation_name_string+ '_' + str(eqtl_sample_size) + '_pca_joint_ldsc_multimethod.txt'
+t = open(output_file,'w')
+t.write('method\teQTL_SS\tsim_h2\tsim_med_h2\tsim_nm_h2\test_med_h2_joint_reml\test_med_h2_per_tissue_joint_reml\test_nm_h2_joint_reml\test_mean_eqtl_h2_joint_reml\test_h2_ldsc\test_h2_ldsc_constrained_intercept\n')
+
+# CHECK
+est_total_med_h2, est_per_tissue_med_h2, est_nm_h2, est_gene_cis_h2, X_init = med_h2_with_sumstat_ldsc_two_step_multivariate_gene_bins(gwas_beta, gwas_beta_se, gwas_variant_ld_scores.reshape(-1,1), eqtl_beta_mat, eqtl_beta_se_mat, eqtl_ld_score_mat, eqtl_n_cis_snps, eqtl_classes, gene_indexer, eqtl_sample_size, np.asarray([len(gwas_beta)]), burn_in_iters=10, total_iters=20, gibbs=False)
+t.write('eqtl_pced_no_intercept_two_step\t' + str(eqtl_sample_size) + '\t' + str(sim_h2) + '\t' + str(sim_med_h2) + '\t' + str(sim_nm_h2) + '\t' + str(est_total_med_h2) + '\t' + ','.join(est_per_tissue_med_h2.astype(str)) + '\t' + str(est_nm_h2) + '\t' + str(np.mean(est_gene_cis_h2)) + '\t' + str(ldsc_snp_h2) + '\t' + str(ldsc_constrained_intercept_snp_h2) + '\n')
+# CHECK
+est_total_med_h2, est_per_tissue_med_h2, est_nm_h2, est_gene_cis_h2, X = med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_variance(gwas_beta, gwas_beta_se, gwas_variant_ld_scores.reshape(-1,1), eqtl_beta_mat, eqtl_beta_se_mat, eqtl_ld_score_mat, eqtl_n_cis_snps, eqtl_classes, gene_indexer, eqtl_sample_size, eqtl_cis_snp_position, ordered_window_names, np.asarray([len(gwas_beta)]), burn_in_iters=burn_in_iter, total_iters=total_iter, gibbs=False, eqtl_only=False)
+t.write('eqtl_pced_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance\t' + str(eqtl_sample_size) + '\t' + str(sim_h2) + '\t' + str(sim_med_h2) + '\t' + str(sim_nm_h2) + '\t' + str(est_total_med_h2) + '\t' + ','.join(est_per_tissue_med_h2.astype(str)) + '\t' + str(est_nm_h2) + '\t' + str(np.mean(est_gene_cis_h2)) + '\t' + str(ldsc_snp_h2) + '\t' + str(ldsc_constrained_intercept_snp_h2) + '\n')
+
+est_total_med_h2, est_per_tissue_med_h2, est_nm_h2, est_gene_cis_h2, X = med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_variance(gwas_beta, gwas_beta_se, gwas_variant_ld_scores.reshape(-1,1), eqtl_beta_mat, eqtl_beta_se_mat, eqtl_ld_score_mat, eqtl_n_cis_snps, eqtl_classes, gene_indexer, eqtl_sample_size, eqtl_cis_snp_position, ordered_window_names, np.asarray([len(gwas_beta)]), burn_in_iters=burn_in_iter, total_iters=total_iter, gibbs=False, eqtl_only=True)
+t.write('eqtl_pced_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance_cis_window\t' + str(eqtl_sample_size) + '\t' + str(sim_h2) + '\t' + str(sim_med_h2) + '\t' + str(sim_nm_h2) + '\t' + str(est_total_med_h2) + '\t' + ','.join(est_per_tissue_med_h2.astype(str)) + '\t' + str(est_nm_h2) + '\t' + str(np.mean(est_gene_cis_h2)) + '\t' + str(ldsc_snp_h2) + '\t' + str(ldsc_constrained_intercept_snp_h2) + '\n')
+
+#######################
+# Non-PCA version
+#######################
+# load in eqtl data
+# Out of sample eqtl ld
+eqtl_sumstat_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_small_window_eqtl_sumstats.txt'
+genes, eqtl_beta, eqtl_beta_se, eqtl_ldscore, eqtl_position, eqtl_cis_snp_position, eqtl_n_cis_snps, eqtl_classes, gene_indexer, ordered_window_names = load_in_eqtl_data_with_bins_per_gene(eqtl_sumstat_file, snp_name_to_position, window_to_ld_files ,eqtl_sample_size, eqtl_ld='out_of_sample', n_bins=5)
+# Generate matrix form of eqtl data
+eqtl_beta_mat = get_matrix_form_of_eqtl_data(eqtl_beta, eqtl_position, 0.0, len(gwas_variant_ld_scores))
+eqtl_beta_se_mat = get_matrix_form_of_eqtl_data(eqtl_beta_se, eqtl_position, 1.0/np.sqrt(eqtl_sample_size), len(gwas_variant_ld_scores))
+eqtl_ld_score_mat = get_matrix_form_of_eqtl_data(eqtl_ldscore, eqtl_position, 0.0, len(gwas_variant_ld_scores))
+
+
+est_total_med_h2, est_per_tissue_med_h2, est_nm_h2, est_gene_cis_h2, X_init = med_h2_with_sumstat_ldsc_two_step_multivariate_gene_bins(gwas_beta, gwas_beta_se, gwas_variant_ld_scores.reshape(-1,1), eqtl_beta_mat, eqtl_beta_se_mat, eqtl_ld_score_mat, eqtl_n_cis_snps, eqtl_classes, gene_indexer, eqtl_sample_size, np.asarray([len(gwas_beta)]), burn_in_iters=10, total_iters=20, gibbs=False)
+t.write('eqtl_5_binned_no_intercept_two_step\t' + str(eqtl_sample_size) + '\t' + str(sim_h2) + '\t' + str(sim_med_h2) + '\t' + str(sim_nm_h2) + '\t' + str(est_total_med_h2) + '\t' + ','.join(est_per_tissue_med_h2.astype(str)) + '\t' + str(est_nm_h2) + '\t' + str(np.mean(est_gene_cis_h2)) + '\t' + str(ldsc_snp_h2) + '\t' + str(ldsc_constrained_intercept_snp_h2) + '\n')
+
+est_total_med_h2, est_per_tissue_med_h2, est_nm_h2, est_gene_cis_h2, X = med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_variance(gwas_beta, gwas_beta_se, gwas_variant_ld_scores.reshape(-1,1), eqtl_beta_mat, eqtl_beta_se_mat, eqtl_ld_score_mat, eqtl_n_cis_snps, eqtl_classes, gene_indexer, eqtl_sample_size, eqtl_cis_snp_position, ordered_window_names, np.asarray([len(gwas_beta)]), burn_in_iters=burn_in_iter, total_iters=total_iter, gibbs=False, eqtl_only=False)
+t.write('eqtl_5_binned_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance\t' + str(eqtl_sample_size) + '\t' + str(sim_h2) + '\t' + str(sim_med_h2) + '\t' + str(sim_nm_h2) + '\t' + str(est_total_med_h2) + '\t' + ','.join(est_per_tissue_med_h2.astype(str)) + '\t' + str(est_nm_h2) + '\t' + str(np.mean(est_gene_cis_h2)) + '\t' + str(ldsc_snp_h2) + '\t' + str(ldsc_constrained_intercept_snp_h2) + '\n')
+
+est_total_med_h2, est_per_tissue_med_h2, est_nm_h2, est_gene_cis_h2, X = med_h2_with_sumstat_ldsc_bayesian_gibbs_multivariate_gene_bins_per_data_set_variance(gwas_beta, gwas_beta_se, gwas_variant_ld_scores.reshape(-1,1), eqtl_beta_mat, eqtl_beta_se_mat, eqtl_ld_score_mat, eqtl_n_cis_snps, eqtl_classes, gene_indexer, eqtl_sample_size, eqtl_cis_snp_position, ordered_window_names, np.asarray([len(gwas_beta)]), burn_in_iters=burn_in_iter, total_iters=total_iter, gibbs=False, eqtl_only=True)
+t.write('eqtl_5_binned_no_intercept_bayesian_gibbs_resid_var_multivariate_per_data_set_variance_cis_window\t' + str(eqtl_sample_size) + '\t' + str(sim_h2) + '\t' + str(sim_med_h2) + '\t' + str(sim_nm_h2) + '\t' + str(est_total_med_h2) + '\t' + ','.join(est_per_tissue_med_h2.astype(str)) + '\t' + str(est_nm_h2) + '\t' + str(np.mean(est_gene_cis_h2)) + '\t' + str(ldsc_snp_h2) + '\t' + str(ldsc_constrained_intercept_snp_h2) + '\n')
+
+t.close()
 
 
 '''
@@ -4635,16 +4898,11 @@ f.close()
 '''
 
 
-# Run standard S-LDSC
-X = sm.add_constant(gwas_variant_ld_scores)
-Y = np.square(gwas_beta/gwas_beta_se)
-model = sm.OLS(Y,X).fit()
-model_constrained_intercept = sm.OLS(Y-1, gwas_variant_ld_scores).fit()
-ldsc_snp_h2 = len(gwas_beta)*(model.params[1]/N_gwas)
-ldsc_constrained_intercept_snp_h2 = len(gwas_beta)*(model_constrained_intercept.params[0]/N_gwas)
 
 
-output_file = trait_med_h2_inference_dir + simulation_name_string+ '_' + str(eqtl_sample_size) + '_joint_ldsc_multimethod13.txt'
+'''
+
+output_file = trait_med_h2_inference_dir + simulation_name_string+ '_' + str(eqtl_sample_size) + '_pca_joint_ldsc_multimethod.txt'
 t = open(output_file,'w')
 t.write('method\teQTL_SS\tsim_h2\tsim_med_h2\tsim_nm_h2\test_med_h2_joint_reml\test_med_h2_per_tissue_joint_reml\test_nm_h2_joint_reml\test_mean_eqtl_h2_joint_reml\test_h2_ldsc\test_h2_ldsc_constrained_intercept\n')
 
@@ -4700,7 +4958,7 @@ ldsc_constrained_intercept_snp_h2 = len(gwas_beta)*(model_constrained_intercept.
 
 
 
-output_file = trait_med_h2_inference_dir + simulation_name_string+ '_' + str(eqtl_sample_size) + '_joint_ldsc_multimethod13_permuted_eqtls.txt'
+output_file = trait_med_h2_inference_dir + simulation_name_string+ '_' + str(eqtl_sample_size) + '_pca_joint_ldsc_multimethod_permuted_eqtls.txt'
 t = open(output_file,'w')
 t.write('method\teQTL_SS\tsim_h2\tsim_med_h2\tsim_nm_h2\test_med_h2_joint_reml\test_med_h2_per_tissue_joint_reml\test_nm_h2_joint_reml\test_mean_eqtl_h2_joint_reml\test_h2_ldsc\test_h2_ldsc_constrained_intercept\n')
 
@@ -4728,7 +4986,7 @@ print(output_file)
 
 
 
-
+'''
 
 
 

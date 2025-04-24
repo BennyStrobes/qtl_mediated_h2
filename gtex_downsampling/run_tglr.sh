@@ -24,8 +24,9 @@ source ~/.bash_profile
 # Organize TGLR expression scores across tissues
 ########################################
 expression_score_annotation_stem=${tglr_expression_score_dir}"tglr_expression_scores_"${mesc_run_name}"."
+if false; then
 python3 organize_tglr_expression_scores_across_tissues.py $tissue_info_file $mesc_run_name $ldsc_genotype_intercept_annotation_stem $tglr_expression_score_dir $expression_score_annotation_stem
-
+fi
 
 
 

@@ -605,12 +605,112 @@ make_histogram_showing_distribution_of_tissue_0_estimates <- function(per_sim_df
 # Command line args
 ########################
 trait_med_h2_inference_dir = args[1]
-visualize_trait_med_h2_dir = args[2]
+organized_trait_med_h2_results_dir = args[2]
+visualize_trait_med_h2_dir = args[3]
+
+
+
+
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_sim_results_joint_ldsc_binned_summary_averaged.txt")
+joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+
+###################################################
+if (FALSE) {
+# Joint plot showing mediated heritability, non-mediated heritability, and total heritablity for multiple methods
+# Non-mediated plot
+nm_plot <- make_multimethod_se_barplot_for_nm_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc", "two_step_pca_ldsc", "joint_pca_ldsc"))
+# Mediated plot
+med_plot <- make_multimethod_se_barplot_for_med_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc", "two_step_pca_ldsc", "joint_pca_ldsc"))
+# Total h2 plot
+tot_plot <- make_multimethod_se_barplot_for_total_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc", "two_step_pca_ldsc", "joint_pca_ldsc"))
+
+# Get legend
+legender <- get_legend(nm_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(med_plot+ theme(legend.position="none"), nm_plot+ theme(legend.position="none"), tot_plot+ theme(legend.position="none"),legender, ncol=1, rel_heights=c(1,1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, "multimethod_5_tissue_simulation_med_nm_total_h2_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=6.5, units="in")
+print(output_file)
+}
+
+
+
+###################################################
+# Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
+# Make plot for causal tissue
+if (FALSE) {
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc", "two_step_pca_ldsc", "joint_pca_ldsc"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc", "two_step_pca_ldsc", "joint_pca_ldsc"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, "multimethod_5_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=6.5, units="in")
+print(output_file)
+}
+
+if (FALSE) {
+# Joint plot showing mediated heritability, non-mediated heritability, and total heritablity for multiple methods
+# Non-mediated plot
+nm_plot <- make_multimethod_se_barplot_for_nm_h2(joint_ldsc_df, c("joint_ldsc", "joint_ldsc_cis_var"))
+# Mediated plot
+med_plot <- make_multimethod_se_barplot_for_med_h2(joint_ldsc_df, c("joint_ldsc", "joint_ldsc_cis_var"))
+# Total h2 plot
+tot_plot <- make_multimethod_se_barplot_for_total_h2(joint_ldsc_df, c("joint_ldsc", "joint_ldsc_cis_var"))
+
+# Get legend
+legender <- get_legend(nm_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(med_plot+ theme(legend.position="none"), nm_plot+ theme(legend.position="none"), tot_plot+ theme(legend.position="none"),legender, ncol=1, rel_heights=c(1,1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, "multimethod_cis_var_5_tissue_simulation_med_nm_total_h2_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=6.5, units="in")
+print(output_file)
+}
+
+
+###################################################
+# Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
+# Make plot for causal tissue
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("joint_ldsc", "joint_ldsc_cis_var"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("joint_ldsc", "joint_ldsc_cis_var"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, "multimethod_cisvar_5_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=6.5, units="in")
+print(output_file)
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+##############
+# OLD
+##############
+
+if (FALSE) {
 ###################################################
 # Load in data
 # Joint ldsc
@@ -635,8 +735,7 @@ perm_df$permuted = rep(TRUE, dim(df)[1])
 
 # Compbine permuted and unpermuted data frames
 big_df <- rbind(df, perm_df)
-
-
+}
 
 
 ###################################################
@@ -703,12 +802,13 @@ print(output_file)
 
 
 ###################################################
+if (FALSE) {
 # Joint plot showing total permuted to unpermuted mediated heritability fraction
 perm_med_fraction_plot <- make_multi_method_mediated_h2_se_barplot_for_permuted_and_unpermuted_ratio(big_df, c("mesc", "two_step_ldsc", "joint_ldsc"))
 output_file <- paste0(visualize_trait_med_h2_dir, "multimethod_5_tissue_simulation_permuted_med_vs_unpermuted_med_ratio_barplot.pdf")
 ggsave(perm_med_fraction_plot, file=output_file, width=7.2, height=4.5, units="in")
 print(output_file)
-
+}
 
 
 
