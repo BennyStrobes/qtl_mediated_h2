@@ -56,7 +56,7 @@ for eqtl_sample_size in eqtl_sample_sizes:
 	start_index = start_index + eqtl_sample_size
 
 
-ref_genotype_ss=500
+ref_genotype_ss=50000
 print_individual_list_to_output(individual_list, start_index, (start_index+ref_genotype_ss), ref_genotype_individual_file)
 start_index = start_index + ref_genotype_ss
 

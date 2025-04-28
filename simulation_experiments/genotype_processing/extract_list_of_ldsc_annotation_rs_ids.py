@@ -68,3 +68,5 @@ for line in f:
 t.close()
 f.close()
 
+print(skipped)
+
