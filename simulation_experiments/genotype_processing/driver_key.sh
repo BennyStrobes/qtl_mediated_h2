@@ -48,13 +48,11 @@ processed_genotype_data_dir="/n/scratch/users/b/bes710/qtl_mediated_h2/simulatio
 ############################
 # Needs to be 200GB and 25 h
 n_gwas_individuals="100000"
-chrom_num="1"
 if false; then
+chrom_num="1"
 sbatch prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file $joint_ldsc_code_dir
-fi
 
 chrom_num="2"
-if false; then
 sbatch prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file $joint_ldsc_code_dir
 fi
 
@@ -62,7 +60,7 @@ fi
 # TO do
 # 1. let above finish running
 # 2. compare to original. make sure same number of rows and base ldscores are the same
-# 3. Switch filenames so new is main and tmp is deleted (also modify code above so it is good for future)
+# 3. Switch filenames so new is main and tmp is deleted
 # 4. Run below on it.
 
 

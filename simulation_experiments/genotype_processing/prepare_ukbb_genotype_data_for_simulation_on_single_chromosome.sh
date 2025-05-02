@@ -139,7 +139,7 @@ source /n/groups/price/ben/environments/tf_new/bin/activate
 genotype_version="reference_genotype_data"
 
 # Extract variant level LD scores
-variant_ld_score_file=${processed_genotype_data_dir}"variant_"${genotype_version}"_ldscores_chrom"${chrom_num}"_tmp.txt"
+variant_ld_score_file=${processed_genotype_data_dir}"variant_"${genotype_version}"_ldscores_chrom"${chrom_num}".txt"
 python3 ${joint_ldsc_code_dir}extract_variant_ldscores.py --chrom $chrom_num --bgen-file ${processed_genotype_data_dir}"simulated_"${genotype_version}"_"${chrom_num}".bgen" --hm3-rsid-file $hm3_rs_id_file --sldsc-annotation-file ${ldsc_baseline_hg19_annotation_dir}"baselineLD."${chrom_num}".annot.gz" --variant-ld-score-file $variant_ld_score_file
 
 

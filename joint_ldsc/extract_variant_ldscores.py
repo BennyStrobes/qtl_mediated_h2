@@ -127,7 +127,7 @@ snp_anno = extract_snp_anno(ordered_rsids, rsid_to_anno)
 
 # Open output file handle
 t = open(args.variant_ld_score_file,'w')
-t.write('chr\trsid\tcm\tpos\ta1\ta2\t' + '\t'.join(anno_names) + '\n')
+t.write('chr\trsid\tcm\tpos\tref_allele\talt_allele\t' + '\t'.join(anno_names) + '\n')
 
 mid_window_left = np.min(snp_cm)
 mid_window_right = mid_window_left + cm_window_size
@@ -162,10 +162,10 @@ while mid_window_left <= np.max(snp_cm):
 	window_geno_mat = []
 	for snp_integer in window_snp_integers:
 		var = genotype_obj[snp_integer]
-		dosage = var.minor_allele_dosage # Note, not standardized but ok for ld
+		dosage = var.alt_dosage # Note, not standardized but ok for ld
 		window_geno_mat.append(dosage)
 		window_a0s.append(var.alleles[0])
-		window_a1s.append(var.alleles[1])
+		window_a1s.append(var.alleles[1])  # This is alt allele!!
 	window_geno_mat = np.asarray(window_geno_mat)
 	geno_ss = window_geno_mat.shape[1]
 	LD = np.corrcoef(window_geno_mat)
