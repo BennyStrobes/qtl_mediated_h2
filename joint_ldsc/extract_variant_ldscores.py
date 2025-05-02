@@ -3,10 +3,8 @@ import os
 import sys
 import pdb
 from bgen import BgenReader
-
-
-
-
+import argparse
+import gzip
 
 
 
@@ -38,44 +36,98 @@ def create_dictionary_mapping_from_rsid_to_cm_position(bim_file):
 	f.close()
 	return dicti
 
+def create_dictionary_mapping_from_rsid_to_cm_position_and_annotation_vector(sldsc_annotation_file, invalid_annotations):
+	cm_dicti = {}
+	anno_dicti = {}
+	head_count = 0
+	f = gzip.open(sldsc_annotation_file)
+	for line in f:
+		line = line.decode('utf-8').rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			anno_names = np.asarray(data[4:])
+			valid_anno_indices = []
+			for ii, anno_name in enumerate(anno_names):
+				if anno_name not in invalid_annotations:
+					valid_anno_indices.append(ii)
+			valid_anno_indices = np.asarray(valid_anno_indices)
+			anno_names = anno_names[valid_anno_indices]
+			continue
+		rsid = data[2]
+		cm = float(data[3])
+		anno_vec = np.asarray(data[4:]).astype(float)
+
+		if rsid in cm_dicti or rsid in anno_vec:
+			print('assumption erororr')
+			pdb.set_trace()
+		cm_dicti[rsid] = cm
+		anno_dicti[rsid] = anno_vec[valid_anno_indices]
+
+	f.close()
+	return cm_dicti, anno_dicti, anno_names
+
 def extract_snp_cm_pos(ordered_rsids, rsid_to_cm):
 	cm_arr = []
 	for rsid in ordered_rsids:
 		cm_arr.append(rsid_to_cm[rsid])
 	return np.asarray(cm_arr)
 
+def extract_snp_anno(ordered_rsids, rsid_to_anno):
+	anno_arr = []
+	for rsid in ordered_rsids:
+		anno_arr.append(rsid_to_anno[rsid])
+	return np.asarray(anno_arr)	
+
 
 
 
 #####################
-# Command line args
+# Parse command line arguments
 #####################
-chrom_num = sys.argv[1]
-bgen_genotype_stem = sys.argv[2]
-hm3_rs_id_file = sys.argv[3]
-kg_genotype_dir = sys.argv[4]  # Used to get CM values for snps
-variant_ld_score_file = sys.argv[5]  # Output file
+parser = argparse.ArgumentParser()
+parser.add_argument('--chrom', default='None', type=str,
+                    help='Chromosome number (e.g. 1)')
+parser.add_argument('--bgen-file', default='None', type=str,
+                    help='Absolute path to reference bgen genotype file')
+parser.add_argument('--hm3-rsid-file', default='None', type=str,
+                    help='Absolute path to file containing list of hm3 rsids (note: file has no header. just one line per snp)')
+parser.add_argument('--sldsc-annotation-file', default='None', type=str,
+                    help='Absolute path to gziped sldsc annotation file')
+parser.add_argument('--variant-ld-score-file', default='None', type=str,
+                    help='Absolute path to output file')
+parser.add_argument('--cm-window-size', default=1.0, type=float,
+                    help='size of CM window around genetic elements to use')
+parser.add_argument('--filter-baselineld-qtl-anno', default=True, action='store_true',
+                    help='Boolean on whether to filter out baselineLD qtl related annotations')
+args = parser.parse_args()
 
-# CM window size (impacts memory/speed trast)
-cm_window_size = 1.0
+
+cm_window_size = args.cm_window_size
 
 # Create dictionary list of hm3rsids
-hm3_rsids = create_dictionary_list_of_hm3_rsids(hm3_rs_id_file)
-print(len(hm3_rsids))
+hm3_rsids = create_dictionary_list_of_hm3_rsids(args.hm3_rsid_file)
 
 # Create dictionary mapping from rsid to CM position
-rsid_to_cm = create_dictionary_mapping_from_rsid_to_cm_position(kg_genotype_dir + '1000G.EUR.QC.' + str(chrom_num) + '.bim')
+invalid_annotations = {}
+if args.filter_baselineld_qtl_anno:
+	invalid_annotations['GTEx_eQTL_MaxCPP'] = 1
+	invalid_annotations['BLUEPRINT_H3K27acQTL_MaxCPP'] = 1
+	invalid_annotations['BLUEPRINT_H3K4me1QTL_MaxCPP'] = 1
+	invalid_annotations['BLUEPRINT_DNA_methylation_MaxCPP'] = 1
+rsid_to_cm, rsid_to_anno, anno_names = create_dictionary_mapping_from_rsid_to_cm_position_and_annotation_vector(args.sldsc_annotation_file, invalid_annotations)
 
 # Load in genotype object
-genotype_obj = BgenReader(bgen_genotype_stem + '.bgen')
+genotype_obj = BgenReader(args.bgen_file)
 snp_pos = np.asarray(genotype_obj.positions())
 ordered_rsids = np.asarray(genotype_obj.rsids())
 snp_cm = extract_snp_cm_pos(ordered_rsids, rsid_to_cm)
 snp_integers = np.arange(len(ordered_rsids))
+snp_anno = extract_snp_anno(ordered_rsids, rsid_to_anno)
 
 # Open output file handle
-t = open(variant_ld_score_file,'w')
-t.write('chr\trsid\tcm\tpos\ta1\ta2\tldscore\n')
+t = open(args.variant_ld_score_file,'w')
+t.write('chr\trsid\tcm\tpos\ta1\ta2\t' + '\t'.join(anno_names) + '\n')
 
 mid_window_left = np.min(snp_cm)
 mid_window_right = mid_window_left + cm_window_size
@@ -102,6 +154,7 @@ while mid_window_left <= np.max(snp_cm):
 	window_rsids = ordered_rsids[window_snp_indices]
 	window_cm = snp_cm[window_snp_indices]
 	window_snp_integers = snp_integers[window_snp_indices]  # Used getting dosage
+	window_snp_anno = snp_anno[window_snp_indices, :]
 
 	# Construct LD
 	window_a0s = []
@@ -141,10 +194,11 @@ while mid_window_left <= np.max(snp_cm):
 		nearby_snp_indices = np.abs(window_cm - window_snp_cm) <= 1.0
 
 		# Compute LD score
-		snp_ldscore = np.sum(squared_adj_LD[window_snp_iter, nearby_snp_indices])
+		#snp_ldscore = np.sum(squared_adj_LD[window_snp_iter, nearby_snp_indices])
+		snp_anno_ldscore = np.dot(np.transpose(window_snp_anno[nearby_snp_indices,:]),squared_adj_LD[window_snp_iter, nearby_snp_indices])
 
 		# print to output file
-		t.write(str(chrom_num) + '\t' + window_snp_rsid + '\t' + str(window_snp_cm) + '\t' + str(window_snp_pos) + '\t' + window_snp_a0 + '\t' + window_snp_a1 + '\t' + str(snp_ldscore) + '\n')
+		t.write(str(args.chrom) + '\t' + window_snp_rsid + '\t' + str(window_snp_cm) + '\t' + str(window_snp_pos) + '\t' + window_snp_a0 + '\t' + window_snp_a1 + '\t' + '\t'.join(snp_anno_ldscore.astype(str)) + '\n')
 		t.flush()
 
 	# update window pos

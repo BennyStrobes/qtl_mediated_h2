@@ -3,23 +3,27 @@ import os
 import sys
 import pdb
 from bgen import BgenReader
+import argparse
+import gzip
+import time
 
 
 
-
-
-
-def create_dictionary_mapping_from_rsid_to_cm_position(bim_file):
+def create_dictionary_mapping_from_rsid_to_cm_position(sldsc_anno_file):
 	dicti = {}
-	f = open(bim_file)
+	f = gzip.open(sldsc_anno_file)
+	head_count = 0
 	for line in f:
-		line = line.rstrip()
+		line = line.decode('utf-8').rstrip()
 		data = line.split('\t')
-		rsid =data[1]
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		rsid =data[2]
 		if rsid in dicti:
 			print('assumption error')
 			pdb.set_trace()
-		cm_position = float(data[2])
+		cm_position = float(data[3])
 		dicti[rsid] = cm_position
 	f.close()
 	return dicti
@@ -55,7 +59,7 @@ def extract_snp_cm_pos(ordered_rsids, rsid_to_cm):
 
 def make_gene_regression_snp_summary_file(gene_regression_snp_summary_file, chrom_num, tmp_rsids, tmp_poss, tmp_cms, tmp_a0s, tmp_a1s, tmp_cis_snp_booleans, hm3_rsid_to_regression_index):
 	t = open(gene_regression_snp_summary_file,'w')
-	t.write('chr\trsid\tcm\tpos\ta1\ta2\tcis_snp_indicator\tregression_snp_index\n')
+	t.write('chr\trsid\tcm\tpos\tref_allele\talt_allele\tcis_snp_indicator\n')
 
 	for snp_index, tmp_rsid in enumerate(tmp_rsids):
 		tmp_cm = tmp_cms[snp_index]
@@ -65,7 +69,7 @@ def make_gene_regression_snp_summary_file(gene_regression_snp_summary_file, chro
 		tmp_cis_snp_boolean = tmp_cis_snp_booleans[snp_index]
 		regression_snp_index = hm3_rsid_to_regression_index[tmp_rsid]
 
-		t.write(str(chrom_num) + '\t' + tmp_rsid + '\t' + str(tmp_cm) + '\t' + str(tmp_pos) + '\t' + tmp_a0 + '\t' + tmp_a1 + '\t' + str(tmp_cis_snp_boolean*1.0) + '\t' + str(regression_snp_index) + '\n')
+		t.write(str(chrom_num) + '\t' + tmp_rsid + '\t' + str(tmp_cm) + '\t' + str(tmp_pos) + '\t' + tmp_a0 + '\t' + tmp_a1 + '\t' + str(tmp_cis_snp_boolean*1.0) + '\n')
 	t.close()
 	return
 
@@ -100,52 +104,73 @@ def pairwise_correlations(Z, X):
 
 	return correlations
 
-######################
-# Command line args
-######################
-chrom_num = sys.argv[1]
-simulated_gene_position_file = sys.argv[2]
-bgen_genotype_stem = sys.argv[3]
-variant_ld_score_file = sys.argv[4]
-kg_genotype_dir = sys.argv[5]
-gene_snp_representation = sys.argv[6]
-gene_ld_output_root = sys.argv[7]
+
+
+#####################
+# Parse command line arguments
+#####################
+parser = argparse.ArgumentParser()
+parser.add_argument('--chrom', default='None', type=str,
+                    help='Chromosome number (e.g. 1)')
+parser.add_argument('--gene-position-file', default='None', type=str,
+                    help='Absolute path to gene position file')
+parser.add_argument('--bgen-file', default='None', type=str,
+                    help='Absolute path to reference bgen genotype file')
+parser.add_argument('--variant-ld-score-file', default='None', type=str,
+                    help='Absolute path to variant ld score file')
+parser.add_argument('--gene-snp-representation', default='None', type=str,
+                    help='Which type of low dimensional representation to use')
+parser.add_argument('--sldsc-annotation-file', default='None', type=str,
+                    help='Absolute path to gziped sldsc annotation file')
+parser.add_argument('--gene-ld-output-root', default='None', type=str,
+                    help='Output root')
+parser.add_argument('--cm-window-size', default=1.0, type=float,
+                    help='size of CM window around genetic elements to use')
+parser.add_argument('--min-cis-snps', default=5, type=int,
+                    help='Minimimum number of allowable cis snps for a gene')
+parser.add_argument('--min-regr-snps', default=5, type=int,
+                    help='Minimimum number of allowable regression snps a gene')
+args = parser.parse_args()
+
 
 
 # CM window size (impacts memory/speed trast)
-cm_window_size = 1.0
+cm_window_size = args.cm_window_size
 
 # Create dictionary mapping from rsid to CM position
-rsid_to_cm = create_dictionary_mapping_from_rsid_to_cm_position(kg_genotype_dir + '1000G.EUR.QC.' + str(chrom_num) + '.bim')
+rsid_to_cm = create_dictionary_mapping_from_rsid_to_cm_position(args.sldsc_annotation_file)
 
 # Create dictionary mapping from HM3 rsid to regression index
-hm3_rsid_to_regression_index = create_mapping_from_hm3_rsid_to_regression_index(variant_ld_score_file)
+hm3_rsid_to_regression_index = create_mapping_from_hm3_rsid_to_regression_index(args.variant_ld_score_file)
+
 
 # Load in genotype object
-genotype_obj = BgenReader(bgen_genotype_stem + '.bgen')
+genotype_obj = BgenReader(args.bgen_file)
 snp_pos = np.asarray(genotype_obj.positions())
 ordered_rsids = np.asarray(genotype_obj.rsids())
 snp_cm = extract_snp_cm_pos(ordered_rsids, rsid_to_cm)
 snp_integers = np.arange(len(ordered_rsids))
 
+
 # Output summary file
-output_summary_file = gene_ld_output_root + '_summary_file.txt'
+output_summary_file = args.gene_ld_output_root + '_summary_file.txt'
 t = open(output_summary_file,'w')
 
 
 # Now loop through genes
-f = open(simulated_gene_position_file)
+f = open(args.gene_position_file)
 head_count = 0
 for line in f:
 	line = line.rstrip()
 	data = line.split('\t')
 	if head_count == 0:
 		head_count = head_count + 1
-		t.write(line + '\t' + 'regression_snp_summary_file\tlow_dimensional_squared_ld_file\tn_snps_per_low_dim_file\n')
+		t.write(line + '\t' + 'regression_snp_summary_file\tlow_dimensional_squared_ld_file\tn_snps_per_low_dim_file\tregression_snp_ld_file\n')
 		continue
 
 	# Extract relevent fields
 	gene_name = data[1]
+	print(gene_name)
 	gene_tss = int(data[2])
 	gene_cis_start = int(data[4])
 	gene_cis_end = int(data[5])
@@ -154,8 +179,10 @@ for line in f:
 	cis_snp_indices = (snp_pos >= gene_cis_start) & (snp_pos <= gene_cis_end)
 
 	# Skip genes that have no cis snps
-	if np.sum(cis_snp_indices) < 5:
+	if np.sum(cis_snp_indices) < args.min_cis_snps:
+		print('skipped gene because too few cis snps')
 		continue
+
 
 	# Get cis snps
 	cis_window_pos = snp_pos[cis_snp_indices]
@@ -168,8 +195,8 @@ for line in f:
 	cis_window_cm_ub = np.max(cis_window_cm)
 
 	# Gene window cm lb and ub
-	big_window_cm_lb = cis_window_cm_lb - 1.0
-	big_window_cm_ub = cis_window_cm_ub + 1.0
+	big_window_cm_lb = cis_window_cm_lb - cm_window_size
+	big_window_cm_ub = cis_window_cm_ub + cm_window_size
 
 	# Extract indices of "big window" for gene
 	big_window_snp_indices = (snp_cm >= big_window_cm_lb) & (snp_cm <= big_window_cm_ub)
@@ -190,7 +217,8 @@ for line in f:
 	# Extract cis snps in big window
 	big_window_cis_snp_indices = cis_snp_indices[big_window_snp_indices]
 
-	if np.sum(big_window_hm3_boolean) < 5:
+	if np.sum(big_window_hm3_boolean) < args.min_regr_snps:
+		print('skipped gene because too few regression snps')
 		continue
 
 	# Construct LD
@@ -199,11 +227,13 @@ for line in f:
 	big_window_geno_mat = []
 	for snp_integer in big_window_snp_integers:
 		var = genotype_obj[snp_integer]
-		dosage = var.minor_allele_dosage # Note, not standardized but ok for ld
+		#dosage = var.minor_allele_dosage # Note, not standardized but ok for ld
+		dosage = var.alt_dosage # Note, not standardized but ok for ld
 		dosage = (dosage - np.mean(dosage))/np.std(dosage)
 		big_window_geno_mat.append(dosage)
 		big_window_a0s.append(var.alleles[0])
-		big_window_a1s.append(var.alleles[1])
+		big_window_a1s.append(var.alleles[1]) # THIS IS ALT ALLELE! Note: for some reason this is flipped with the .pvar file, but at least the flip is consistent. So all should be good.
+
 	big_window_geno_mat = np.asarray(big_window_geno_mat)
 	geno_ss = big_window_geno_mat.shape[1]
 	big_window_a0s = np.asarray(big_window_a0s)
@@ -212,11 +242,17 @@ for line in f:
 
 	# Need to return a file summarizing regression snps (one line per snp include snp name, but also cis indicator as well as regression index)
 	# Make gene regression snp summmary file
-	gene_regression_snp_summary_file = gene_ld_output_root + '_' + gene_name + '_regression_snp_summary.txt'
-	make_gene_regression_snp_summary_file(gene_regression_snp_summary_file, chrom_num, big_window_rsids[big_window_hm3_boolean], big_window_pos[big_window_hm3_boolean], big_window_cm[big_window_hm3_boolean], big_window_a0s[big_window_hm3_boolean], big_window_a1s[big_window_hm3_boolean], big_window_cis_snp_indices[big_window_hm3_boolean], hm3_rsid_to_regression_index)
+	gene_regression_snp_summary_file = args.gene_ld_output_root + '_' + gene_name + '_regression_snp_summary.txt'
+	make_gene_regression_snp_summary_file(gene_regression_snp_summary_file, args.chrom, big_window_rsids[big_window_hm3_boolean], big_window_pos[big_window_hm3_boolean], big_window_cm[big_window_hm3_boolean], big_window_a0s[big_window_hm3_boolean], big_window_a1s[big_window_hm3_boolean], big_window_cis_snp_indices[big_window_hm3_boolean], hm3_rsid_to_regression_index)
+
+	# Need to save a npy file with regression snp LD
+	gene_regression_snp_LD_file = args.gene_ld_output_root + '_' + gene_name + '_regression_snp_LD.npy'
+	np.save(gene_regression_snp_LD_file, LD[big_window_hm3_boolean, :][:, big_window_hm3_boolean])
+
 
 	# Need to return regression snp X latent snp squared ld matrix
-	if gene_snp_representation == 'pca':
+	if args.gene_snp_representation.startswith('pca'):
+		rho_thresh = float('.' + args.gene_snp_representation.split('_')[1])
 		# Subset LD to cis snps
 		gene_cis_snp_ld = LD[:, big_window_cis_snp_indices][big_window_cis_snp_indices,:]
 		lambdas_full, U_full = np.linalg.eig(gene_cis_snp_ld)
@@ -231,7 +267,6 @@ for line in f:
 			pdb.set_trace()
 		lambdas = lambdas.astype(float)
 		U = U.astype(float)
-		rho_thresh = 0.99
 		lambda_thresh = compute_lambda_thresh(lambdas, rho_thresh)
 		thresh_components = lambdas >= lambda_thresh
 		lambdas = lambdas[thresh_components]
@@ -244,23 +279,20 @@ for line in f:
 		squared_ld_pc_snps = np.square(pairwise_correlations(Z, big_window_geno_mat[big_window_hm3_boolean,:]))
 
 		# Save low dimensional ld file
-		regression_snp_low_dimensional_snp_squared_ld_file = gene_ld_output_root + '_' + gene_name + '_regression_snp_by_low_dimensional_squared_ld_mat.npy'
+		regression_snp_low_dimensional_snp_squared_ld_file = args.gene_ld_output_root + '_' + gene_name + '_regression_snp_by_low_dimensional_squared_ld_mat.npy'
 		np.save(regression_snp_low_dimensional_snp_squared_ld_file, squared_ld_pc_snps)
 
 		# number of low dimensions
 		n_low_dimensions = squared_ld_pc_snps.shape[1]
 		n_snps_per_low_dim = np.ones(n_low_dimensions)
 		# Save n_snps per low dimension
-		n_snps_per_low_dim_file = gene_ld_output_root + '_' + gene_name + '_n_snps_per_low_dimension.npy'
+		n_snps_per_low_dim_file = args.gene_ld_output_root + '_' + gene_name + '_n_snps_per_low_dimension.npy'
 		np.save(n_snps_per_low_dim_file, n_snps_per_low_dim)
-	elif gene_snp_representation == 'pca2':
-		pdb.set_trace()
-
-	elif gene_snp_representation.startswith('bins'):
+	elif args.gene_snp_representation.startswith('bins'):
 		# Create LD matrix that is regression snp by cis snp
 		small_ld_sq = np.square(LD[big_window_hm3_boolean, :][:, big_window_cis_snp_indices])
 		squared_adj_LD = small_ld_sq - ((1.0-small_ld_sq)/(geno_ss-2.0))
-		n_bins = int(gene_snp_representation.split('_')[1])
+		n_bins = int(args.gene_snp_representation.split('_')[1])
 		n_cis_snps = np.sum(big_window_cis_snp_indices)
 		temp_vec = np.arange(n_cis_snps)
 		snp_chunks = np.array_split(temp_vec,n_bins)
@@ -275,15 +307,15 @@ for line in f:
 		low_dimensional_ld_score_mat = np.transpose(np.asarray(low_dimensional_ld_score_mat))
 
 		# Save low dimensional ld file
-		regression_snp_low_dimensional_snp_squared_ld_file = gene_ld_output_root + '_' + gene_name + '_regression_snp_by_low_dimensional_squared_ld_mat.npy'
+		regression_snp_low_dimensional_snp_squared_ld_file = args.gene_ld_output_root + '_' + gene_name + '_regression_snp_by_low_dimensional_squared_ld_mat.npy'
 		np.save(regression_snp_low_dimensional_snp_squared_ld_file, low_dimensional_ld_score_mat)
 
 		# Save n_snps per low dimension
-		n_snps_per_low_dim_file = gene_ld_output_root + '_' + gene_name + '_n_snps_per_low_dimension.npy'
+		n_snps_per_low_dim_file = args.gene_ld_output_root + '_' + gene_name + '_n_snps_per_low_dimension.npy'
 		np.save(n_snps_per_low_dim_file, n_snps_per_low_dim)
 
 
-	t.write(line + '\t' + gene_regression_snp_summary_file + '\t' + regression_snp_low_dimensional_snp_squared_ld_file + '\t' + n_snps_per_low_dim_file + '\n')
+	t.write(line + '\t' + gene_regression_snp_summary_file + '\t' + regression_snp_low_dimensional_snp_squared_ld_file + '\t' + n_snps_per_low_dim_file + '\t' + gene_regression_snp_LD_file + '\n')
 
 
 

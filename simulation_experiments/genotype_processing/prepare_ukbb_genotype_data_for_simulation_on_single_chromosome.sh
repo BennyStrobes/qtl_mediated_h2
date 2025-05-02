@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-45:00                         # Runtime in D-HH:MM format
-#SBATCH -p medium                           # Partition to run in
-#SBATCH --mem=20GB                         # Memory total in MiB (for all cores)
+#SBATCH -t 0-8:00                         # Runtime in D-HH:MM format
+#SBATCH -p short                           # Partition to run in
+#SBATCH --mem=15GB                         # Memory total in MiB (for all cores)
 
 # First three parts ran at 200GB
-
+# Needs to be run for longer (was just running small section)
 
 
 ukbb_genotype_dir="$1"
@@ -17,7 +17,7 @@ kg_genotype_dir="$6"
 hm3_snp_list_dir="$7"
 quasi_independent_dir="$8"
 gencode_gene_annotation_file="${9}"
-
+joint_ldsc_code_dir="${10}"
 source ~/.bash_profile
 
 
@@ -139,10 +139,10 @@ source /n/groups/price/ben/environments/tf_new/bin/activate
 genotype_version="reference_genotype_data"
 
 # Extract variant level LD scores
-variant_ld_score_file=${processed_genotype_data_dir}"variant_"${genotype_version}"_ldscores_chrom"${chrom_num}".txt"
-if false; then
-python3 extract_variant_ldscores.py $chrom_num ${processed_genotype_data_dir}"simulated_"${genotype_version}"_"${chrom_num} $hm3_rs_id_file $kg_genotype_dir $variant_ld_score_file
-fi
+variant_ld_score_file=${processed_genotype_data_dir}"variant_"${genotype_version}"_ldscores_chrom"${chrom_num}"_tmp.txt"
+python3 ${joint_ldsc_code_dir}extract_variant_ldscores.py --chrom $chrom_num --bgen-file ${processed_genotype_data_dir}"simulated_"${genotype_version}"_"${chrom_num}".bgen" --hm3-rsid-file $hm3_rs_id_file --sldsc-annotation-file ${ldsc_baseline_hg19_annotation_dir}"baselineLD."${chrom_num}".annot.gz" --variant-ld-score-file $variant_ld_score_file
+
+
 
 # Extract gene list
 # Genes are defined by actual tss
@@ -154,6 +154,29 @@ python3 prepare_simulated_gene_position_list.py $chrom_num $gencode_gene_annotat
 fi
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###################
+# OLD
+###################
 
 
 # Construct gene level LD matrices
@@ -171,10 +194,11 @@ python3 construct_gene_level_ld_matrices.py $chrom_num $simulated_gene_position_
 fi
 
 
+if false; then
 gene_snp_representation="bins_20"
 gene_ld_output_root=${processed_genotype_data_dir}"gene_level_ld_chr"${chrom_num}"_"${gene_snp_representation}
 python3 construct_gene_level_ld_matrices.py $chrom_num $simulated_gene_position_file ${processed_genotype_data_dir}"simulated_"${genotype_version}"_"${chrom_num} $variant_ld_score_file $kg_genotype_dir $gene_snp_representation $gene_ld_output_root
-
+fi
 
 
 
@@ -198,7 +222,7 @@ fi
 
 
 ####################
-# OLD
+# OLDer
 ####################
 
 

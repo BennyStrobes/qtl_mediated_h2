@@ -6,7 +6,7 @@
 ukbb_genotype_dir="/n/groups/price/UKBiobank/bgen_MAF001_500K_v3/"
 
 # LDSC baseline annotations (hg19)
-ldsc_baseline_hg19_annotation_dir="/n/groups/price/ldsc/reference_files/1000G_EUR_Phase3/baseline_v1.2/"
+ldsc_baseline_hg19_annotation_dir="/n/groups/price/ldsc/reference_files/1000G_EUR_Phase3/baselineLD_v2.2/"
 
 # LDSC 1KG genotype files (hg19)
 kg_genotype_dir="/n/groups/price/ldsc/reference_files/1000G_EUR_Phase3/plink_files/"
@@ -19,6 +19,9 @@ quasi_independent_dir="/n/groups/price/ben/quasi_independent_ld_blocks/"
 
 # Gencode hg19 gene annotation file
 gencode_gene_annotation_file="/n/groups/price/ben/gene_annotation_files/gencode.v19.annotation.gtf.gz"
+
+# Joint-LDSC code dir
+joint_ldsc_code_dir="/n/groups/price/ben/joint_ldsc/"
 
 
 ############################
@@ -47,18 +50,32 @@ processed_genotype_data_dir="/n/scratch/users/b/bes710/qtl_mediated_h2/simulatio
 n_gwas_individuals="100000"
 chrom_num="1"
 if false; then
-sbatch prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file
+sbatch prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file $joint_ldsc_code_dir
 fi
 
 chrom_num="2"
 if false; then
-sbatch prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file
+sbatch prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file $joint_ldsc_code_dir
 fi
 
 
+# TO do
+# 1. let above finish running
+# 2. compare to original. make sure same number of rows and base ldscores are the same
+# 3. Switch filenames so new is main and tmp is deleted (also modify code above so it is good for future)
+# 4. Run below on it.
 
 
 
-
+gene_snp_representation_arr=( "bins_10" "bins_20" "pca_90" "pca_95" "pca_99")
+if false; then
+for gene_snp_representation in "${gene_snp_representation_arr[@]}"
+do
+	chrom_num="1"
+	sh prepare_gene_ld_files.sh $chrom_num $processed_genotype_data_dir $ldsc_baseline_hg19_annotation_dir $gene_snp_representation $joint_ldsc_code_dir $n_gwas_individuals
+	chrom_num="2"
+	sh prepare_gene_ld_files.sh $chrom_num $processed_genotype_data_dir $ldsc_baseline_hg19_annotation_dir $gene_snp_representation $joint_ldsc_code_dir $n_gwas_individuals
+done
+fi
 
 
