@@ -70,10 +70,9 @@ if false; then
 for gene_snp_representation in "${gene_snp_representation_arr[@]}"
 do
 	chrom_num="1"
-	sh prepare_gene_ld_files.sh $chrom_num $processed_genotype_data_dir $ldsc_baseline_hg19_annotation_dir $gene_snp_representation $joint_ldsc_code_dir $n_gwas_individuals
+	sbatch prepare_gene_ld_files.sh $chrom_num $processed_genotype_data_dir $ldsc_baseline_hg19_annotation_dir $gene_snp_representation $joint_ldsc_code_dir $n_gwas_individuals
 	chrom_num="2"
-	sh prepare_gene_ld_files.sh $chrom_num $processed_genotype_data_dir $ldsc_baseline_hg19_annotation_dir $gene_snp_representation $joint_ldsc_code_dir $n_gwas_individuals
+	sbatch prepare_gene_ld_files.sh $chrom_num $processed_genotype_data_dir $ldsc_baseline_hg19_annotation_dir $gene_snp_representation $joint_ldsc_code_dir $n_gwas_individuals
 done
 fi
-
 

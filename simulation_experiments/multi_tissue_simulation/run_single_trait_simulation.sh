@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-33:30                         # Runtime in D-HH:MM format
+#SBATCH -t 0-40:30                         # Runtime in D-HH:MM format
 #SBATCH -p medium                           # Partition to run in
 #SBATCH --mem=10GB                         # Memory total in MiB (for all cores)
 
@@ -23,7 +23,6 @@ simulated_gwas_dir="${14}"
 eqtl_architecture="${15}"
 n_tissues="${16}"
 alt_simulated_learned_gene_models_dir="${17}"
-gene_trait_architecture="${18}"
 
 echo "Simulation"$simulation_number
 date
@@ -44,18 +43,31 @@ echo "Simulation Step 1"
 python3 simulate_causal_eqtl_effect_sizes.py $simulation_number $chrom_string $cis_window $simulated_gene_expression_dir $simulation_name_string $processed_genotype_data_dir $ge_h2 $eqtl_architecture $n_tissues
 
 
-#######################################################
-# Step 2: Simulate trait values
-#######################################################
-echo "Simulation Step 2"
-python3 simulate_trait_values.py $simulation_number $chrom_string $cis_window $simulated_gene_expression_dir $simulation_name_string $processed_genotype_data_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $simulated_trait_dir $n_gwas_individuals $eqtl_architecture $ge_h2 $gene_trait_architecture
+
+gene_trait_architecture="linear"
+gene_trait_architecture="stdExpr"
+gene_trait_architecture_arr=( "linear" "stdExpr" ) 
+
+for gene_trait_architecture in "${gene_trait_architecture_arr[@]}"
+do
+	echo $gene_trait_architecture
+	gwas_simulation_name_string=${simulation_name_string}"_gt_arch_"${gene_trait_architecture}
 
 
-#######################################################
-# Step 3: Run GWAS on simulated trait on only snps in TGFM windows.
-#######################################################
-echo "Simulation Step 3"
-python3 run_gwas_on_simulated_trait.py $simulation_number $chrom_string $simulation_name_string $processed_genotype_data_dir $simulated_trait_dir $simulated_gwas_dir
+	#######################################################
+	# Step 2: Simulate trait values
+	#######################################################
+	echo "Simulation Step 2"
+	python3 simulate_trait_values.py $simulation_number $chrom_string $cis_window $simulated_gene_expression_dir $simulation_name_string $gwas_simulation_name_string $processed_genotype_data_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $simulated_trait_dir $n_gwas_individuals $eqtl_architecture $ge_h2 $gene_trait_architecture
+
+	#######################################################
+	# Step 3: Run GWAS on simulated trait on only snps in TGFM windows.
+	#######################################################
+	echo "Simulation Step 3"
+	python3 run_gwas_on_simulated_trait.py $simulation_number $chrom_string $gwas_simulation_name_string $processed_genotype_data_dir $simulated_trait_dir $simulated_gwas_dir
+done
+
+
 
 
 #######################################################

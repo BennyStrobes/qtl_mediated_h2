@@ -36,11 +36,18 @@ def load_in_alt_allele_genotype_dosage_mat(bfile, window_indices, ref_alt_allele
 
 	for window_index in window_indices:
 		var = bfile[window_index]
-		dosage = var.minor_allele_dosage
-		ma = var.minor_allele
+		dosage = var.alt_dosage
+		#ma = var.minor_allele
 
 		index_ref_alt_allele = ref_alt_alleles[window_index]
 
+		if var.alleles[0] != index_ref_alt_allele[1]:
+			print('assumption errror')
+			pdb.set_trace()
+		if var.alleles[1] != index_ref_alt_allele[0]:
+			print('assumption eroror')
+			pdb.set_trace()
+		'''
 		# Flip dosage if alt-allele is not equal to minor allele
 		if index_ref_alt_allele[1] != ma:
 			# Quick error check
@@ -49,6 +56,7 @@ def load_in_alt_allele_genotype_dosage_mat(bfile, window_indices, ref_alt_allele
 				pdb.set_trace()
 			# Flip dosage
 			dosage = 2.0 - dosage
+		'''
 
 		# Append snp dosage to global array
 		dosages.append(dosage)
@@ -257,7 +265,7 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 				marginal_effects, marginal_effects_se = compute_marginal_regression_coefficients(sim_stand_expr, gene_regr_geno)
 
 				for regression_snp_index, regression_snp in enumerate(regression_snps):
-					t['tissue' + str(tiss_iter)].write(ensamble_id + '\t' + regression_snp + '\t' + str(chrom_num) + '\t' + str(regression_snp_pos[regression_snp_index]) + '\t' + str(regression_snp_alleles[regression_snp_index,0]) + '\t' + str(regression_snp_alleles[regression_snp_index,1]) + '\t' + str(marginal_effects[regression_snp_index]) + '\t' + str(marginal_effects_se[regression_snp_index]) + '\t' + str(marginal_effects[regression_snp_index]/marginal_effects_se[regression_snp_index]) + '\n')
+					t['tissue' + str(tiss_iter)].write(ensamble_id + '\t' + regression_snp + '\t' + str(chrom_num) + '\t' + str(regression_snp_pos[regression_snp_index]) + '\t' + str(regression_snp_alleles[regression_snp_index,1]) + '\t' + str(regression_snp_alleles[regression_snp_index,0]) + '\t' + str(marginal_effects[regression_snp_index]) + '\t' + str(marginal_effects_se[regression_snp_index]) + '\t' + str(marginal_effects[regression_snp_index]/marginal_effects_se[regression_snp_index]) + '\n')
 		f.close()
 
 

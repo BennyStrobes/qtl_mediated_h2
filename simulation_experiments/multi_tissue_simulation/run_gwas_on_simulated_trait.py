@@ -70,15 +70,23 @@ def run_gwas_on_all_snps(trait_values_file, processed_genotype_data_dir, chrom_s
 			if snp_rsid not in hm3_dicti:
 				continue
 			var = genotype_obj[snp_iter]
-			dosage = var.minor_allele_dosage
-			ma = var.minor_allele
+			dosage = var.alt_dosage
+			#ma = var.minor_allele
 			index_ref_alt_allele = ref_alt_alleles[snp_iter]
+			'''
 			if index_ref_alt_allele[1] != ma:
 				# Quick error check
 				if ma != index_ref_alt_allele[0]:
 					print('assumptino errror')
 				# flip dosage
 				dosage = 2.0 - dosage
+			'''
+			if var.alleles[0] != index_ref_alt_allele[1]:
+				print('assumption errror')
+				pdb.set_trace()
+			if var.alleles[1] != index_ref_alt_allele[0]:
+				print('assumption eroror')
+				pdb.set_trace()
 
 			line_snp_pos = snp_pos[snp_iter]
 
@@ -94,7 +102,7 @@ def run_gwas_on_all_snps(trait_values_file, processed_genotype_data_dir, chrom_s
 			effect_size_z = effect_size/effect_size_se
 
 			# Print to output file
-			t.write(snp_rsid + '\t' + str(chrom_num) + '\t' + str(line_snp_pos) + '\t' + index_ref_alt_allele[0] + '\t' + index_ref_alt_allele[1] + '\t' + str(effect_size) + '\t' + str(effect_size_se) + '\t' + str(effect_size_z) + '\n')
+			t.write(snp_rsid + '\t' + str(chrom_num) + '\t' + str(line_snp_pos) + '\t' + index_ref_alt_allele[1] + '\t' + index_ref_alt_allele[0] + '\t' + str(effect_size) + '\t' + str(effect_size_se) + '\t' + str(effect_size_z) + '\n')
 
 
 	t.close()
