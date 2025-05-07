@@ -313,4 +313,11 @@ simulated_causal_eqtl_effect_summary_file = simulated_gene_expression_dir + simu
 ############################
 simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_causal_eqtl_effect_summary_file, int(eqtl_sample_size), simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_string, n_tissues)
 
-
+global_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_eqtl_sumstats_xt_summary.txt'
+t = open(global_output_file,'w')
+t.write('tissue_name\tN\teqtl_sumstat_file\n')
+for tissue_iter in range(n_tissues):
+	tissue_sumstat_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_tissue' + str(tissue_iter) + '_' + str(eqtl_sample_size) + '_eqtl_sumstats.txt'
+	t.write('tissue' + str(tissue_iter) + '\t' + str(eqtl_sample_size) + '\t' + tissue_sumstat_output_file + '\n')
+t.close()
+print(global_output_file)

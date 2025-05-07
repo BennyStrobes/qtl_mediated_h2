@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-40:30                         # Runtime in D-HH:MM format
+#SBATCH -t 0-32:30                         # Runtime in D-HH:MM format
 #SBATCH -p medium                           # Partition to run in
 #SBATCH --mem=10GB                         # Memory total in MiB (for all cores)
 
@@ -47,7 +47,6 @@ python3 simulate_causal_eqtl_effect_sizes.py $simulation_number $chrom_string $c
 gene_trait_architecture="linear"
 gene_trait_architecture="stdExpr"
 gene_trait_architecture_arr=( "linear" "stdExpr" ) 
-
 for gene_trait_architecture in "${gene_trait_architecture_arr[@]}"
 do
 	echo $gene_trait_architecture

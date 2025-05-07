@@ -266,7 +266,7 @@ def average_results_across_simulations_single_causal_tissue(sim_nums, eqtl_sampl
 	return
 
 
-def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, permuted_eqtls=False):
+def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, permuted_eqtls=False):
 	t = open(avg_results_summary_file,'w')
 	t.write('method\teqtl_sample_size\theritability_type\tsim_h2\test_h2\test_h2_lb\test_h2_ub\n')
 	for ii,method in enumerate(methods):
@@ -280,12 +280,15 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 			est_per_tissue_h2 =[]
 			est_eqtl_h2 = []
 			for sim_num in sim_nums:
-				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_gt_arch_linear_bins_20_' + str(eqtl_sample_size) + '_joint_ldsc_results.txt'
+				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_pca_90_genotype_intercept_linear_' + str(eqtl_sample_size) + '_joint_ldsc_results.txt'
 				#filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + str(eqtl_sample_size) + '_joint_ldsc_multimethod13.txt'
 				if permuted_eqtls:
 					filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + str(eqtl_sample_size) + '_joint_ldsc_multimethod13_permuted_eqtls.txt'
 
+				if sim_num in invalid_sims:
+					continue
 				if os.path.isfile(filer) == False:
+					print(sim_num)
 					continue
 
 				#aa = np.loadtxt(filer,dtype=str,delimiter='\t')
@@ -293,7 +296,7 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 				arr = []
 				for line in f:
 					line = line.rstrip()
-					data = line.split('\t')
+					data = line.split()
 					if data[0].endswith(str(eqtl_sample_size)):
 						new_data = []
 						new_data.append(data[0].split(str(eqtl_sample_size))[0])
@@ -313,18 +316,20 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 				index = np.where(aa[:,0] == method)[0][0]
 				vec = aa[index,:]
 
-				per_tissue_est = np.asarray(vec[6].split(',')).astype(float)
+				per_tissue_est = np.asarray(vec[2].split(',')).astype(float)
 
 
 
-				sim_total_h2.append(float(vec[2]))
-				sim_med_h2.append(float(vec[3]))
-				sim_nm_h2.append(float(vec[4]))
-				est_med_h2.append(float(vec[5]))
-				est_nm_h2.append(float(vec[7]))
-				est_total_h2.append(float(vec[5]) + float(vec[7]))
+				sim_total_h2.append(float(.3))
+				sim_med_h2.append(float(.03))
+				sim_nm_h2.append(float(0.0))
+				est_med_h2.append(float(vec[1]))
+				est_nm_h2.append(float(vec[3]))
+				est_total_h2.append(float(vec[1]) + float(vec[3]))
 				est_per_tissue_h2.append(per_tissue_est)
-				est_eqtl_h2.append(float(vec[8]))
+				est_eqtl_h2.append(float(vec[4]))
+
+
 
 			est_per_tissue_h2 = np.asarray(est_per_tissue_h2)
 			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_total_h2, est_total_h2, 'total_h2')
@@ -659,7 +664,7 @@ visualize_trait_med_h2_dir = sys.argv[2]
 
 # Simulation params
 sim_nums = np.arange(1,101)
-eqtl_sample_sizes = np.asarray([100,200,300,1000, 1000])
+eqtl_sample_sizes = np.asarray([100,200,300,1000])
 
 
 
@@ -671,11 +676,18 @@ eqtl_sample_sizes = np.asarray([100,200,300,1000, 1000])
 #####################
 # Joint LDSC analysis
 #sim_nums = np.arange(1,501)
+invalid_sims = {}
+invalid_sims[76] = 1 # This should be only bad one
+invalid_sims[54] = 1 # These will get re-run
+invalid_sims[55] = 1 # These will get re-run
+invalid_sims[72] = 1 # These will get re-run
+invalid_sims[31] = 1 # These will get re-run
+
 
 avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_sim_results_joint_ldsc_binned_summary_averaged.txt'
 methods = ['two_step_joint_ldsc', 'joint_ldsc']
 clean_method_names = ['two_step_ldsc', 'joint_ldsc']
-average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names)
+average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims)
 
 '''
 # concatenate results

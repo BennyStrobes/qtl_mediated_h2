@@ -79,8 +79,16 @@ def extract_snp_anno(ordered_rsids, rsid_to_anno):
 		anno_arr.append(rsid_to_anno[rsid])
 	return np.asarray(anno_arr)	
 
-
-
+def print_m_vec_to_output(anno_names, m_vec, variant_M_file):
+	if len(anno_names) != len(m_vec):
+		print('assumtpioneororr')
+		pdb.set_trace()
+	t = open(variant_M_file,'w')
+	t.write('annotation\tn_snps\n')
+	for ii, anno_name in enumerate(anno_names):
+		t.write(anno_name + '\t' + str(m_vec[ii]) + '\n')
+	t.close()
+	return
 
 #####################
 # Parse command line arguments
@@ -95,7 +103,9 @@ parser.add_argument('--hm3-rsid-file', default='None', type=str,
 parser.add_argument('--sldsc-annotation-file', default='None', type=str,
                     help='Absolute path to gziped sldsc annotation file')
 parser.add_argument('--variant-ld-score-file', default='None', type=str,
-                    help='Absolute path to output file')
+                    help='Absolute path to LD output file')
+parser.add_argument('--variant-M-file', default='None', type=str,
+                    help='Absolute path to M output file')
 parser.add_argument('--cm-window-size', default=1.0, type=float,
                     help='size of CM window around genetic elements to use')
 parser.add_argument('--filter-baselineld-qtl-anno', default=True, action='store_true',
@@ -124,6 +134,10 @@ ordered_rsids = np.asarray(genotype_obj.rsids())
 snp_cm = extract_snp_cm_pos(ordered_rsids, rsid_to_cm)
 snp_integers = np.arange(len(ordered_rsids))
 snp_anno = extract_snp_anno(ordered_rsids, rsid_to_anno)
+
+# Print m_vec to output
+m_vec = np.sum(snp_anno,axis=0)
+print_m_vec_to_output(anno_names, m_vec, args.variant_M_file)
 
 # Open output file handle
 t = open(args.variant_ld_score_file,'w')
@@ -209,8 +223,6 @@ while mid_window_left <= np.max(snp_cm):
 
 
 t.close()
-
-
 
 
 

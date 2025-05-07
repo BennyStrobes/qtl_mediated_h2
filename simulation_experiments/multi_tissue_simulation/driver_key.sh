@@ -10,6 +10,9 @@
 # Real genotype data directories
 simulation_genotype_dir="/n/scratch/users/b/bes710/qtl_mediated_h2/simulation_experiments/genotype_processing/gwas_sample_size_100000/"
 
+# Joint-LDSC code dir
+joint_ldsc_code_dir="/n/groups/price/ben/joint_ldsc/"
+joint_ldsc_code_dir="/n/groups/price/ben/joint_ldsc_tmp/"
 
 ############################
 # Output directories
@@ -91,20 +94,36 @@ chrom_string="1_2"
 ############################
 # Run main single simulation of simulating the trait data
 ############################
-simulation_number="1"
-simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
 if false; then
-sbatch run_single_trait_simulation.sh $simulation_number $chrom_string $cis_window $n_gwas_individuals $simulation_name_string $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
+for simulation_number in $(seq 1 100); do 
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+	sh run_single_trait_simulation.sh $simulation_number $chrom_string $cis_window $n_gwas_individuals $simulation_name_string $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
+done
 fi
 
+# Below currently being run on code_temp5
 if false; then
-for simulation_number in $(seq 2 100); do 
+simulation_number="31"
+simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+sbatch run_single_trait_simulation.sh $simulation_number $chrom_string $cis_window $n_gwas_individuals $simulation_name_string $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
+
+simulation_number="54"
+simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+sbatch run_single_trait_simulation.sh $simulation_number $chrom_string $cis_window $n_gwas_individuals $simulation_name_string $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
+
+simulation_number="55"
+simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+sbatch run_single_trait_simulation.sh $simulation_number $chrom_string $cis_window $n_gwas_individuals $simulation_name_string $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
+
+simulation_number="72"
+simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+sbatch run_single_trait_simulation.sh $simulation_number $chrom_string $cis_window $n_gwas_individuals $simulation_name_string $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
+
+for simulation_number in $(seq 101 200); do 
 	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
 	sbatch run_single_trait_simulation.sh $simulation_number $chrom_string $cis_window $n_gwas_individuals $simulation_name_string $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
 done
 fi
-
-
 
 
 
@@ -113,10 +132,18 @@ fi
 ###############################
 if false; then
 for simulation_number in $(seq 1 100); do 
-	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}"_gt_arch_"${gene_trait_architecture}
-	sbatch joint_ldsc_trait_mediated_h2_inference.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+	sbatch joint_ldsc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $joint_ldsc_code_dir
 done
 fi
+
+simulation_number="3"
+simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+sh joint_ldsc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $joint_ldsc_code_dir
+
+
+
+
 
 
 ####################
