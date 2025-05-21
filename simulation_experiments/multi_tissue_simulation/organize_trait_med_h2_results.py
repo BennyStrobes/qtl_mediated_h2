@@ -266,7 +266,7 @@ def average_results_across_simulations_single_causal_tissue(sim_nums, eqtl_sampl
 	return
 
 
-def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, permuted_eqtls=False):
+def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, permuted_eqtls=False):
 	t = open(avg_results_summary_file,'w')
 	t.write('method\teqtl_sample_size\theritability_type\tsim_h2\test_h2\test_h2_lb\test_h2_ub\n')
 	for ii,method in enumerate(methods):
@@ -278,9 +278,10 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 			est_med_h2 = []
 			est_total_h2 = []
 			est_per_tissue_h2 =[]
+			est_per_category_h2 = []
 			est_eqtl_h2 = []
 			for sim_num in sim_nums:
-				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_pca_90_genotype_intercept_linear_' + str(eqtl_sample_size) + '_joint_ldsc_results.txt'
+				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_calibrated_mesc_results.txt'
 				#filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + str(eqtl_sample_size) + '_joint_ldsc_multimethod13.txt'
 				if permuted_eqtls:
 					filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_cis_window_100000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + str(eqtl_sample_size) + '_joint_ldsc_multimethod13_permuted_eqtls.txt'
@@ -289,6 +290,7 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 					continue
 				if os.path.isfile(filer) == False:
 					print(sim_num)
+					print('miss')
 					continue
 
 				#aa = np.loadtxt(filer,dtype=str,delimiter='\t')
@@ -309,29 +311,39 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 				f.close()
 				aa = np.asarray(arr)
 
-				if aa.shape[0] != 3:
+				if aa.shape[0] != 6:
+					print(sim_num)
+					print(aa.shape)
 					continue
+
 
 
 				index = np.where(aa[:,0] == method)[0][0]
 				vec = aa[index,:]
 
-				per_tissue_est = np.asarray(vec[2].split(',')).astype(float)
 
+				per_tissue_est = np.asarray(vec[4].split(',')).astype(float)
+				per_category_est = np.asarray(vec[5].split(',')).astype(float)
 
 
 				sim_total_h2.append(float(.3))
 				sim_med_h2.append(float(.03))
 				sim_nm_h2.append(float(0.0))
 				est_med_h2.append(float(vec[1]))
-				est_nm_h2.append(float(vec[3]))
-				est_total_h2.append(float(vec[1]) + float(vec[3]))
+				est_nm_h2.append(float(vec[2]))
+				est_total_h2.append(float(vec[1]) + float(vec[2]))
 				est_per_tissue_h2.append(per_tissue_est)
-				est_eqtl_h2.append(float(vec[4]))
+				est_per_category_h2.append(per_category_est)
+				est_eqtl_h2.append(float(vec[3]))
 
 
 
 			est_per_tissue_h2 = np.asarray(est_per_tissue_h2)
+			est_per_category_h2 = np.asarray(est_per_category_h2)
+
+			if len(sim_total_h2) == 0:
+				continue
+
 			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_total_h2, est_total_h2, 'total_h2')
 			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_nm_h2, est_nm_h2, 'nm_h2')
 			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, est_med_h2, 'med_h2')
@@ -663,8 +675,10 @@ visualize_trait_med_h2_dir = sys.argv[2]
 
 
 # Simulation params
-sim_nums = np.arange(1,101)
-eqtl_sample_sizes = np.asarray([100,200,300,1000])
+sim_nums = np.arange(1,201)
+eqtl_sample_sizes = np.asarray(['100','200','300','1000'])
+eqtl_sample_sizes = np.asarray(['100', '200'])
+eqtl_sample_sizes = np.asarray(['100','200','300','1000', '100-1000'])
 
 
 
@@ -678,16 +692,29 @@ eqtl_sample_sizes = np.asarray([100,200,300,1000])
 #sim_nums = np.arange(1,501)
 invalid_sims = {}
 invalid_sims[76] = 1 # This should be only bad one
-invalid_sims[54] = 1 # These will get re-run
-invalid_sims[55] = 1 # These will get re-run
-invalid_sims[72] = 1 # These will get re-run
-invalid_sims[31] = 1 # These will get re-run
+invalid_sims[162] = 1 # These will get re-run
 
 
-avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_sim_results_joint_ldsc_binned_summary_averaged.txt'
-methods = ['two_step_joint_ldsc', 'joint_ldsc']
-clean_method_names = ['two_step_ldsc', 'joint_ldsc']
-average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims)
+
+eqtl_snp_representation = 'bins_20'
+eqtl_snp_representation = 'pca_95'
+eqtl_snp_representation = 'pca_90'
+
+
+non_med_anno = 'full_anno'
+non_med_anno = 'genotype_intercept'
+
+simulated_gt_architecture = 'linear'
+inference_gt_architecture = 'linear'
+gene_ld_score_type = 'squared_marginal_sumstats'
+gene_ld_score_type = 'ldsc_style_pred'
+
+run_string = eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type
+
+avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_sim_results_calibrated_ldsc_summary_averaged.txt'
+clean_method_names = ['two_step_ldsc', 'calibrated_two_step_ldsc']
+methods = ['two_step_joint_ldsc', 'calibrated_two_step_joint_ldsc']
+average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string)
 
 '''
 # concatenate results

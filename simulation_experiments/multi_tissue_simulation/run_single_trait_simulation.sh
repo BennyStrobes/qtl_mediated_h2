@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-32:30                         # Runtime in D-HH:MM format
+#SBATCH -t 0-40:30                         # Runtime in D-HH:MM format
 #SBATCH -p medium                           # Partition to run in
 #SBATCH --mem=10GB                         # Memory total in MiB (for all cores)
 
@@ -35,18 +35,20 @@ module load cuda/12.1
 source /n/groups/price/ben/environments/tf_new/bin/activate
 
 date
+if false; then
 
 #######################################################
 # Step 1: Simulate gene expression causal eqtl effects
 #######################################################
 echo "Simulation Step 1"
 python3 simulate_causal_eqtl_effect_sizes.py $simulation_number $chrom_string $cis_window $simulated_gene_expression_dir $simulation_name_string $processed_genotype_data_dir $ge_h2 $eqtl_architecture $n_tissues
-
+fi
 
 
 gene_trait_architecture="linear"
 gene_trait_architecture="stdExpr"
 gene_trait_architecture_arr=( "linear" "stdExpr" ) 
+if false; then
 for gene_trait_architecture in "${gene_trait_architecture_arr[@]}"
 do
 	echo $gene_trait_architecture
@@ -65,7 +67,7 @@ do
 	echo "Simulation Step 3"
 	python3 run_gwas_on_simulated_trait.py $simulation_number $chrom_string $gwas_simulation_name_string $processed_genotype_data_dir $simulated_trait_dir $simulated_gwas_dir
 done
-
+fi
 
 
 
@@ -74,12 +76,35 @@ done
 #######################################################
 # TODO: Include up to 10K (will probably need to load in chunks of genotype at a time instead of whole thing at once)
 # TODO: Add MESC CODE
+if false; then
 echo "Simulation Step 4"
 eqtl_sample_size_arr=( "100" "200" "300" "1000")
 for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
 do
 	echo $eqtl_sample_size
 	python3 simulate_gene_expression_and_compute_eqtl_ss.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $eqtl_sample_size $n_tissues
+done
+fi
+
+
+if false; then
+python3 add_tissue_imbalence_sim.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $n_tissues
+fi
+
+
+
+#######################################################
+# Step : Simulate gene expression and compute eqtl summary statistics
+#######################################################
+# TODO: Include up to 10K (will probably need to load in chunks of genotype at a time instead of whole thing at once)
+# TODO: Add MESC CODE
+
+eqtl_sample_size_arr=( "100" "200" "300" "1000")
+
+for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
+do
+	echo $eqtl_sample_size
+	python3 simulate_sample_replicate_gene_expression_and_compute_eqtl_ss.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $eqtl_sample_size $n_tissues
 done
 
 
@@ -95,6 +120,45 @@ done
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+######################################
+# OLD
+######################################
+
+#######################################################
+# Step 4: Simulate gene expression and compute eqtl summary statistics
+#######################################################
+# TODO: Include up to 10K (will probably need to load in chunks of genotype at a time instead of whole thing at once)
+# TODO: Add MESC CODE
+if false; then
+echo "Simulation Step 4"
+eqtl_sample_size_arr=( "100" "200" "300" "1000")
+for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
+do
+	echo $eqtl_sample_size
+	python3 simulate_gene_expression_and_compute_eqtl_ss_v2.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $eqtl_sample_size $n_tissues
+done
+fi
 
 
 

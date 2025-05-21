@@ -1,0 +1,196 @@
+#!/bin/bash
+#SBATCH -c 1                               # Request one core
+#SBATCH -t 0-8:10                         # Runtime in D-HH:MM format
+#SBATCH -p short                           # Partition to run in
+#SBATCH --mem=10GB                         # Memory total in MiB (for all cores)
+
+
+
+simulation_number="$1"
+simulation_name_string="$2"
+simulated_trait_dir="$3"
+simulated_gwas_dir="$4"
+simulation_genotype_dir="$5"
+simulated_learned_gene_models_dir="$6"
+n_gwas_individuals="$7"
+trait_med_h2_inference_dir="$8"
+simulated_gene_expression_dir="$9"
+chrom_string="${10}"
+calibrated_mesc_code_dir="${11}"
+
+echo "SIMULATION"$simulation_number
+
+
+chrom_nums_file="/n/groups/price/ben/joint_ldsc_temp_data/simulation_chromosomes.txt"
+
+echo $calibrated_mesc_code_dir
+
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+echo $simulated_gt_architecture"_"$inference_gt_architecture
+
+
+
+
+#####################
+gene_ld_score_type="squared_marginal_sumstats"
+non_med_anno_arr=("genotype_intercept" "full_anno")
+non_med_anno_arr=("genotype_intercept")
+
+eqtl_sample_size_arr=( "100" "200" "300" "1000" "100-1000")
+
+eqtl_snp_representation_arr=( "pca_90" "pca_95" "bins_10" "bins_20")
+eqtl_snp_representation_arr=( "bins_20")
+
+for non_med_anno in "${non_med_anno_arr[@]}"
+do
+for eqtl_snp_representation in "${eqtl_snp_representation_arr[@]}"
+do
+for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
+do
+
+
+
+gwas_sumstat_file=$simulated_gwas_dir${simulation_name_string}"_gt_arch_"${simulated_gt_architecture}"_simualated_gwas_results.txt"
+variant_ldscore_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
+variant_stdev_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_genotype_stdev_chrom"
+
+gene_ldscore_filestem=${simulation_genotype_dir}"gene_level_ld_chr"
+gene_ldscore_filesuffix="_"${eqtl_snp_representation}"_summary_file.txt"
+eqtl_summary_file=$simulated_learned_gene_models_dir${simulation_name_string}"_"${eqtl_sample_size}"_replicate_eqtl_sumstats_xt_summary.txt"
+variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
+	
+	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${eqtl_snp_representation}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${gene_ld_score_type}"_"${eqtl_sample_size}
+
+	date
+	python3 ${calibrated_mesc_code_dir}run_calibrated_mesc.py \
+		--gwas-sumstat-file $gwas_sumstat_file \
+		--gwas-N ${n_gwas_individuals} \
+		--variant-ldscore-filestem ${variant_ldscore_filestem} \
+		--variant-M-filestem ${variant_m_filestem} \
+		--gene-ldscore-filestem ${gene_ldscore_filestem} \
+		--gene-ldscore-filesuffix ${gene_ldscore_filesuffix} \
+		--variant-stdev-filestem ${variant_stdev_filestem} \
+		--chromosome-file ${chrom_nums_file} \
+		--eqtl-summary-file ${eqtl_summary_file} \
+		--non-mediated-annotation-version ${non_med_anno} \
+		--gene-trait-architecture ${inference_gt_architecture} \
+		--gene-ldscore-type ${gene_ld_score_type} \
+		--output-stem ${output_stem}
+	date
+
+done
+done
+done
+
+
+
+if false; then
+#####################
+gene_ld_score_type="ldsc_style_pred"
+
+non_med_anno_arr=("genotype_intercept" "full_anno")
+eqtl_sample_size_arr=( "100" "200" "300" "1000" "100-1000")
+eqtl_snp_representation_arr=( "pca_90" "pca_95" "bins_10" "bins_20")
+
+
+non_med_anno_arr=("genotype_intercept" "full_anno")
+eqtl_sample_size_arr=( "100" "200" "300" "1000" "100-1000")
+eqtl_snp_representation_arr=( "pca_90" "pca_95" "bins_10" "bins_20")
+
+for non_med_anno in "${non_med_anno_arr[@]}"
+do
+for eqtl_snp_representation in "${eqtl_snp_representation_arr[@]}"
+do
+for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
+do
+
+
+
+gwas_sumstat_file=$simulated_gwas_dir${simulation_name_string}"_gt_arch_"${simulated_gt_architecture}"_simualated_gwas_results.txt"
+variant_ldscore_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
+gene_ldscore_filestem=${simulation_genotype_dir}"gene_level_ld_chr"
+gene_ldscore_filesuffix="_"${eqtl_snp_representation}"_summary_file.txt"
+eqtl_summary_file=$simulated_learned_gene_models_dir${simulation_name_string}"_"${eqtl_sample_size}"_eqtl_sumstats_xt_summary.txt"
+variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
+	
+	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${eqtl_snp_representation}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${gene_ld_score_type}"_"${eqtl_sample_size}
+	date
+	echo $output_stem
+	python3 ${calibrated_mesc_code_dir}run_calibrated_mesc.py \
+		--gwas-sumstat-file $gwas_sumstat_file \
+		--gwas-N ${n_gwas_individuals} \
+		--variant-ldscore-filestem ${variant_ldscore_filestem} \
+		--variant-M-filestem ${variant_m_filestem} \
+		--gene-ldscore-filestem ${gene_ldscore_filestem} \
+		--gene-ldscore-filesuffix ${gene_ldscore_filesuffix} \
+		--chromosome-file ${chrom_nums_file} \
+		--eqtl-summary-file ${eqtl_summary_file} \
+		--non-mediated-annotation-version ${non_med_anno} \
+		--gene-trait-architecture ${inference_gt_architecture} \
+		--gene-ldscore-type ${gene_ld_score_type} \
+		--output-stem ${output_stem}
+	date
+
+done
+done
+done
+fi
+
+
+
+#####################
+gene_ld_score_type="ashr_style_pred"
+
+
+if false; then
+non_med_anno_arr=("genotype_intercept" "full_anno")
+non_med_anno_arr=("genotype_intercept")
+
+eqtl_sample_size_arr=( "100" "200" "300" "1000" "100-1000")
+eqtl_sample_size_arr=( "100" "200")
+eqtl_snp_representation_arr=("bins_20")
+
+for non_med_anno in "${non_med_anno_arr[@]}"
+do
+for eqtl_snp_representation in "${eqtl_snp_representation_arr[@]}"
+do
+for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
+do
+
+
+
+gwas_sumstat_file=$simulated_gwas_dir${simulation_name_string}"_gt_arch_"${simulated_gt_architecture}"_simualated_gwas_results.txt"
+variant_ldscore_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
+gene_ldscore_filestem=${simulation_genotype_dir}"gene_level_ld_chr"
+gene_ldscore_filesuffix="_"${eqtl_snp_representation}"_summary_file.txt"
+eqtl_summary_file=$simulated_learned_gene_models_dir${simulation_name_string}"_"${eqtl_sample_size}"_eqtl_sumstats_xt_summary.txt"
+variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
+	
+	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${eqtl_snp_representation}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${gene_ld_score_type}"_"${eqtl_sample_size}
+	date
+	echo $output_stem
+	python3 ${calibrated_mesc_code_dir}run_calibrated_mesc.py \
+		--gwas-sumstat-file $gwas_sumstat_file \
+		--gwas-N ${n_gwas_individuals} \
+		--variant-ldscore-filestem ${variant_ldscore_filestem} \
+		--variant-M-filestem ${variant_m_filestem} \
+		--gene-ldscore-filestem ${gene_ldscore_filestem} \
+		--gene-ldscore-filesuffix ${gene_ldscore_filesuffix} \
+		--chromosome-file ${chrom_nums_file} \
+		--eqtl-summary-file ${eqtl_summary_file} \
+		--non-mediated-annotation-version ${non_med_anno} \
+		--gene-trait-architecture ${inference_gt_architecture} \
+		--gene-ldscore-type ${gene_ld_score_type} \
+		--output-stem ${output_stem}
+	date
+
+done
+done
+done
+fi
+
+
+
+
+

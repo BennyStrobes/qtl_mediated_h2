@@ -188,11 +188,42 @@ make_se_barplot_for_med_h2_joint_vs_marginal <- function(df, method) {
 
 }
 
+
+make_multimethod_se_barplot_for_causal_tissue_med_h2_v1 <- function(df, methods) {
+	df2 <- df[as.character(df$method)%in%methods,]
+	df2 <- df2[as.character(df2$heritability_type)=="causal_tissue_med_h2",]
+	df2$eqtl_sample_size = as.character(df2$eqtl_sample_size)
+	valid_ss=c("100","200","300","1000")
+	df2 <- df2[as.character(df2$eqtl_sample_size)%in%valid_ss,]
+
+	print(df2)
+
+	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c("100","200","300","1000"))
+	df2$heritability_type = factor(df2$heritability_type, levels=c("causal_tissue_med_h2"))
+
+	sim_h2 = df2$sim_h2[1]
+
+	df2$method = factor(df2$method,levels=methods)
+
+
+	pp<-ggplot(data=df2, aes(x=eqtl_sample_size, y=est_h2, fill=snp_representation)) +
+  		geom_bar(stat="identity", position=position_dodge()) +
+  		geom_errorbar(aes(ymin=est_h2_lb, ymax=est_h2_ub), width=.4, position=position_dodge(.9))  +
+  		#scale_fill_manual(values=c("skyblue", "grey", "grey"))+
+  		figure_theme() +
+  		labs(x="eQTL SS", y="h2", fill="", title=paste0("Causal tissue mediated h2")) +
+  		geom_hline(yintercept=sim_h2, linetype=2) 
+
+  	return(pp)
+}
+
+
+
 make_multimethod_se_barplot_for_causal_tissue_med_h2 <- function(df, methods) {
 	df2 <- df[as.character(df$method)%in%methods,]
 	df2 <- df2[as.character(df2$heritability_type)=="causal_tissue_med_h2",]
 	
-	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c(100,200,300,1000))
+	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c("100","200","300","1000","100-1000"))
 	df2$heritability_type = factor(df2$heritability_type, levels=c("causal_tissue_med_h2"))
 
 	sim_h2 = df2$sim_h2[1]
@@ -211,11 +242,40 @@ make_multimethod_se_barplot_for_causal_tissue_med_h2 <- function(df, methods) {
   	return(pp)
 }
 
+make_multimethod_se_barplot_for_noncausal_tissue_med_h2_v1 <- function(df, methods) {
+	df2 <- df[as.character(df$method)%in%methods,]
+	df2 <- df2[as.character(df2$heritability_type)=="non_causal_tissue_med_h2",]
+	
+	df2$eqtl_sample_size = as.character(df2$eqtl_sample_size)
+	df2 <- df2[as.character(df2$eqtl_sample_size)%in%c("100","200","300","1000"),]
+
+
+
+	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c("100","200","300","1000"))
+	df2$heritability_type = factor(df2$heritability_type, levels=c("non_causal_tissue_med_h2"))
+
+	sim_h2 = df2$sim_h2[1]
+
+	df2$method = factor(df2$method,levels=methods)
+
+
+	pp<-ggplot(data=df2, aes(x=eqtl_sample_size, y=est_h2, fill=snp_representation)) +
+  		geom_bar(stat="identity", position=position_dodge()) +
+  		geom_errorbar(aes(ymin=est_h2_lb, ymax=est_h2_ub), width=.4, position=position_dodge(.9))  +
+  		#scale_fill_manual(values=c("skyblue", "grey", "grey"))+
+  		figure_theme() +
+  		labs(x="eQTL SS", y="h2", fill="", title=paste0("Aggregate non-Causal tissue mediated h2")) +
+  		geom_hline(yintercept=sim_h2, linetype=2) 
+
+  	return(pp)
+}
+
+
 make_multimethod_se_barplot_for_noncausal_tissue_med_h2 <- function(df, methods) {
 	df2 <- df[as.character(df$method)%in%methods,]
 	df2 <- df2[as.character(df2$heritability_type)=="non_causal_tissue_med_h2",]
 	
-	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c(100,200,300,1000))
+	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c("100","200","300","1000","100-1000"))
 	df2$heritability_type = factor(df2$heritability_type, levels=c("non_causal_tissue_med_h2"))
 
 	sim_h2 = df2$sim_h2[1]
@@ -608,14 +668,221 @@ trait_med_h2_inference_dir = args[1]
 organized_trait_med_h2_results_dir = args[2]
 visualize_trait_med_h2_dir = args[3]
 
+if (FALSE) {
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture)
 
-
-
-joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_sim_results_joint_ldsc_binned_summary_averaged.txt")
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_joint_ldsc_binned_summary_averaged.txt")
 joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+print(joint_ldsc_df)
+
+###################################################
+# Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
+# Make plot for causal tissue
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=6.5, units="in")
+}
+
+
+if (FALSE) {
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture)
+
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_joint_ldsc_binned_summary_averaged.txt")
+joint_ldsc_df_bins20 <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+joint_ldsc_df_bins20['snp_representation'] = rep(eqtl_snp_representation, dim(joint_ldsc_df_bins20)[1])
+print(joint_ldsc_df_bins20)
+
+eqtl_snp_representation="bins_10"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture)
+
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_joint_ldsc_binned_summary_averaged.txt")
+joint_ldsc_df_bins10 <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+joint_ldsc_df_bins10['snp_representation'] = rep(eqtl_snp_representation, dim(joint_ldsc_df_bins10)[1])
+
+eqtl_snp_representation="pca_90"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture)
+
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_joint_ldsc_binned_summary_averaged.txt")
+joint_ldsc_df_pca90 <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+joint_ldsc_df_pca90['snp_representation'] = rep(eqtl_snp_representation, dim(joint_ldsc_df_pca90)[1])
+
+
+joint_ldsc_df <- rbind(joint_ldsc_df_bins10, joint_ldsc_df_bins20, joint_ldsc_df_pca90)
+
+###################################################
+# Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
+# Make plot for causal tissue
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2_v1(joint_ldsc_df, c("joint_ldsc"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2_v1(joint_ldsc_df, c("joint_ldsc"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, "cmp_eqtl_snp_reps_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=6.5, units="in")
+}
 
 
 
+if (FALSE) {
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="stdExpr"
+inference_gt_architecture="stdExpr"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture)
+
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_joint_ldsc_binned_summary_averaged.txt")
+joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+print(joint_ldsc_df)
+
+###################################################
+# Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
+# Make plot for causal tissue
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=6.5, units="in")
+}
+
+
+
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="stdExpr"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture)
+
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_joint_ldsc_binned_summary_averaged.txt")
+joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+print(joint_ldsc_df)
+
+###################################################
+# Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
+# Make plot for causal tissue
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=6.5, units="in")
+
+
+
+
+
+
+
+
+if (FALSE) {
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture)
+
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_joint_ldsc_binned_summary_averaged.txt")
+joint_ldsc_df_bins20 <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+joint_ldsc_df_bins20['snp_representation'] = rep(non_med_anno, dim(joint_ldsc_df_bins20)[1])
+
+eqtl_snp_representation="bins_20"
+non_med_anno="full_anno"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture)
+
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_joint_ldsc_binned_summary_averaged.txt")
+joint_ldsc_df_bins10 <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+joint_ldsc_df_bins10['snp_representation'] = rep(non_med_anno, dim(joint_ldsc_df_bins10)[1])
+
+
+joint_ldsc_df <- rbind(joint_ldsc_df_bins10, joint_ldsc_df_bins20)
+
+joint_ldsc_df$snp_representation = factor(joint_ldsc_df$snp_representation, levels=c("genotype_intercept", "full_anno"))
+
+print(joint_ldsc_df)
+
+
+###################################################
+# Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
+# Make plot for causal tissue
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2_v1(joint_ldsc_df, c("joint_ldsc"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2_v1(joint_ldsc_df, c("joint_ldsc"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, "cmp_non_med_anno_reps_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=6.5, units="in")
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if (FALSE) {
 ###################################################
 # Joint plot showing mediated heritability, non-mediated heritability, and total heritablity for multiple methods
 # Non-mediated plot
@@ -636,23 +903,7 @@ ggsave(joint, file=output_file, width=7.2, height=6.5, units="in")
 print(output_file)
 
 
-
-###################################################
-# Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
-# Make plot for causal tissue
-causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc"))
-# Make plot for non-causal tissue
-non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("two_step_ldsc","joint_ldsc"))
-# Get legend
-legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
-# Combine together with cowplot
-joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
-
-# Save
-output_file <- paste0(visualize_trait_med_h2_dir, "multimethod_5_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
-ggsave(joint, file=output_file, width=7.2, height=6.5, units="in")
-print(output_file)
-
+}
 
 if (FALSE) {
 # Joint plot showing mediated heritability, non-mediated heritability, and total heritablity for multiple methods

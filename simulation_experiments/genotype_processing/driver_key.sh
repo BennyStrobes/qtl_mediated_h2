@@ -23,6 +23,9 @@ gencode_gene_annotation_file="/n/groups/price/ben/gene_annotation_files/gencode.
 # Joint-LDSC code dir
 joint_ldsc_code_dir="/n/groups/price/ben/joint_ldsc/"
 
+# Calibrated mesc code dir
+calibrated_mesc_code_dir="/n/groups/price/ben/calibrated_mesc_v3/"
+
 
 ############################
 # Output data
@@ -47,12 +50,13 @@ processed_genotype_data_dir="/n/scratch/users/b/bes710/qtl_mediated_h2/simulatio
 # NOTE: THERE IS CURRENTLY A HACK IN HERE TO REMOVE 3 variants (out of 500000) on chrom 1 that have no variance across the 100-sample eqtl data set.
 ############################
 # Needs to be 200GB and 25 h
-n_gwas_individuals="100000"
 if false; then
+n_gwas_individuals="100000"
 chrom_num="1"
-sbatch prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file $joint_ldsc_code_dir
+sh prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file $calibrated_mesc_code_dir
+
 chrom_num="2"
-sbatch prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file $joint_ldsc_code_dir
+sh prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file $calibrated_mesc_code_dir
 fi
 
 

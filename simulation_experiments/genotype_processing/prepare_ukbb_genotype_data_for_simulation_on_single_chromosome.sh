@@ -17,7 +17,7 @@ kg_genotype_dir="$6"
 hm3_snp_list_dir="$7"
 quasi_independent_dir="$8"
 gencode_gene_annotation_file="${9}"
-joint_ldsc_code_dir="${10}"
+calibrated_mesc_code_dir="${10}"
 source ~/.bash_profile
 
 
@@ -130,7 +130,6 @@ plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size
 plink2 --pfile ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num} --keep-allele-order --export bgen-1.2 --out ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num}
 fi
 
-
 module load gcc/9.2.0
 module load python/3.9.14
 module load cuda/12.1
@@ -141,8 +140,17 @@ genotype_version="reference_genotype_data"
 # Extract variant level LD scores
 variant_ld_score_file=${processed_genotype_data_dir}"variant_"${genotype_version}"_ldscores_chrom"${chrom_num}".txt"
 variant_M_file=${processed_genotype_data_dir}"variant_"${genotype_version}"_ldscores_chrom"${chrom_num}"_M.txt"
+if false; then
+python3 ${calibrated_mesc_code_dir}extract_variant_ldscores.py --chrom $chrom_num --bgen-file ${processed_genotype_data_dir}"simulated_"${genotype_version}"_"${chrom_num}".bgen" --hm3-rsid-file $hm3_rs_id_file --sldsc-annotation-file ${ldsc_baseline_hg19_annotation_dir}"baselineLD."${chrom_num}".annot.gz" --variant-ld-score-file $variant_ld_score_file --variant-M-file $variant_M_file
+fi
 
-python3 ${joint_ldsc_code_dir}extract_variant_ldscores.py --chrom $chrom_num --bgen-file ${processed_genotype_data_dir}"simulated_"${genotype_version}"_"${chrom_num}".bgen" --hm3-rsid-file $hm3_rs_id_file --sldsc-annotation-file ${ldsc_baseline_hg19_annotation_dir}"baselineLD."${chrom_num}".annot.gz" --variant-ld-score-file $variant_ld_score_file --variant-M-file $variant_M_file
+
+
+genotype_version="reference_genotype_data"
+
+# Extract variant level LD scores
+variant_sdev_file=${processed_genotype_data_dir}"variant_"${genotype_version}"_genotype_stdev_chrom"${chrom_num}".txt"
+python3 ${calibrated_mesc_code_dir}extract_genotype_standard_deviations.py --chrom $chrom_num --bgen-file ${processed_genotype_data_dir}"simulated_"${genotype_version}"_"${chrom_num}".bgen" --output-file $variant_sdev_file
 
 
 
@@ -210,6 +218,7 @@ gene_snp_representation="pca2"
 gene_ld_output_root=${processed_genotype_data_dir}"gene_level_ld_chr"${chrom_num}"_"${gene_snp_representation}
 python3 construct_gene_level_ld_matrices.py $chrom_num $simulated_gene_position_file ${processed_genotype_data_dir}"simulated_"${genotype_version}"_"${chrom_num} $variant_ld_score_file $kg_genotype_dir $gene_snp_representation $gene_ld_output_root
 fi
+
 
 
 

@@ -11,7 +11,8 @@ def linear_regression(XX, YY, intercept=False):
 		print('not yet implemented. add column of 1s to X')
 		pdb.set_trace()
 
-	return np.dot(np.dot(np.linalg.pinv(np.dot(np.transpose(XX), XX)), np.transpose(XX)), YY)
+	xtx_inv = np.linalg.pinv(np.dot(np.transpose(XX), XX))
+	return np.dot(np.dot(xtx_inv, np.transpose(XX)), YY), xtx_inv
 
 def fixed_variance_update_eqtl_resid_vars(eqtl_ss, gene_info, genes, eqtl_category_to_index):
 	n_cat = len(eqtl_category_to_index)
@@ -80,7 +81,7 @@ def initialize_variant_to_gene_effect_size_variances(genes, gene_info, n_reg_snp
 			# Fit model
 			#model = sm.OLS(eqtl_sq_sumstats[:, eqtl_category_iter], squared_ld).fit()
 			#weights2 = model.params
-			weights = linear_regression(squared_ld, eqtl_sq_sumstats[:, eqtl_category_iter])
+			weights, xtx_inv = linear_regression(squared_ld, eqtl_sq_sumstats[:, eqtl_category_iter])
 
 			# update gene_delta_sq mat
 			gene_delta_sq[:, eqtl_category_iter] = weights
@@ -116,13 +117,12 @@ def initialize_variant_to_gene_effect_size_variances(genes, gene_info, n_reg_snp
 
 
 class med_h2(object):
-	def __init__(self, version='default',max_iter=600, convergence_thresh=1e-10, fixed_variance=False, per_dataset_variance=False, inference_approach='mle'):
+	def __init__(self, version='default',burn_in_iter=600,max_iter=1000, fixed_variance=False, per_dataset_variance=False):
 		self.max_iter = max_iter  # Total iterations
-		self.convergence_thresh = convergence_thresh
 		self.version = version
 		self.fixed_variance = fixed_variance
 		self.per_dataset_variance = per_dataset_variance
-		self.inference_approach = inference_approach
+		self.burn_in_iter = burn_in_iter
 	def fit(self, genes, gene_info, gwas_variant_ld_scores, gwas_E_beta_sq, eqtl_category_names, eqtl_dataset_names, n_ref_snps):
 		""" Fit the model.
 			Args:
@@ -134,11 +134,22 @@ class med_h2(object):
 			print('###############################')
 		else:
 			print('###############################')
-			print(' Joint LDSC   ')
+			print(' Joint LDSC Gibbs  ')
 			print('###############################')
 
 		# Initialize variables
 		self.initialize_variables(genes, gene_info, gwas_variant_ld_scores, gwas_E_beta_sq, eqtl_category_names, eqtl_dataset_names, n_ref_snps)
+
+		# Keep track of relevent params
+		self.sampled_dataset_med_h2 = []
+		self.sampled_category_med_h2 = []
+		self.sampled_avg_eqtl_h2 = []
+		self.sampled_nm_h2 = []
+		self.sampled_med_h2 = []
+		self.sampled_gwas_resid_var = []
+		self.sampled_eqtl_resid_var = []
+
+		# Print to output
 		print('NM h2: ' + str(self.nm_h2))
 		print('Total med h2: ' + str(np.sum(self.category_med_h2)))
 		print('dataset med h2:')
@@ -163,7 +174,8 @@ class med_h2(object):
 			gene_ldscores = self.update_variant_to_gene_effect_size_variances(genes, gene_info)
 
 			# Update non-mediated per snp h2 (gamma_sq) and gene_trait varaince (alpha_sq)
-			mesc_style_params = linear_regression(np.hstack((gwas_variant_ld_scores, gene_ldscores)), gwas_E_beta_sq)
+			mesc_style_params_tmp,xtx_inv = linear_regression(np.hstack((gwas_variant_ld_scores, gene_ldscores)), gwas_E_beta_sq)
+			mesc_style_params = np.random.multivariate_normal(mean=mesc_style_params_tmp,cov=xtx_inv*self.gwas_resid_var)
 			self.gamma_sq = mesc_style_params[:self.n_non_med_categories]
 			self.alpha_sq = mesc_style_params[self.n_non_med_categories:]
 
@@ -192,20 +204,30 @@ class med_h2(object):
 			print(self.eqtl_resid_vars)
 			print('Time')
 			print(t2-t1)
-			# Assess convergence
-			max_abs_diff = np.max(np.abs((cur_med_h2 - self.category_med_h2)))
-			cur_med_h2 = np.copy(self.category_med_h2)
-			print('Diff:')
-			print(max_abs_diff)
-			print(' ')
-			if max_abs_diff <= self.convergence_thresh:
-				converged = True
-				break
-
-		if converged == False:
-			print('Did not converge after ' + str(self.max_iter) + ' iterations')
 
 
+			if itera > self.burn_in_iter:
+				self.sampled_dataset_med_h2.append(np.copy(self.dataset_med_h2))
+				self.sampled_category_med_h2.append(np.copy(self.category_med_h2))
+				self.sampled_avg_eqtl_h2.append(self.avg_eqtl_h2)
+				self.sampled_nm_h2.append(self.nm_h2)
+				self.sampled_med_h2.append(np.sum(self.category_med_h2))
+				self.sampled_gwas_resid_var.append(self.gwas_resid_var)
+				self.sampled_eqtl_resid_var.append(np.copy(self.eqtl_resid_vars))
+
+		self.sampled_dataset_med_h2 = np.asarray(self.sampled_dataset_med_h2)
+		self.sampled_category_med_h2 = np.asarray(self.sampled_category_med_h2)
+		self.sampled_avg_eqtl_h2 = np.asarray(self.sampled_avg_eqtl_h2)
+		self.sampled_nm_h2 = np.asarray(self.sampled_nm_h2)
+		self.sampled_med_h2 = np.asarray(self.sampled_med_h2)
+		self.sampled_gwas_resid_var = np.asarray(self.sampled_gwas_resid_var)
+		self.sampled_eqtl_resid_var = np.asarray(self.sampled_eqtl_resid_var)
+	
+		# Take averages
+		self.category_med_h2 = np.mean(self.sampled_category_med_h2,axis=0)
+		self.dataset_med_h2 = np.mean(self.sampled_dataset_med_h2,axis=0)
+		self.nm_h2 = np.mean(self.sampled_nm_h2)
+		self.avg_eqtl_h2 = np.mean(self.sampled_avg_eqtl_h2)
 
 		return
 
@@ -293,7 +315,10 @@ class med_h2(object):
 
 			# Run regression
 			S = np.linalg.pinv(xt_x_terms)
-			mean = np.dot(S, xt_y_terms)
+			tmp_mean = np.dot(S, xt_y_terms)
+
+			# Sample
+			mean = np.random.multivariate_normal(mean=tmp_mean,cov=S)
 
 
 			tmp_gene_cis_h2_vec = np.zeros(len(info['eqtl_category_names']))
@@ -330,7 +355,7 @@ class med_h2(object):
 			self.gwas_resid_E_beta_sq[gene_regression_snp_indices] = self.gwas_resid_E_beta_sq[gene_regression_snp_indices] - pred_gene_effects
 
 		if self.fixed_variance == False:
-			self.eqtl_resid_vars = resid_var_sum_sq/resid_var_count
+			self.eqtl_resid_vars=(1.0/np.random.gamma(shape=(resid_var_count/2), scale=1.0/((resid_var_sum_sq)/2),size=len(resid_var_count)))
 
 		return gene_ld_scores
 
@@ -370,7 +395,8 @@ class med_h2(object):
 		return
 
 	def update_gwas_resid_var(self):
-		self.gwas_resid_var = np.sum(np.square(self.gwas_resid_E_beta_sq))/len(self.gwas_resid_E_beta_sq)
+		self.gwas_resid_var = (1.0/np.random.gamma(shape=(len(self.gwas_resid_E_beta_sq)/2), scale=1.0/((np.sum(np.square(self.gwas_resid_E_beta_sq)))/2),size=1))[0]
+
 		return
 
 	def initialize_variables(self, genes, gene_info, gwas_variant_ld_scores, gwas_E_beta_sq, eqtl_category_names, eqtl_dataset_names, n_ref_snps):
@@ -400,7 +426,7 @@ class med_h2(object):
 
 
 		# Initialize non-mediated per snp h2 (gamma_sq) and gene_trait varaince (alpha_sq)
-		mesc_style_params = linear_regression(np.hstack((gwas_variant_ld_scores, gene_ld_scores)), gwas_E_beta_sq)
+		mesc_style_params,xtx_inv = linear_regression(np.hstack((gwas_variant_ld_scores, gene_ld_scores)), gwas_E_beta_sq)
 
 		self.gamma_sq = mesc_style_params[:self.n_non_med_categories]
 		self.alpha_sq = mesc_style_params[self.n_non_med_categories:]
