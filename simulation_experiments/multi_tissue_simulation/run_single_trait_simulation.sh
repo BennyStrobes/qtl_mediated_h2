@@ -29,6 +29,7 @@ date
 echo $simulation_name_string
 echo $eqtl_architecture
 
+
 module load gcc/9.2.0
 module load python/3.9.14
 module load cuda/12.1
@@ -100,14 +101,20 @@ fi
 # TODO: Add MESC CODE
 
 eqtl_sample_size_arr=( "100" "200" "300" "1000")
-
+if false; then
 for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
 do
 	echo $eqtl_sample_size
 	python3 simulate_sample_replicate_gene_expression_and_compute_eqtl_ss.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $eqtl_sample_size $n_tissues
 done
+fi
+eqtl_sample_size="100"
+	python3 simulate_sample_replicate_gene_expression_and_compute_eqtl_ss.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $eqtl_sample_size $n_tissues
 
 
+if false; then
+python3 add_tissue_imbalence_sample_replicate_sim.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $n_tissues
+fi
 
 
 

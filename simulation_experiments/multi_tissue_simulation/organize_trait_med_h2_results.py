@@ -311,7 +311,7 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 				f.close()
 				aa = np.asarray(arr)
 
-				if aa.shape[0] != 6:
+				if aa.shape[0] != 7:
 					print(sim_num)
 					print(aa.shape)
 					continue
@@ -696,22 +696,23 @@ invalid_sims[162] = 1 # These will get re-run
 
 
 
-eqtl_snp_representation = 'bins_20'
 eqtl_snp_representation = 'pca_95'
 eqtl_snp_representation = 'pca_90'
-
+eqtl_snp_representation = 'bins_20'
+beta_squared_thresh = '100.0'
 
 non_med_anno = 'full_anno'
 non_med_anno = 'genotype_intercept'
 
 simulated_gt_architecture = 'linear'
 inference_gt_architecture = 'linear'
-gene_ld_score_type = 'squared_marginal_sumstats'
 gene_ld_score_type = 'ldsc_style_pred'
+gene_ld_score_type = 'squared_marginal_sumstats'
 
-run_string = eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type
 
-avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_sim_results_calibrated_ldsc_summary_averaged.txt'
+run_string = eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh
+
+avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh + '_sim_results_calibrated_ldsc_summary_averaged.txt'
 clean_method_names = ['two_step_ldsc', 'calibrated_two_step_ldsc']
 methods = ['two_step_joint_ldsc', 'calibrated_two_step_joint_ldsc']
 average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string)

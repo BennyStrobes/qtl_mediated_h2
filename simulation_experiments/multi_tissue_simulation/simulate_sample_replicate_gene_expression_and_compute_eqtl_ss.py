@@ -249,6 +249,30 @@ def marginal_ols(Y, X):
 
 	return beta, se
 
+def fixed_effect_meta(beta, se):
+    """
+    beta : array‐like, shape (K,)
+        Point estimates from each study.
+    se : array‐like, shape (K,)
+        Standard errors of the estimates.
+    Returns: dict with keys 'beta_FE', 'se_FE', 'ci95', 'z', 'p'
+    """
+    beta = np.asarray(beta, dtype=float)
+    se   = np.asarray(se,   dtype=float)
+    # inverse‐variance weights
+    w = 1.0 / (se**2)
+
+    # fixed‐effect estimate
+    beta_FE = np.sum(w * beta) / np.sum(w)
+
+    # standard error of the pooled estimate
+    se_FE = np.sqrt(1.0 / np.sum(w))
+
+    return beta_FE, se_FE
+
+
+
+
 
 def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_causal_eqtl_effect_summary_file, eqtl_sample_size, simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_string, n_tissues):
 
@@ -261,6 +285,10 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 		tissue_sumstat2_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_tissue' + str(tissue_iter) + '_' + str(eqtl_sample_size) + '_replicate2' + '_eqtl_sumstats.txt'
 		t['tissue' + str(tissue_iter) + 'replicate2'] = open(tissue_sumstat2_output_file,'w')
 		t['tissue' + str(tissue_iter) + 'replicate2'].write('gene_id\trsid\tchr\tpos\ta1\ta2\tbeta\tbeta_se\tz\tin_sample_sdev\n')
+		tissue_sumstatfull_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_tissue' + str(tissue_iter) + '_' + str(eqtl_sample_size) + '_full' + '_eqtl_sumstats.txt'
+		t['tissue' + str(tissue_iter) + 'full'] = open(tissue_sumstatfull_output_file,'w')
+		t['tissue' + str(tissue_iter) + 'full'].write('gene_id\trsid\tchr\tpos\ta1\ta2\tbeta\tbeta_se\tz\tin_sample_sdev\n')
+
 
 
 	# Get chromosomes corresponding to chrom_string
@@ -349,12 +377,13 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 			scaled_cis_geno = genotype_dosage[:,cis_snp_indices_raw]/ref_geno_sdevs[cis_snp_indices_raw]
 			cis_regr_geno_rep1 = genotype_dosage[:,regression_snp_indices_raw][rep1_indices,:]
 			cis_regr_geno_rep2 = genotype_dosage[:,regression_snp_indices_raw][rep2_indices,:]
-
+			cis_regr_geno = genotype_dosage[:,regression_snp_indices_raw]
 
 			regression_snp_alleles = np.asarray(ref_alt_alleles)[regression_snp_indices_raw,:]
 			regression_snp_pos = G_obj_pos[regression_snp_indices_raw]
 			regression_snp_rep1_sdev = rep1_genotype_sdev[regression_snp_indices_raw]
 			regression_snp_rep2_sdev = rep2_genotype_sdev[regression_snp_indices_raw]
+			regression_snp_global_sdev = global_genotype_sdev[regression_snp_indices_raw]
 
 
 
@@ -397,11 +426,20 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 				for regression_snp_index, regression_snp in enumerate(regression_snps):
 					t['tissue' + str(tiss_iter) + 'replicate2'].write(ensamble_id + '\t' + regression_snp + '\t' + str(chrom_num) + '\t' + str(regression_snp_pos[regression_snp_index]) + '\t' + str(regression_snp_alleles[regression_snp_index,1]) + '\t' + str(regression_snp_alleles[regression_snp_index,0]) + '\t' + str(marginal_effects_rep2[regression_snp_index]) + '\t' + str(marginal_effects_se_rep2[regression_snp_index]) + '\t' + str(marginal_effects_rep2[regression_snp_index]/marginal_effects_se_rep2[regression_snp_index]) + '\t' + str(regression_snp_rep2_sdev[regression_snp_index]) + '\n')
 
+				###############################
+				# Full data
+				###############################
+				marginal_effects, marginal_effects_se = marginal_ols(sim_stand_expr, cis_regr_geno)
+				# Print to output
+				for regression_snp_index, regression_snp in enumerate(regression_snps):
+					t['tissue' + str(tiss_iter) + 'full'].write(ensamble_id + '\t' + regression_snp + '\t' + str(chrom_num) + '\t' + str(regression_snp_pos[regression_snp_index]) + '\t' + str(regression_snp_alleles[regression_snp_index,1]) + '\t' + str(regression_snp_alleles[regression_snp_index,0]) + '\t' + str(marginal_effects[regression_snp_index]) + '\t' + str(marginal_effects_se[regression_snp_index]) + '\t' + str(marginal_effects[regression_snp_index]/marginal_effects_se[regression_snp_index]) + '\t' + str(regression_snp_global_sdev[regression_snp_index]) + '\n')
+
 		f.close()
 
 	for tissue_iter in range(n_tissues):
 		t['tissue' + str(tissue_iter)+ 'replicate1'].close()
 		t['tissue' + str(tissue_iter)+ 'replicate2'].close()
+		t['tissue' + str(tiss_iter) + 'full'].close()
 
 	return rep1_ss, rep2_ss
 
@@ -444,12 +482,15 @@ simulated_causal_eqtl_effect_summary_file = simulated_gene_expression_dir + simu
 ############################
 rep1_ss, rep2_ss = simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_causal_eqtl_effect_summary_file, int(eqtl_sample_size), simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_string, n_tissues)
 
+
 global_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_replicate_eqtl_sumstats_xt_summary.txt'
 t = open(global_output_file,'w')
-t.write('tissue_name\tN_rep1\tN_rep2\teqtl_sumstat_rep1_file\teqtl_sumstat_rep2_file\n')
+t.write('tissue_name\tN_rep1\tN_rep2\tN_full\teqtl_sumstat_rep1_file\teqtl_sumstat_rep2_file\teqtl_sumstat_full_file\n')
 for tissue_iter in range(n_tissues):
 	tissue_sumstat1_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_tissue' + str(tissue_iter) + '_' + str(eqtl_sample_size) + '_replicate1_eqtl_sumstats.txt'
 	tissue_sumstat2_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_tissue' + str(tissue_iter) + '_' + str(eqtl_sample_size) + '_replicate2_eqtl_sumstats.txt'
-	t.write('tissue' + str(tissue_iter) + '\t' + str(rep1_ss) + '\t' + str(rep2_ss) + '\t' + tissue_sumstat1_output_file + '\t' + tissue_sumstat2_output_file + '\n')
+	tissue_sumstat_full_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_tissue' + str(tissue_iter) + '_' + str(eqtl_sample_size) + '_full_eqtl_sumstats.txt'
+
+	t.write('tissue' + str(tissue_iter) + '\t' + str(rep1_ss) + '\t' + str(rep2_ss) + '\t' + str(rep1_ss + rep2_ss) + '\t' + tissue_sumstat1_output_file + '\t' + tissue_sumstat2_output_file + '\t' + tissue_sumstat_full_output_file + '\n')
 t.close()
 print(global_output_file)
