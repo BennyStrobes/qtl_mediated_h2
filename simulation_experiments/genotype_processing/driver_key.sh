@@ -60,12 +60,13 @@ sh prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genot
 fi
 
 
+
+
 # TO do
 # 1. let above finish running
 # 2. compare to original. make sure same number of rows and base ldscores are the same
 # 3. Switch filenames so new is main and tmp is deleted
 # 4. Run below on it.
-
 
 
 gene_snp_representation_arr=( "bins_10" "bins_20" "pca_90" "pca_95" "pca_99")

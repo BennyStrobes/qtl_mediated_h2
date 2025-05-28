@@ -144,14 +144,18 @@ if false; then
 python3 ${calibrated_mesc_code_dir}extract_variant_ldscores.py --chrom $chrom_num --bgen-file ${processed_genotype_data_dir}"simulated_"${genotype_version}"_"${chrom_num}".bgen" --hm3-rsid-file $hm3_rs_id_file --sldsc-annotation-file ${ldsc_baseline_hg19_annotation_dir}"baselineLD."${chrom_num}".annot.gz" --variant-ld-score-file $variant_ld_score_file --variant-M-file $variant_M_file
 fi
 
+# Extract hm3 variant level LD scores
+variant_ld_score_file=${processed_genotype_data_dir}"variant_"${genotype_version}"_hm3_ldscores_chrom"${chrom_num}".txt"
+python3 ${calibrated_mesc_code_dir}extract_hm3_variant_ldscores_for_weighting.py --chrom $chrom_num --bgen-file ${processed_genotype_data_dir}"simulated_"${genotype_version}"_"${chrom_num}".bgen" --cm-position-file ${ldsc_baseline_hg19_annotation_dir}"baselineLD."${chrom_num}".annot.gz" --hm3-rsid-file $hm3_rs_id_file --variant-ld-score-file $variant_ld_score_file
+
 
 
 genotype_version="reference_genotype_data"
-
 # Extract variant level LD scores
 variant_sdev_file=${processed_genotype_data_dir}"variant_"${genotype_version}"_genotype_stdev_chrom"${chrom_num}".txt"
+if false; then
 python3 ${calibrated_mesc_code_dir}extract_genotype_standard_deviations.py --chrom $chrom_num --bgen-file ${processed_genotype_data_dir}"simulated_"${genotype_version}"_"${chrom_num}".bgen" --output-file $variant_sdev_file
-
+fi
 
 
 # Extract gene list
