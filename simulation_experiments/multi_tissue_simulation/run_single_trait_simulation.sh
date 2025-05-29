@@ -72,6 +72,57 @@ fi
 
 
 
+
+#######################################################
+# Step : Simulate gene expression and compute eqtl summary statistics
+#######################################################
+
+eqtl_sample_size_arr=( "100" "200" "300" "1000")
+
+for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
+do
+	echo $eqtl_sample_size
+	python3 simulate_sample_replicate_gene_expression_and_compute_eqtl_ss.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $eqtl_sample_size $n_tissues
+done
+
+
+if false; then
+python3 add_tissue_imbalence_sample_replicate_sim.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $n_tissues
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#########################
+# OLD
+########################
+
+
+
 #######################################################
 # Step 4: Simulate gene expression and compute eqtl summary statistics
 #######################################################
@@ -91,39 +142,6 @@ fi
 if false; then
 python3 add_tissue_imbalence_sim.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $n_tissues
 fi
-
-
-
-#######################################################
-# Step : Simulate gene expression and compute eqtl summary statistics
-#######################################################
-# TODO: Include up to 10K (will probably need to load in chunks of genotype at a time instead of whole thing at once)
-# TODO: Add MESC CODE
-
-eqtl_sample_size_arr=( "100" "200" "300" "1000")
-if false; then
-for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
-do
-	echo $eqtl_sample_size
-	python3 simulate_sample_replicate_gene_expression_and_compute_eqtl_ss.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $eqtl_sample_size $n_tissues
-done
-fi
-eqtl_sample_size="100"
-	python3 simulate_sample_replicate_gene_expression_and_compute_eqtl_ss.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $eqtl_sample_size $n_tissues
-
-
-if false; then
-python3 add_tissue_imbalence_sample_replicate_sim.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $n_tissues
-fi
-
-
-
-
-
-
-
-
-
 
 
 

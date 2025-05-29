@@ -155,8 +155,8 @@ def simulate_gene_expression(G, sim_beta):
 	gene_heritability = np.var(genetic_pred_ge)
 	if gene_heritability > 1:
 		gene_heritability = .99
-		print('assumption eroorr')
-		pdb.set_trace()
+		print('Gene h2 greater than 1')
+
 
 	noise = np.random.normal(loc=0, scale=np.sqrt(1.0-gene_heritability), size=len(genetic_pred_ge))
 
@@ -175,9 +175,7 @@ def simulate_gene_expression(G, sim_beta):
 
 	ge = genetic_pred_ge + (best_scale_factor*noise)
 
-	if np.abs(np.std(ge) - 1.0) > .025:
-		print('assumption eroror')
-		pdb.set_trace()
+
 	#ge = np.random.normal(loc=genetic_pred_ge, scale=np.sqrt(1.0-gene_heritability))
 	return ge
 
@@ -270,13 +268,38 @@ def fixed_effect_meta(beta, se):
 
     return beta_FE, se_FE
 
+def get_sample_names(bgen_sample_name_file):
+	arr = []
+	head_count = 0
+	f = open(bgen_sample_name_file)
+	for line in f:
+		line = line.rstrip()
+		data = line.split()
+		if len(data) != 4:
+			print('assumption eroror')
+			pdb.set_trace()
+		if head_count == 0 or head_count == 1:
+			head_count = head_count + 1
+			continue
+		if data[0] != data[1]:
+			print('assumption erororo')
+			pdb.set_trace()
+		arr.append(data[0])
+	f.close()
+
+	arr = np.asarray(arr)
+	if len(arr) != len(np.unique(arr)):
+		print('assumption eroro')
+		pdb.set_trace()
+
+	return np.asarray(arr)
 
 
 
 
 def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_causal_eqtl_effect_summary_file, eqtl_sample_size, simulation_name_string, processed_genotype_data_dir, simulated_learned_gene_models_dir, chrom_string, n_tissues):
 
-	# Open output file handles
+	# Open output summary statistic file handles
 	t = {}
 	for tissue_iter in range(n_tissues):
 		tissue_sumstat1_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_tissue' + str(tissue_iter) + '_' + str(eqtl_sample_size) + '_replicate1' + '_eqtl_sumstats.txt'
@@ -290,17 +313,41 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 		t['tissue' + str(tissue_iter) + 'full'].write('gene_id\trsid\tchr\tpos\ta1\ta2\tbeta\tbeta_se\tz\tin_sample_sdev\n')
 
 
-
 	# Get chromosomes corresponding to chrom_string
 	if chrom_string == '1_2':
 		chrom_arr = np.asarray([1,2])
 
+	# Get sample names
+	sample_names = get_sample_names(processed_genotype_data_dir + 'simulated_eqtl_' + str(eqtl_sample_size) + '_data_' + str(chrom_arr[0]) + '.sample')
+	sample_names2 = get_sample_names(processed_genotype_data_dir + 'simulated_eqtl_' + str(eqtl_sample_size) + '_data_' + str(chrom_arr[1]) + '.sample')
+	# quick error check
+	if np.array_equal(sample_names, sample_names2) == False:
+		print('asusmptpineornr)')
+		pdb.set_trace()
+
 
 	# Split samples into two replicates
-	rep1_indices, rep2_indices = np.array_split(np.random.permutation(np.arange(eqtl_sample_size)),2)
-
+	rep1_indices_unsorted, rep2_indices_unsorted = np.array_split(np.random.permutation(np.arange(eqtl_sample_size)),2)
+	rep1_indices = np.sort(rep1_indices_unsorted)
+	rep2_indices = np.sort(rep2_indices_unsorted)
 	rep1_ss = len(rep1_indices)
 	rep2_ss = len(rep2_indices)
+	rep1_sample_names = sample_names[rep1_indices]
+	rep2_sample_names = sample_names[rep2_indices]
+
+	# Open output expression output file handles
+	t_expr = {}
+	for tissue_iter in range(n_tissues):
+		tissue_expr1_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_tissue' + str(tissue_iter) + '_' + str(eqtl_sample_size) + '_replicate1' + '_expression.txt'
+		t_expr['tissue' + str(tissue_iter) + 'replicate1'] = open(tissue_expr1_output_file,'w')
+		t_expr['tissue' + str(tissue_iter) + 'replicate1'].write('GENE\tCHR\tGENE_COORD\t' + '\t'.join(rep1_sample_names) + '\n')
+		tissue_expr2_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_tissue' + str(tissue_iter) + '_' + str(eqtl_sample_size) + '_replicate2' + '_expression.txt'
+		t_expr['tissue' + str(tissue_iter) + 'replicate2'] = open(tissue_expr2_output_file,'w')
+		t_expr['tissue' + str(tissue_iter) + 'replicate2'].write('GENE\tCHR\tGENE_COORD\t' + '\t'.join(rep2_sample_names) + '\n')
+		tissue_exprfull_output_file = simulated_learned_gene_models_dir + simulation_name_string + '_tissue' + str(tissue_iter) + '_' + str(eqtl_sample_size) + '_full' + '_expression.txt'
+		t_expr['tissue' + str(tissue_iter) + 'full'] = open(tissue_exprfull_output_file,'w')
+		t_expr['tissue' + str(tissue_iter) + 'full'].write('GENE\tCHR\tGENE_COORD\t' + '\t'.join(sample_names) + '\n')
+
 
 	for chrom_num in chrom_arr:
 
@@ -317,6 +364,7 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 		genotype_obj = BgenReader(genotype_stem + '.bgen')
 		G_obj_pos = np.asarray(genotype_obj.positions())
 		G_obj_rsids = np.asarray(genotype_obj.rsids())
+
 		# Load in ref-alt alleles
 		ref_alt_alleles = load_in_ref_alt_allele_arr(genotype_stem + '.pvar')
 		genotype_dosage = load_in_alt_allele_genotype_dosage_mat(genotype_obj, np.arange(len(G_obj_rsids)), ref_alt_alleles)
@@ -343,6 +391,7 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 				head_count = head_count + 1
 				continue
 			ensamble_id = data[0]
+			print(ensamble_id)
 			line_chrom_num = data[1]
 			# Skip genes not on this chromosome
 			if line_chrom_num != str(chrom_num):
@@ -410,11 +459,14 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 				# the marginal effects and the marginal_effects_se by the desired standard deviation
 				marginal_effects_rep1, marginal_effects_se_rep1 = marginal_ols(sim_stand_expr[rep1_indices], cis_regr_geno_rep1)
 
-
-				# Print to output
+				# Print summary stats to output
 				for regression_snp_index, regression_snp in enumerate(regression_snps):
 					t['tissue' + str(tiss_iter) + 'replicate1'].write(ensamble_id + '\t' + regression_snp + '\t' + str(chrom_num) + '\t' + str(regression_snp_pos[regression_snp_index]) + '\t' + str(regression_snp_alleles[regression_snp_index,1]) + '\t' + str(regression_snp_alleles[regression_snp_index,0]) + '\t' + str(marginal_effects_rep1[regression_snp_index]) + '\t' + str(marginal_effects_se_rep1[regression_snp_index]) + '\t' + str(marginal_effects_rep1[regression_snp_index]/marginal_effects_se_rep1[regression_snp_index]) + '\t' + str(regression_snp_rep1_sdev[regression_snp_index]) + '\n')
 		
+				# Print expression to output
+				t_expr['tissue' + str(tissue_iter) + 'replicate1'].write(ensamble_id + '\t' + str(chrom_num) + '\t' + str(gene_tss) + '\t' + '\t'.join((sim_stand_expr[rep1_indices]).astype(str)) + '\n')
+
+
 				###############################
 				# Second replicate
 				###############################
@@ -422,17 +474,23 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 				# the marginal effects and the marginal_effects_se by the desired standard deviation
 				marginal_effects_rep2, marginal_effects_se_rep2 = marginal_ols(sim_stand_expr[rep2_indices], cis_regr_geno_rep2)
 
-				# Print to output
+				# Print summary stats to output
 				for regression_snp_index, regression_snp in enumerate(regression_snps):
 					t['tissue' + str(tiss_iter) + 'replicate2'].write(ensamble_id + '\t' + regression_snp + '\t' + str(chrom_num) + '\t' + str(regression_snp_pos[regression_snp_index]) + '\t' + str(regression_snp_alleles[regression_snp_index,1]) + '\t' + str(regression_snp_alleles[regression_snp_index,0]) + '\t' + str(marginal_effects_rep2[regression_snp_index]) + '\t' + str(marginal_effects_se_rep2[regression_snp_index]) + '\t' + str(marginal_effects_rep2[regression_snp_index]/marginal_effects_se_rep2[regression_snp_index]) + '\t' + str(regression_snp_rep2_sdev[regression_snp_index]) + '\n')
+				# Print expression to output
+				t_expr['tissue' + str(tissue_iter) + 'replicate2'].write(ensamble_id + '\t' + str(chrom_num) + '\t' + str(gene_tss) + '\t' + '\t'.join((sim_stand_expr[rep2_indices]).astype(str)) + '\n')
+
+
 
 				###############################
 				# Full data
 				###############################
 				marginal_effects, marginal_effects_se = marginal_ols(sim_stand_expr, cis_regr_geno)
-				# Print to output
+				# Print summary stats to output
 				for regression_snp_index, regression_snp in enumerate(regression_snps):
 					t['tissue' + str(tiss_iter) + 'full'].write(ensamble_id + '\t' + regression_snp + '\t' + str(chrom_num) + '\t' + str(regression_snp_pos[regression_snp_index]) + '\t' + str(regression_snp_alleles[regression_snp_index,1]) + '\t' + str(regression_snp_alleles[regression_snp_index,0]) + '\t' + str(marginal_effects[regression_snp_index]) + '\t' + str(marginal_effects_se[regression_snp_index]) + '\t' + str(marginal_effects[regression_snp_index]/marginal_effects_se[regression_snp_index]) + '\t' + str(regression_snp_global_sdev[regression_snp_index]) + '\n')
+				# Print expression to output
+				t_expr['tissue' + str(tissue_iter) + 'full'].write(ensamble_id + '\t' + str(chrom_num) + '\t' + str(gene_tss) + '\t' + '\t'.join((sim_stand_expr).astype(str)) + '\n')
 
 		f.close()
 
@@ -440,6 +498,10 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 		t['tissue' + str(tissue_iter)+ 'replicate1'].close()
 		t['tissue' + str(tissue_iter)+ 'replicate2'].close()
 		t['tissue' + str(tiss_iter) + 'full'].close()
+		t_expr['tissue' + str(tissue_iter)+ 'replicate1'].close()
+		t_expr['tissue' + str(tissue_iter)+ 'replicate2'].close()
+		t_expr['tissue' + str(tiss_iter) + 'full'].close()
+
 
 	return rep1_ss, rep2_ss
 

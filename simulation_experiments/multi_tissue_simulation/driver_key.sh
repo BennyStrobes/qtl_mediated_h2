@@ -106,12 +106,86 @@ for simulation_number in $(seq 1 200); do
 	sbatch run_single_trait_simulation.sh $simulation_number $chrom_string $cis_window $n_gwas_individuals $simulation_name_string $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
 done
 fi
+
 if false; then
 for simulation_number in $(seq 1 200); do 
 	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
-	sh run_single_trait_simulation.sh $simulation_number $chrom_string $cis_window $n_gwas_individuals $simulation_name_string $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
+	sbatch run_single_trait_simulation.sh $simulation_number $chrom_string $cis_window $n_gwas_individuals $simulation_name_string $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
 done
 fi
+
+
+
+###############################
+# Calibrated mesc approach
+###############################
+if false; then
+for simulation_number in $(seq 1 200); do 
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+	sbatch calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $calibrated_mesc_code_dir
+done
+fi
+
+
+
+
+####################
+# Organize results
+####################
+tmp_simulation_name_string="_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+if false; then
+python3 organize_trait_med_h2_results.py $trait_med_h2_inference_dir $organized_trait_med_h2_results_dir $simulated_trait_dir $tmp_simulation_name_string
+fi
+
+
+
+
+
+if false; then
+module load R/3.5.1
+fi
+if false; then
+Rscript visualize_trait_med_h2_results.R $trait_med_h2_inference_dir $organized_trait_med_h2_results_dir $visualize_trait_med_h2_dir
+fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ###############################
@@ -137,41 +211,6 @@ for simulation_number in $(seq 1 200); do
 	sbatch joint_ldsc_trait_mediated_h2_inference_shell_v3.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $joint_ldsc_code_dir
 done
 fi
-
-
-
-###############################
-# Calibrated mesc approach
-###############################
-if false; then
-for simulation_number in $(seq 1 200); do 
-	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
-	sbatch calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $calibrated_mesc_code_dir
-done
-fi
-
-
-
-
-####################
-# Organize results
-####################
-if false; then
-python3 organize_trait_med_h2_results.py $trait_med_h2_inference_dir $organized_trait_med_h2_results_dir
-fi
-
-
-if false; then
-module load R/3.5.1
-fi
-if false; then
-Rscript visualize_trait_med_h2_results.R $trait_med_h2_inference_dir $organized_trait_med_h2_results_dir $visualize_trait_med_h2_dir
-fi
-
-
-
-
-
 
 
 

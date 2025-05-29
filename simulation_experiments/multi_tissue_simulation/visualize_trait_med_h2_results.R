@@ -223,7 +223,7 @@ make_multimethod_se_barplot_for_causal_tissue_med_h2 <- function(df, methods) {
 	df2 <- df[as.character(df$method)%in%methods,]
 	df2 <- df2[as.character(df2$heritability_type)=="causal_tissue_med_h2",]
 	
-	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c("100","200","300","1000","100-1000"))
+	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c("100", "100-1000","200","300","1000"))
 	df2$heritability_type = factor(df2$heritability_type, levels=c("causal_tissue_med_h2"))
 
 	sim_h2 = df2$sim_h2[1]
@@ -275,7 +275,7 @@ make_multimethod_se_barplot_for_noncausal_tissue_med_h2 <- function(df, methods)
 	df2 <- df[as.character(df$method)%in%methods,]
 	df2 <- df2[as.character(df2$heritability_type)=="non_causal_tissue_med_h2",]
 	
-	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c("100","200","300","1000","100-1000"))
+	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c("100", "100-1000","200","300","1000"))
 	df2$heritability_type = factor(df2$heritability_type, levels=c("non_causal_tissue_med_h2"))
 
 	sim_h2 = df2$sim_h2[1]
@@ -658,6 +658,167 @@ make_histogram_showing_distribution_of_tissue_0_estimates <- function(per_sim_df
   	return(pp)
 }
 
+make_coverage_standard_error_barplot <- function(df_cal, genetic_element_class) {
+
+
+
+
+	df <- df_cal[as.character(df_cal$genetic_element) == genetic_element_class,]
+
+	df$eQTL_ss <- factor(df$eQTL_ss, levels=c("100", "100-1000", "200", "300", "1000"))
+	df$expected_coverage <- factor(df$expected_coverage, levels=c(0.50,0.70, 0.90, 0.95))
+
+
+
+df_lines <- data.frame(
+  expected_coverage = factor(c(0.50,0.70,0.90,0.95),
+                             levels = levels(df$expected_coverage)),
+  hline_y          = c(0.50, 0.70, 0.90, 0.95)
+)
+
+	pp<-ggplot(data=df, aes(x=expected_coverage, y=observed_coverage, fill=eQTL_ss)) +
+  		geom_bar(stat="identity", position=position_dodge()) +
+  		geom_errorbar(aes(ymin=observed_coverage_lb, ymax=observed_coverage_ub), width=.4, position=position_dodge(.9))  +
+  		figure_theme() +
+  		labs(x="Expected coverage", y="Coverage", fill="eQTL SS", title=genetic_element_class)
+
+
+pp=pp +
+  geom_errorbar(
+    data       = df_lines,
+    aes(x       = expected_coverage,
+        ymin    = hline_y,
+        ymax    = hline_y),
+    width      = 0.9,        # matches the full width of a bar group
+    inherit.aes = FALSE,     # don’t carry over your original aes()
+    color      = "grey40",    # pick whatever color you like
+    size       = .5
+  )
+
+  	return(pp)
+
+}
+
+
+make_power_standard_error_barplot <- function(df_cal, genetic_element_class) {
+
+
+
+
+	df <- df_cal[as.character(df_cal$genetic_element) == genetic_element_class,]
+
+	df <- df[as.character(df$method_name) == "calibrated_mesc",]
+
+	df$eQTL_ss <- factor(df$eQTL_ss, levels=c("100", "100-1000", "200", "300", "1000"))
+
+
+	df$pvalue_threshold <- factor(df$pvalue_threshold, levels=c(0.20,0.10, 0.05, 0.01))
+
+df_lines <- data.frame(
+  pvalue_threshold = factor(c(0.20,0.10, 0.05, 0.01),
+                             levels = levels(df$pvalue_threshold)),
+  hline_y          = c(0.20,0.10, 0.05, 0.01)
+)
+
+
+
+	pp<-ggplot(data=df, aes(x=pvalue_threshold, y=power, fill=eQTL_ss)) +
+  		geom_bar(stat="identity", position=position_dodge()) +
+  		geom_errorbar(aes(ymin=power_lb, ymax=power_ub), width=.4, position=position_dodge(.9))  +
+  		figure_theme() +
+  		labs(x="p-value threshold", y="Power", fill="eQTL SS", title=genetic_element_class)
+
+pp=pp +
+  geom_errorbar(
+    data       = df_lines,
+    aes(x       = pvalue_threshold,
+        ymin    = hline_y,
+        ymax    = hline_y),
+    width      = 0.9,        # matches the full width of a bar group
+    inherit.aes = FALSE,     # don’t carry over your original aes()
+    color      = "grey40",    # pick whatever color you like
+    size       = .5
+  )
+
+  	return(pp)
+
+}
+
+make_fstat_violinplot_w_stdExpr_data <- function(df, remove_1000=FALSE) {
+	#df <- fstat_df[as.character(fstat_df$method_name) == "category0",]
+	if (remove_1000) {
+		df <- df[as.character(df$eQTL_ss) != "1000",]
+		df$eQTL_ss <- factor(df$eQTL_ss, levels=c("100", "100-1000", "200", "300"))
+	} else {
+		df$eQTL_ss <- factor(df$eQTL_ss, levels=c("100", "100-1000", "200", "300", "1000"))
+	}
+
+
+	pp<-ggplot(df, aes(x=eQTL_ss, y=fstat, color=method_name)) +
+  		geom_violin(trim=FALSE) +
+  		figure_theme() + 
+  		labs(x="eQTL SS", y="F statistic", color="cis-snp h2 bin") 
+
+  	return(pp)
+
+}
+
+
+make_fstat_violinplot <- function(fstat_df, remove_1000=FALSE) {
+	df <- fstat_df[as.character(fstat_df$method_name) == "category0",]
+	if (remove_1000) {
+		df <- df[as.character(df$eQTL_ss) != "1000",]
+		df$eQTL_ss <- factor(df$eQTL_ss, levels=c("100", "100-1000", "200", "300"))
+	} else {
+		df$eQTL_ss <- factor(df$eQTL_ss, levels=c("100", "100-1000", "200", "300", "1000"))
+	}
+
+	pp<-ggplot(df, aes(x=eQTL_ss, y=fstat, color=eQTL_ss)) +
+  		geom_violin(trim=FALSE) +
+  		figure_theme() + 
+  		labs(x="eQTL SS", y="F statistic", color="") +
+  		theme(legend.position="none")
+
+  	return(pp)
+
+}
+
+
+make_fstat_method_comparison_violinplot <- function(fstat_df,fstat_random_bins_df, remove_1000=FALSE) {
+	df <- fstat_df[as.character(fstat_df$method_name) == "category0",]
+	df2 <- fstat_random_bins_df[as.character(fstat_random_bins_df$method_name) == "category0",]
+	if (remove_1000) {
+		df <- df[as.character(df$eQTL_ss) != "1000",]
+		df$eQTL_ss <- factor(df$eQTL_ss, levels=c("100", "100-1000", "200", "300"))
+		df2 <- df2[as.character(df2$eQTL_ss) != "1000",]
+		df2$eQTL_ss <- factor(df2$eQTL_ss, levels=c("100", "100-1000", "200", "300"))
+
+
+	} else {
+		df$eQTL_ss <- factor(df$eQTL_ss, levels=c("100", "100-1000", "200", "300", "1000"))
+		d2f$eQTL_ss <- factor(df$eQTL_ss, levels=c("100", "100-1000", "200", "300", "1000"))
+	}
+
+
+	df$source <- "single_gene_bin"
+	df2$source <- "four_gene_bins"
+
+	# stack them
+	new_df <- rbind(df, df2)
+
+	# make the new column a factor if you like
+	new_df$source <- factor(new_df$source, levels = c("single_gene_bin","four_gene_bins"))
+
+
+	pp<-ggplot(new_df, aes(x=eQTL_ss, y=fstat, color=source)) +
+  		geom_violin(trim=FALSE) +
+  		figure_theme() + 
+  		labs(x="eQTL SS", y="F statistic", color="")
+
+  	return(pp)
+
+}
+
 
 
 
@@ -668,6 +829,34 @@ trait_med_h2_inference_dir = args[1]
 organized_trait_med_h2_results_dir = args[2]
 visualize_trait_med_h2_dir = args[3]
 
+if (FALSE) {
+###################################################
+# Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
+# Make plot for causal tissue
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+sq_sumstat_threshold="100.0"
+weighting = "unweighted"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold,"_", weighting)
+
+
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_calibrated_ldsc_summary_averaged.txt")
+joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_calibrated_mesc_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=5.5, units="in")
+
 
 ###################################################
 # Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
@@ -677,16 +866,44 @@ non_med_anno="genotype_intercept"
 simulated_gt_architecture="linear"
 inference_gt_architecture="linear"
 sq_sumstat_threshold="100.0"
-run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold)
-
+weighting = "weighted"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold,"_", weighting)
 
 
 joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_calibrated_ldsc_summary_averaged.txt")
 joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
 
-causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("two_step_ldsc","calibrated_two_step_ldsc"))
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
 # Make plot for non-causal tissue
-non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("two_step_ldsc","calibrated_two_step_ldsc"))
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_calibrated_mesc_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=5.5, units="in")
+
+
+###################################################
+# Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
+# Make plot for causal tissue
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="random_bins"
+sq_sumstat_threshold="100.0"
+weighting = "unweighted"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold,"_", weighting)
+
+
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_calibrated_ldsc_summary_averaged.txt")
+joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
 # Get legend
 legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
 # Combine together with cowplot
@@ -698,9 +915,193 @@ ggsave(joint, file=output_file, width=7.2, height=5.5, units="in")
 
 
 
+###################################################
+# Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
+# Make plot for causal tissue
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+sq_sumstat_threshold="100.0"
+weighting = "unweighted"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold,"_", weighting)
+
+
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_calibrated_ldsc_summary_variance_weighted_averaged.txt")
+joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_calibrated_mesc_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_variance_weighted_med_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=5.5, units="in")
+
+}
+
+
+###################################################
+# Make bookstrapped standard error coverage plots
+if (FALSE) {
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+sq_sumstat_threshold="100.0"
+weighting = "unweighted"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold,"_", weighting)
+
+
+calibration_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_calibration_summary.txt")
+df_cal <- read.table(calibration_summary_file, header=TRUE, sep="\t")
+
+genetic_element_class <- "total_nm_h2"
+pp1 <- make_coverage_standard_error_barplot(df_cal, genetic_element_class)
+
+genetic_element_class <- "total_med_h2"
+pp2 <- make_coverage_standard_error_barplot(df_cal, genetic_element_class)
+
+genetic_element_class <- "causal_tissue_med_h2"
+pp3 <- make_coverage_standard_error_barplot(df_cal, genetic_element_class)
+
+joint_pp <- plot_grid(pp1, pp2, pp3, ncol=1)
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_coverage_calibrated_mesc_se_barplot.pdf")
+ggsave(joint_pp, file=output_file, width=7.2, height=5.5, units="in")
+}
 
 
 
+
+###################################################
+# Make bookstrapped power plots
+if (FALSE) {
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+sq_sumstat_threshold="100.0"
+weighting = "unweighted"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold,"_", weighting)
+
+
+power_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_power_summary.txt")
+df_power <- read.table(power_summary_file, header=TRUE, sep="\t")
+
+genetic_element_class <- "total_nm_h2"
+pp1 <- make_power_standard_error_barplot(df_power, genetic_element_class)
+
+genetic_element_class <- "total_med_h2"
+pp2 <- make_power_standard_error_barplot(df_power, genetic_element_class)
+
+genetic_element_class <- "causal_tissue_med_h2"
+pp3 <- make_power_standard_error_barplot(df_power, genetic_element_class)
+
+joint_pp <- plot_grid(pp1, pp2, pp3, ncol=1)
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_power_calibrated_mesc_se_barplot.pdf")
+ggsave(joint_pp, file=output_file, width=7.2, height=5.5, units="in")
+}
+
+
+
+
+
+###################################################
+# Make F-statistic plots
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+sq_sumstat_threshold="100.0"
+weighting = "unweighted"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold,"_", weighting)
+if (FALSE) {
+fstat_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_fstat_summary.txt")
+fstat_df <- read.table(fstat_summary_file, header=TRUE, sep="\t")
+
+pp <- make_fstat_violinplot(fstat_df)
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_fstat_violinplot.pdf")
+ggsave(pp, file=output_file, width=7.2, height=4.5, units="in")
+
+
+pp <- make_fstat_violinplot(fstat_df, remove_1000=TRUE)
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_fstat_remove_1000_violinplot.pdf")
+ggsave(pp, file=output_file, width=7.2, height=4.5, units="in")
+}
+
+###################################################
+# Make F-statistic plots
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="stdExpr"
+inference_gt_architecture="stdExpr"
+sq_sumstat_threshold="100.0"
+weighting = "unweighted"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold,"_", weighting)
+fstat_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_fstat_summary.txt")
+fstat_df <- read.table(fstat_summary_file, header=TRUE, sep="\t")
+pp <- make_fstat_violinplot_w_stdExpr_data(fstat_df, remove_1000=TRUE)
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_fstat_stdExpr_remove_1000_violinplot.pdf")
+ggsave(pp, file=output_file, width=7.2, height=3.79, units="in")
+
+
+###################################################
+# Make F-statistic plots comparing linear model + random bins
+if (FALSE) {
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+sq_sumstat_threshold="100.0"
+weighting = "unweighted"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold,"_", weighting)
+fstat_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_fstat_summary.txt")
+fstat_df <- read.table(fstat_summary_file, header=TRUE, sep="\t")
+simulated_gt_architecture="linear"
+inference_gt_architecture="random_bins"
+sq_sumstat_threshold="100.0"
+weighting = "unweighted"
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold,"_", weighting)
+fstat_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_fstat_summary.txt")
+fstat_random_bins_df <- read.table(fstat_summary_file, header=TRUE, sep="\t")
+
+pp <- make_fstat_method_comparison_violinplot(fstat_df,fstat_random_bins_df, remove_1000=TRUE)
+
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_fstat_method_comparison_remove_1000_violinplot.pdf")
+ggsave(pp, file=output_file, width=7.2, height=4.0, units="in")
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if (FALSE) {
 ###################################################
 # Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
 # Make plot for causal tissue
@@ -819,7 +1220,7 @@ joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_me
 output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_calibrated_mesc_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
 ggsave(joint, file=output_file, width=7.2, height=5.5, units="in")
 
-
+}
 
 
 
