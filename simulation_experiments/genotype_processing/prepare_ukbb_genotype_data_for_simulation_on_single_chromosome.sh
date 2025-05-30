@@ -130,11 +130,40 @@ plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size
 plink2 --pfile ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num} --keep-allele-order --export bgen-1.2 --out ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num}
 fi
 
+
+###############################
+# Convert to plink1 (needed for mesc)
+###############################
+# GWAS 
+plink2 --pfile ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num} --keep-allele-order -make-bed --out ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num}
+
+# eQTL 
+eqtl_sample_size="100"
+plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --make-bed --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
+eqtl_sample_size="200"
+plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --make-bed --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
+eqtl_sample_size="300"
+plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --make-bed --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
+eqtl_sample_size="500"
+plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --make-bed --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
+eqtl_sample_size="1000"
+plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --make-bed --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
+eqtl_sample_size="10000"
+plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num} --keep-allele-order --make-bed --out ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size}"_data_"${chrom_num}
+
+# Reference genotype
+plink2 --pfile ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num} --keep-allele-order -make-bed --out ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num}
+
+
+
+
+
+if false; then
 module load gcc/9.2.0
 module load python/3.9.14
 module load cuda/12.1
 source /n/groups/price/ben/environments/tf_new/bin/activate
-
+fi
 genotype_version="reference_genotype_data"
 
 # Extract variant level LD scores
@@ -146,8 +175,9 @@ fi
 
 # Extract hm3 variant level LD scores
 variant_ld_score_file=${processed_genotype_data_dir}"variant_"${genotype_version}"_hm3_ldscores_chrom"${chrom_num}".txt"
+if false; then
 python3 ${calibrated_mesc_code_dir}extract_hm3_variant_ldscores_for_weighting.py --chrom $chrom_num --bgen-file ${processed_genotype_data_dir}"simulated_"${genotype_version}"_"${chrom_num}".bgen" --cm-position-file ${ldsc_baseline_hg19_annotation_dir}"baselineLD."${chrom_num}".annot.gz" --hm3-rsid-file $hm3_rs_id_file --variant-ld-score-file $variant_ld_score_file
-
+fi
 
 
 genotype_version="reference_genotype_data"

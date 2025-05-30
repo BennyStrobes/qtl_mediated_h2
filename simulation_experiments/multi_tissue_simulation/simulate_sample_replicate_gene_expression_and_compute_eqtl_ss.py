@@ -464,7 +464,7 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 					t['tissue' + str(tiss_iter) + 'replicate1'].write(ensamble_id + '\t' + regression_snp + '\t' + str(chrom_num) + '\t' + str(regression_snp_pos[regression_snp_index]) + '\t' + str(regression_snp_alleles[regression_snp_index,1]) + '\t' + str(regression_snp_alleles[regression_snp_index,0]) + '\t' + str(marginal_effects_rep1[regression_snp_index]) + '\t' + str(marginal_effects_se_rep1[regression_snp_index]) + '\t' + str(marginal_effects_rep1[regression_snp_index]/marginal_effects_se_rep1[regression_snp_index]) + '\t' + str(regression_snp_rep1_sdev[regression_snp_index]) + '\n')
 		
 				# Print expression to output
-				t_expr['tissue' + str(tissue_iter) + 'replicate1'].write(ensamble_id + '\t' + str(chrom_num) + '\t' + str(gene_tss) + '\t' + '\t'.join((sim_stand_expr[rep1_indices]).astype(str)) + '\n')
+				t_expr['tissue' + str(tiss_iter) + 'replicate1'].write(ensamble_id + '\t' + str(chrom_num) + '\t' + str(gene_tss) + '\t' + '\t'.join((sim_stand_expr[rep1_indices]).astype(str)) + '\n')
 
 
 				###############################
@@ -478,7 +478,7 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 				for regression_snp_index, regression_snp in enumerate(regression_snps):
 					t['tissue' + str(tiss_iter) + 'replicate2'].write(ensamble_id + '\t' + regression_snp + '\t' + str(chrom_num) + '\t' + str(regression_snp_pos[regression_snp_index]) + '\t' + str(regression_snp_alleles[regression_snp_index,1]) + '\t' + str(regression_snp_alleles[regression_snp_index,0]) + '\t' + str(marginal_effects_rep2[regression_snp_index]) + '\t' + str(marginal_effects_se_rep2[regression_snp_index]) + '\t' + str(marginal_effects_rep2[regression_snp_index]/marginal_effects_se_rep2[regression_snp_index]) + '\t' + str(regression_snp_rep2_sdev[regression_snp_index]) + '\n')
 				# Print expression to output
-				t_expr['tissue' + str(tissue_iter) + 'replicate2'].write(ensamble_id + '\t' + str(chrom_num) + '\t' + str(gene_tss) + '\t' + '\t'.join((sim_stand_expr[rep2_indices]).astype(str)) + '\n')
+				t_expr['tissue' + str(tiss_iter) + 'replicate2'].write(ensamble_id + '\t' + str(chrom_num) + '\t' + str(gene_tss) + '\t' + '\t'.join((sim_stand_expr[rep2_indices]).astype(str)) + '\n')
 
 
 
@@ -490,17 +490,17 @@ def simulate_gene_expression_and_and_compute_eqtl_ss_all_genes_shell(simulated_c
 				for regression_snp_index, regression_snp in enumerate(regression_snps):
 					t['tissue' + str(tiss_iter) + 'full'].write(ensamble_id + '\t' + regression_snp + '\t' + str(chrom_num) + '\t' + str(regression_snp_pos[regression_snp_index]) + '\t' + str(regression_snp_alleles[regression_snp_index,1]) + '\t' + str(regression_snp_alleles[regression_snp_index,0]) + '\t' + str(marginal_effects[regression_snp_index]) + '\t' + str(marginal_effects_se[regression_snp_index]) + '\t' + str(marginal_effects[regression_snp_index]/marginal_effects_se[regression_snp_index]) + '\t' + str(regression_snp_global_sdev[regression_snp_index]) + '\n')
 				# Print expression to output
-				t_expr['tissue' + str(tissue_iter) + 'full'].write(ensamble_id + '\t' + str(chrom_num) + '\t' + str(gene_tss) + '\t' + '\t'.join((sim_stand_expr).astype(str)) + '\n')
+				t_expr['tissue' + str(tiss_iter) + 'full'].write(ensamble_id + '\t' + str(chrom_num) + '\t' + str(gene_tss) + '\t' + '\t'.join((sim_stand_expr).astype(str)) + '\n')
 
 		f.close()
 
 	for tissue_iter in range(n_tissues):
 		t['tissue' + str(tissue_iter)+ 'replicate1'].close()
 		t['tissue' + str(tissue_iter)+ 'replicate2'].close()
-		t['tissue' + str(tiss_iter) + 'full'].close()
+		t['tissue' + str(tissue_iter) + 'full'].close()
 		t_expr['tissue' + str(tissue_iter)+ 'replicate1'].close()
 		t_expr['tissue' + str(tissue_iter)+ 'replicate2'].close()
-		t_expr['tissue' + str(tiss_iter) + 'full'].close()
+		t_expr['tissue' + str(tissue_iter) + 'full'].close()
 
 
 	return rep1_ss, rep2_ss
