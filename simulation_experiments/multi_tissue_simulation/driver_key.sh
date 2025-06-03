@@ -20,7 +20,7 @@ calibrated_mesc_code_dir="/n/groups/price/ben/calibrated_mesc_v2/"
 calibrated_mesc_code_dir="/n/groups/price/ben/calibrated_mesc_v4/"
 
 
-mesc_code_dir="/n/groups/price/ben/tools/mesc/"
+mesc_code_dir="/n/groups/price/ben/tools/mesc_2_chromosomes/"
 
 plink_executable="/n/groups/price/ben/tools/plink_linux_x86_64_20210606/plink"
 
@@ -51,6 +51,12 @@ trait_h2_inference_dir=$output_root_dir"trait_h2_inference/"
 
 # Directory containing mesc expression scores
 mesc_expression_score_dir=$output_root_dir"mesc_expression_scores/"
+
+# Directory containing default mesc results
+mesc_processed_input_dir=$output_root_dir"mesc_processed_input/"
+
+# Directory containing default mesc results
+mesc_results_dir=$output_root_dir"mesc_results/"
 
 # Directory containing results of trait med h2 inference
 trait_med_h2_inference_dir=$output_root_dir"trait_mediated_h2_inference/"
@@ -111,17 +117,34 @@ chrom_string="1_2"
 if false; then
 for simulation_number in $(seq 1 200); do 
 	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
-	sbatch run_single_trait_simulation.sh $simulation_number $chrom_string $cis_window $n_gwas_individuals $simulation_name_string $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
+	sh run_single_trait_simulation.sh $simulation_number $chrom_string $cis_window $n_gwas_individuals $simulation_name_string $simulation_genotype_dir $per_element_heritability $total_heritability $fraction_expression_mediated_heritability $ge_h2 $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulated_trait_dir $simulated_gwas_dir $eqtl_architecture $n_tissues $alt_simulated_learned_gene_models_dir
 done
 fi
+
 
 ############################
 # Use MESC to generate expression scores
 ############################
-simulation_number="1"
-simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
-sh use_mesc_to_generate_expression_scores.sh $simulation_number $chrom_string $simulation_name_string $simulation_genotype_dir $simulated_learned_gene_models_dir $mesc_code_dir $plink_executable $mesc_expression_score_dir
+if false; then
+for simulation_number in $(seq 1 200); do 
+for tissue_num in $(seq 0 4); do
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+	sbatch use_mesc_to_generate_expression_scores.sh $simulation_number $chrom_string $simulation_name_string $simulation_genotype_dir $simulated_learned_gene_models_dir $mesc_code_dir $plink_executable $mesc_expression_score_dir $tissue_num
+done
+done
+fi
 
+
+
+############################
+# Run default mesc
+############################
+if false; then
+for simulation_number in $(seq 1 200); do 
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+	sbatch run_default_mesc_shell.sh $simulation_number $chrom_string $simulation_name_string $simulation_genotype_dir $mesc_code_dir $mesc_expression_score_dir $mesc_processed_input_dir $mesc_results_dir $simulated_gwas_dir
+done
+fi
 
 
 
@@ -132,9 +155,16 @@ sh use_mesc_to_generate_expression_scores.sh $simulation_number $chrom_string $s
 if false; then
 for simulation_number in $(seq 1 200); do 
 	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
-	sbatch calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $calibrated_mesc_code_dir
+	sbatch calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $calibrated_mesc_code_dir $mesc_expression_score_dir
 done
 fi
+
+simulation_number="1"
+simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+sh calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $calibrated_mesc_code_dir $mesc_expression_score_dir
+
+
+
 
 
 
@@ -142,13 +172,15 @@ fi
 ####################
 # Organize results
 ####################
-tmp_simulation_name_string="_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
 if false; then
+tmp_simulation_name_string="_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
 python3 organize_trait_med_h2_results.py $trait_med_h2_inference_dir $organized_trait_med_h2_results_dir $simulated_trait_dir $tmp_simulation_name_string
 fi
 
-
-
+tmp_simulation_name_string="_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+if false; then
+python3 organize_mesc_results.py $mesc_results_dir $organized_trait_med_h2_results_dir $simulated_trait_dir $tmp_simulation_name_string
+fi
 
 
 if false; then

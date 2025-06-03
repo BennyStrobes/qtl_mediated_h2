@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-12:10                         # Runtime in D-HH:MM format
+#SBATCH -t 0-24:10                         # Runtime in D-HH:MM format
 #SBATCH -p medium                           # Partition to run in
 #SBATCH --mem=10GB                         # Memory total in MiB (for all cores)
 
@@ -18,7 +18,9 @@ simulated_learned_gene_models_dir="$5"
 mesc_code_dir="$6"
 plink_executable="$7"
 mesc_expression_score_dir="$8"
+tissue_num="$9"
 
+date
 
 echo $simulation_genotype_dir
 
@@ -47,17 +49,19 @@ conda activate mesc
 
 
 eqtl_sample_size_arr=( "100" "200" "300" "1000")
+
+
 sample_split_arr=( "full" "replicate1" "replicate2")
 
 
 for chrom_num in $(seq 1 2); do 
 for eqtl_ss in "${eqtl_sample_size_arr[@]}"; do
 for sample_split in "${sample_split_arr[@]}"; do
-for tissue_num in $(seq 0 4); do
 
 
 	# Print current iteration
 	echo ${chrom_num}"_"${eqtl_ss}"_"${sample_split}"_"${tissue_num}
+	date
 
 	# File containing HM3 ids
 	hm3_rsid_file="/n/scratch/users/b/bes710/qtl_mediated_h2/simulation_experiments/genotype_processing/hm3_rsids_chr"${chrom_num}".txt"
@@ -113,7 +117,9 @@ for tissue_num in $(seq 0 4); do
 done
 done
 done
-done
 
+
+echo "DONE!"
+date
 
 
