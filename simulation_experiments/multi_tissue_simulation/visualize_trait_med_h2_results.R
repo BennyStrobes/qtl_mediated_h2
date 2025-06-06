@@ -236,7 +236,7 @@ make_multimethod_se_barplot_for_causal_tissue_med_h2 <- function(df, methods) {
   		geom_errorbar(aes(ymin=est_h2_lb, ymax=est_h2_ub), width=.4, position=position_dodge(.9))  +
   		#scale_fill_manual(values=c("skyblue", "grey", "grey"))+
   		figure_theme() +
-  		labs(x="eQTL SS", y="h2", fill="", title=paste0("Causal tissue mediated h2")) +
+  		labs(x="QTL SS", y="Mediated h2", fill="", title=paste0("Causal tissue")) +
   		geom_hline(yintercept=sim_h2, linetype=2) 
 
   	return(pp)
@@ -288,7 +288,7 @@ make_multimethod_se_barplot_for_noncausal_tissue_med_h2 <- function(df, methods)
   		geom_errorbar(aes(ymin=est_h2_lb, ymax=est_h2_ub), width=.4, position=position_dodge(.9))  +
   		#scale_fill_manual(values=c("skyblue", "grey", "grey"))+
   		figure_theme() +
-  		labs(x="eQTL SS", y="h2", fill="", title=paste0("Aggregate non-Causal tissue mediated h2")) +
+  		labs(x="QTL SS", y="Mediated h2", fill="", title=paste0("Aggregate non-causal tissues")) +
   		geom_hline(yintercept=sim_h2, linetype=2) 
 
   	return(pp)
@@ -700,6 +700,215 @@ pp=pp +
 }
 
 
+make_coverage_multimethod_standard_error_barplot <- function(df_cal, genetic_element_class, qtl_ss) {
+
+
+
+  # 1) Subset
+  df <- df_cal[df_cal$genetic_element == genetic_element_class, ]
+  df <- df[df$eQTL_ss == qtl_ss, ]
+  df <- df[df$method != "uncalibrated_mesc", ]
+
+  # 2) Turn expected_coverage into a factor with the desired order
+  df$expected_coverage <- factor(
+    df$expected_coverage,
+    levels = c(0.50, 0.70, 0.90, 0.95)
+  )
+
+  # 3) Ensure method is a factor in the order you want
+  df$method <- factor(df$method, levels = c("mesc", "calibrated_mesc"))
+
+  print(df)  # optional, just to check your subset
+  
+  # 4) Build the “lines” data frame using the same factor levels
+  df_lines <- data.frame(
+    expected_coverage = factor(
+      c(0.50, 0.70, 0.90, 0.95),
+      levels = levels(df$expected_coverage)
+    ),
+    hline_y = c(0.50, 0.70, 0.90, 0.95)
+  )
+
+  # 5) Now plot
+  pp <- ggplot(df, aes(x = expected_coverage, y = observed_coverage, fill = method)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.9)) +
+    geom_errorbar(
+      aes(ymin = observed_coverage_lb, ymax = observed_coverage_ub),
+      width = 0.4,
+      position = position_dodge(width = 0.9)
+    ) +
+    figure_theme() +
+    labs(
+      x    = "Expected coverage",
+      y    = "Coverage",
+      fill = "",
+      title = genetic_element_class
+    )
+
+  # 6) Add the horizontal “ticks” layer: now x is a factor in both data frames
+  pp <- pp +
+    geom_errorbar(
+      data = df_lines,
+      aes(
+        x    = expected_coverage,
+        ymin = hline_y,
+        ymax = hline_y
+      ),
+      width       = 0.9,
+      inherit.aes = FALSE,
+      colour      = "grey40",
+      size        = 0.5
+    )
+
+  return(pp)
+
+}
+
+
+
+
+make_t1e_with_patterns <- function(df) {
+  df$eQTL_ss <- factor(df$eQTL_ss, levels = c("100","100-1000","200","300","1000"))
+  df$pvalue_threshold <- factor(df$pvalue_threshold, levels = c(0.20,0.10,0.05,0.01))
+  df$method <- factor(df$method, levels = c("mesc","calibrated_mesc"))
+
+  dodge_width <- 0.9
+  df_lines <- data.frame(
+    x    = as.integer(df$pvalue_threshold) - dodge_width/2,
+    xend = as.integer(df$pvalue_threshold) + dodge_width/2,
+    y    = as.numeric(as.character(df$pvalue_threshold)),
+    yend = as.numeric(as.character(df$pvalue_threshold))
+  )
+
+  ggplot(df, aes(x = pvalue_threshold, y = t1e, 
+                 pattern = method,       # <— map the “pattern” aesthetic
+                 fill    = eQTL_ss)) +
+    geom_bar_pattern(
+      stat           = "identity",
+      position       = position_dodge(width = dodge_width),
+      pattern_fill   = "black",
+      pattern_density= 0.1,
+      pattern_spacing= 0.02,
+      colour         = "black",
+      size           = 0.2
+    ) +
+    geom_errorbar(
+      aes(ymin = t1e_lb, ymax = t1e_ub),
+      width    = 0.4,
+      position = position_dodge(width = dodge_width)
+    ) +
+    geom_segment(
+      data        = df_lines,
+      aes(x       = x, xend = xend, y = y, yend = yend),
+      color       = "grey40",
+      size        = 0.5,
+      inherit.aes = FALSE
+    ) +
+    scale_pattern_manual(
+      values = c(old = "stripe", new = "none"),  # e.g. “stripe” vs “solid fill”
+      name   = "Method"
+    ) +
+    scale_fill_brewer(palette = "Set2") +
+    figure_theme() +
+    labs(
+      x    = "p-value threshold",
+      y    = "Type 1 Error",
+      fill = "eQTL SS"
+    )
+}
+
+
+
+
+
+
+make_t1e_standard_error_barplot <- function(df) {
+
+
+
+	df <- df[as.character(df$method_name) == "calibrated_mesc",]
+
+
+	df$eQTL_ss <- factor(df$eQTL_ss, levels=c("100", "100-1000", "200", "300", "1000"))
+
+
+	df$pvalue_threshold <- factor(df$pvalue_threshold, levels=c(0.20,0.10, 0.05, 0.01))
+
+df_lines <- data.frame(
+  pvalue_threshold = factor(c(0.20,0.10, 0.05, 0.01),
+                             levels = levels(df$pvalue_threshold)),
+  hline_y          = c(0.20,0.10, 0.05, 0.01)
+)
+
+
+
+	pp<-ggplot(data=df, aes(x=pvalue_threshold, y=t1e, fill=eQTL_ss)) +
+  		geom_bar(stat="identity", position=position_dodge()) +
+  		geom_errorbar(aes(ymin=t1e_lb, ymax=t1e_ub), width=.4, position=position_dodge(.9))  +
+  		figure_theme() +
+  		labs(x="p-value threshold", y="Type 1 Error", fill="eQTL SS")
+
+pp=pp +
+  geom_errorbar(
+    data       = df_lines,
+    aes(x       = pvalue_threshold,
+        ymin    = hline_y,
+        ymax    = hline_y),
+    width      = 0.9,        # matches the full width of a bar group
+    inherit.aes = FALSE,     # don’t carry over your original aes()
+    color      = "grey40",    # pick whatever color you like
+    size       = .5
+  )
+
+  	return(pp)
+
+}
+
+
+
+make_t1e_multimethod_standard_error_barplot <- function(df) {
+
+
+
+	df = df[as.character(df$eQTL_ss) == "200", ]
+	df$method <- factor(df$method, levels=c("mesc", "calibrated_mesc"))
+
+
+	df$pvalue_threshold <- factor(df$pvalue_threshold, levels=c(0.20,0.10, 0.05, 0.01))
+
+df_lines <- data.frame(
+  pvalue_threshold = factor(c(0.20,0.10, 0.05, 0.01),
+                             levels = levels(df$pvalue_threshold)),
+  hline_y          = c(0.20,0.10, 0.05, 0.01)
+)
+
+
+
+	pp<-ggplot(data=df, aes(x=pvalue_threshold, y=t1e, fill=method)) +
+  		geom_bar(stat="identity", position=position_dodge()) +
+  		geom_errorbar(aes(ymin=t1e_lb, ymax=t1e_ub), width=.4, position=position_dodge(.9))  +
+  		figure_theme() +
+  		labs(x="p-value threshold", y="Type 1 Error", fill="", title=paste0("eQTL SS=200"))
+
+pp=pp +
+  geom_errorbar(
+    data       = df_lines,
+    aes(x       = pvalue_threshold,
+        ymin    = hline_y,
+        ymax    = hline_y),
+    width      = 0.9,        # matches the full width of a bar group
+    inherit.aes = FALSE,     # don’t carry over your original aes()
+    color      = "grey40",    # pick whatever color you like
+    size       = .5
+  )
+
+  	return(pp)
+
+}
+
+
+
+
 make_power_standard_error_barplot <- function(df_cal, genetic_element_class) {
 
 
@@ -743,6 +952,52 @@ pp=pp +
   	return(pp)
 
 }
+
+
+
+make_multimethod_power_standard_error_barplot <- function(df_cal, genetic_element_class, qtl_ss) {
+
+
+
+	df <- df_cal[as.character(df_cal$genetic_element) == genetic_element_class,]
+	df <- df[as.character(df$method) != "uncalibrated_mesc", ]
+
+	df = df[as.character(df$eQTL_ss) == qtl_ss, ]
+	df$method <- factor(df$method, levels=c("mesc", "calibrated_mesc"))
+
+
+	df$pvalue_threshold <- factor(df$pvalue_threshold, levels=c(0.20,0.10, 0.05, 0.01))
+
+df_lines <- data.frame(
+  pvalue_threshold = factor(c(0.20,0.10, 0.05, 0.01),
+                             levels = levels(df$pvalue_threshold)),
+  hline_y          = c(0.20,0.10, 0.05, 0.01)
+)
+
+
+
+	pp<-ggplot(data=df, aes(x=pvalue_threshold, y=power, fill=method)) +
+  		geom_bar(stat="identity", position=position_dodge()) +
+  		geom_errorbar(aes(ymin=power_lb, ymax=power_ub), width=.4, position=position_dodge(.9))  +
+  		figure_theme() +
+  		labs(x="p-value threshold", y=paste0("Power (", genetic_element_class,")"), fill="", title=paste0("QTL ss: ", qtl_ss))
+
+pp=pp +
+  geom_errorbar(
+    data       = df_lines,
+    aes(x       = pvalue_threshold,
+        ymin    = hline_y,
+        ymax    = hline_y),
+    width      = 0.9,        # matches the full width of a bar group
+    inherit.aes = FALSE,     # don’t carry over your original aes()
+    color      = "grey40",    # pick whatever color you like
+    size       = .5
+  )
+
+  	return(pp)
+
+}
+
 
 make_fstat_violinplot_w_stdExpr_data <- function(df, remove_1000=FALSE) {
 	#df <- fstat_df[as.character(fstat_df$method_name) == "category0",]
@@ -819,7 +1074,65 @@ make_fstat_method_comparison_violinplot <- function(fstat_df,fstat_random_bins_d
 
 }
 
+make_t1e_barplot_border_linetype <- function(df) {
 
+
+  # 2) Force factor levels
+  df$eQTL_ss <- factor(df$eQTL_ss,
+                       levels = c("100", "100-1000", "200", "300", "1000"))
+  df$pvalue_threshold <- factor(df$pvalue_threshold,
+                                levels = c(0.20, 0.10, 0.05, 0.01))
+  df$method <- factor(df$method, levels = c("mesc", "calibrated_mesc"))
+
+  # 3) Build a tiny data.frame for horizontal "ticks" at each x
+  dodge_width <- 0.9
+  df_lines <- data.frame(
+    x    = as.integer(df$pvalue_threshold) - dodge_width/2,
+    xend = as.integer(df$pvalue_threshold) + dodge_width/2,
+    y    = as.numeric(as.character(df$pvalue_threshold)),
+    yend = as.numeric(as.character(df$pvalue_threshold))
+  )
+
+  # 4) Plot: map fill = eQTL_ss, linetype = method
+  ggplot(df, aes(x = pvalue_threshold, y = t1e,
+                 fill     = eQTL_ss,
+                 linetype = method)) +
+    # (a) Bars: colour="black" for border, size=0.4 for border thickness.
+    geom_bar(
+      stat     = "identity",
+      colour   = "black",
+      position = position_dodge(width = dodge_width),
+      size     = 0.4
+    ) +
+    # (b) Error bars: same dodge so they sit on top of each bar
+    geom_errorbar(
+      aes(ymin = t1e_lb, ymax = t1e_ub),
+      width    = 0.4,
+      position = position_dodge(width = dodge_width)
+    ) +
+    # (c) Horizontal “ticks” at each x‐value
+    geom_segment(
+      data        = df_lines,
+      aes(x = x, xend = xend, y = y, yend = yend),
+      colour      = "grey40",
+      size        = 0.5,
+      inherit.aes = FALSE
+    ) +
+    # (d) Dashed vs Solid for “old” vs “new”
+    scale_linetype_manual(
+      values = c(mesc = "dashed", calibrated_mesc = "solid"),
+      name   = "Method"
+    ) +
+    # (e) Pick any discrete fill palette for the 5 eQTL_SS levels
+    scale_fill_brewer(palette = "Set2") +
+    # (f) Theme + labels
+    figure_theme() +
+    labs(
+      x    = "p-value threshold",
+      y    = "Type 1 Error",
+      fill = "eQTL SS"
+    )
+}
 
 
 ########################
@@ -829,7 +1142,11 @@ trait_med_h2_inference_dir = args[1]
 organized_trait_med_h2_results_dir = args[2]
 visualize_trait_med_h2_dir = args[3]
 
-if (FALSE) {
+
+mesc_summary_file <- paste0(organized_trait_med_h2_results_dir, "mesc_med_h2_5_causal_tissue__full_gt_arch_linear_genotypeIntercept_sim_results_calibrated_ldsc_summary_averaged.txt")
+mesc_df <- read.table(mesc_summary_file, header=TRUE, sep="\t")
+
+
 ###################################################
 # Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
 # Make plot for causal tissue
@@ -838,16 +1155,27 @@ non_med_anno="genotype_intercept"
 simulated_gt_architecture="linear"
 inference_gt_architecture="linear"
 sq_sumstat_threshold="100.0"
-weighting = "unweighted"
-run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold,"_", weighting)
+weighting = "weighted"
 
 
+step1_gene_ldscores="MarginalSS"
+step1_gene_ldscores="mescLassoPlusMarginalSS"
+step1_gene_ldscores="mescLasso"
+
+
+inference_approach="JIVE"
+inference_approach="2SLS"
+if (FALSE) {
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold, "_", step1_gene_ldscores, "_", inference_approach,"_", weighting)
 joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_calibrated_ldsc_summary_averaged.txt")
 joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
 
-causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+joint_ldsc_df <- rbind(mesc_df, joint_ldsc_df)
+
+
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("mesc","calibrated_mesc"))
 # Make plot for non-causal tissue
-non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("mesc","calibrated_mesc"))
 # Get legend
 legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
 # Combine together with cowplot
@@ -856,7 +1184,198 @@ joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_me
 # Save
 output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_calibrated_mesc_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
 ggsave(joint, file=output_file, width=7.2, height=5.5, units="in")
+}
 
+# Make Jacknifed standard error coverage plots
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+sq_sumstat_threshold="100.0"
+weighting = "weighted"
+
+
+step1_gene_ldscores="MarginalSS"
+step1_gene_ldscores="mescLassoPlusMarginalSS"
+step1_gene_ldscores="mescLasso"
+
+
+inference_approach="JIVE"
+inference_approach="2SLS"
+
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold, "_", step1_gene_ldscores, "_", inference_approach,"_", weighting)
+
+
+calibration_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_calibration_summary.txt")
+df_cal <- read.table(calibration_summary_file, header=TRUE, sep="\t")
+
+genetic_element_class <- "total_nm_h2"
+pp1 <- make_coverage_standard_error_barplot(df_cal, genetic_element_class)
+
+genetic_element_class <- "total_med_h2"
+pp2 <- make_coverage_standard_error_barplot(df_cal, genetic_element_class)
+
+genetic_element_class <- "causal_tissue_med_h2"
+pp3 <- make_coverage_standard_error_barplot(df_cal, genetic_element_class)
+
+joint_pp <- plot_grid(pp1, pp2, pp3, ncol=1)
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_coverage_calibrated_mesc_se_barplot.pdf")
+ggsave(joint_pp, file=output_file, width=7.2, height=5.5, units="in")
+
+
+# Add mesc
+coverage_summary_file <- paste0(organized_trait_med_h2_results_dir, "mesc_med_h2_5_causal_tissue__full_gt_arch_linear_genotypeIntercept_sim_results_calibration_summary.txt")
+
+df_cov2 <- read.table(coverage_summary_file, header=TRUE, sep="\t")
+df_cal <- rbind(df_cal, df_cov2)
+
+
+genetic_element_class <- "causal_tissue_med_h2"
+pp <- make_coverage_multimethod_standard_error_barplot(df_cal, genetic_element_class, "200")
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_coverage_multimethod_calibrated_mesc_se_barplot.pdf")
+ggsave(pp, file=output_file, width=7.2, height=4.5, units="in")
+
+
+
+
+###################################################
+# Make Jacknifed power plots
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+sq_sumstat_threshold="100.0"
+weighting = "weighted"
+step1_gene_ldscores="MarginalSS"
+step1_gene_ldscores="mescLassoPlusMarginalSS"
+step1_gene_ldscores="mescLasso"
+
+
+inference_approach="JIVE"
+inference_approach="2SLS"
+
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold, "_", step1_gene_ldscores, "_", inference_approach,"_", weighting)
+
+
+power_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_power_summary.txt")
+df_power <- read.table(power_summary_file, header=TRUE, sep="\t")
+
+genetic_element_class <- "total_nm_h2"
+pp1 <- make_power_standard_error_barplot(df_power, genetic_element_class)
+
+genetic_element_class <- "total_med_h2"
+pp2 <- make_power_standard_error_barplot(df_power, genetic_element_class)
+
+genetic_element_class <- "causal_tissue_med_h2"
+pp3 <- make_power_standard_error_barplot(df_power, genetic_element_class)
+
+joint_pp <- plot_grid(pp1, pp2, pp3, ncol=1)
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_power_calibrated_mesc_se_barplot.pdf")
+ggsave(joint_pp, file=output_file, width=7.2, height=5.5, units="in")
+
+
+# Add mesc
+power_summary_file <- paste0(organized_trait_med_h2_results_dir, "mesc_med_h2_5_causal_tissue__full_gt_arch_linear_genotypeIntercept_sim_results_power_summary.txt")
+
+df_power2 <- read.table(power_summary_file, header=TRUE, sep="\t")
+
+df_power <- rbind(df_power, df_power2)
+genetic_element_class <- "causal_tissue_med_h2"
+qtl_ss = "200"
+pp <- make_multimethod_power_standard_error_barplot(df_power, genetic_element_class, qtl_ss)
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_power_calibrated_multimethod_mesc_se_barplot.pdf")
+ggsave(pp, file=output_file, width=7.2, height=5.5, units="in")
+
+###################################################
+# Make Jacknifed T1E plots
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+sq_sumstat_threshold="100.0"
+weighting = "weighted"
+step1_gene_ldscores="MarginalSS"
+step1_gene_ldscores="mescLassoPlusMarginalSS"
+step1_gene_ldscores="mescLasso"
+
+
+inference_approach="JIVE"
+inference_approach="2SLS"
+
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold, "_", step1_gene_ldscores, "_", inference_approach,"_", weighting)
+
+
+t1e_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_t1e_summary.txt")
+df_t1e <- read.table(t1e_summary_file, header=TRUE, sep="\t")
+
+pp <- make_t1e_standard_error_barplot(df_t1e)
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_t1e_calibrated_mesc_se_barplot.pdf")
+ggsave(pp, file=output_file, width=7.2, height=4.5, units="in")
+
+
+
+
+###################################################
+# Make Jacknifed T1E plots (including both calibrated mesc and mesc)
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="linear"
+inference_gt_architecture="linear"
+sq_sumstat_threshold="100.0"
+weighting = "weighted"
+step1_gene_ldscores="MarginalSS"
+step1_gene_ldscores="mescLassoPlusMarginalSS"
+step1_gene_ldscores="mescLasso"
+
+
+inference_approach="JIVE"
+inference_approach="2SLS"
+
+run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold, "_", step1_gene_ldscores, "_", inference_approach,"_", weighting)
+
+
+t1e_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_t1e_summary.txt")
+df_t1e <- read.table(t1e_summary_file, header=TRUE, sep="\t")
+
+mesc_t1e_file <- paste0(organized_trait_med_h2_results_dir, "mesc_med_h2_5_causal_tissue__full_gt_arch_linear_genotypeIntercept_sim_results_t1e_summary.txt")
+mesc_df <- read.table(mesc_t1e_file, header=TRUE, sep="\t")
+
+df_t1e <- rbind(df_t1e, mesc_df)
+
+
+pp <- make_t1e_multimethod_standard_error_barplot(df_t1e)
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_t1e_calibrated_multimethod_mesc_se_barplot.pdf")
+ggsave(pp, file=output_file, width=7.2, height=4.5, units="in")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if (FALSE) {
 
 ###################################################
 # Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
@@ -1041,6 +1560,7 @@ ggsave(pp, file=output_file, width=7.2, height=4.5, units="in")
 
 ###################################################
 # Make F-statistic plots
+if (FALSE) {
 eqtl_snp_representation="bins_20"
 non_med_anno="genotype_intercept"
 simulated_gt_architecture="stdExpr"
@@ -1054,7 +1574,7 @@ pp <- make_fstat_violinplot_w_stdExpr_data(fstat_df, remove_1000=TRUE)
 # Save
 output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_fstat_stdExpr_remove_1000_violinplot.pdf")
 ggsave(pp, file=output_file, width=7.2, height=3.79, units="in")
-
+}
 
 ###################################################
 # Make F-statistic plots comparing linear model + random bins

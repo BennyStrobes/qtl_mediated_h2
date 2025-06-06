@@ -318,6 +318,24 @@ def compute_power(sim_values, est_values, est_value_ses, coverage):
 	return coverage, coverage_lb, coverage_ub
 
 
+def compute_t1e(est_values, est_value_ses, pvalue_threshold):
+	est_lb, est_ub = ci(est_values, est_value_ses, conf=1.0-pvalue_threshold)
+
+
+	n_covered = np.sum((est_lb <= 0) & (est_ub >= 0))
+	n_tot = len(est_values)
+	t1e = (n_tot-n_covered)/n_tot
+
+	t1e_se = np.sqrt(((t1e)*(1.0-t1e))/n_tot)
+
+	t1e_lb = t1e - (1.96*t1e_se)
+	t1e_ub = t1e + (1.96*t1e_se)
+
+
+	return t1e, t1e_lb, t1e_ub
+
+
+
 
 
 def fstat_summary(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, permuted_eqtls=False, variance_weighting=False):
@@ -378,7 +396,7 @@ def power_summary(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_r
 			est_per_category_h2_se = []
 			est_eqtl_h2 = []
 			for sim_num in sim_nums:
-				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_' + weighting + '_' + method + '_bs_results.txt'
+				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_' + weighting + '_' + method + '_jk_results.txt'
 
 				if sim_num in invalid_sims:
 					continue
@@ -425,11 +443,12 @@ def power_summary(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_r
 				sim_total_h2.append(tmp_total_h2_sim)
 				sim_med_h2.append(tmp_total_med_h2_sim)
 				sim_nm_h2.append(tmp_total_nm_h2_sim)
-				est_med_h2.append(float(arr_est[1]))
-				est_med_h2_se.append(float(arr_est_se[1]))
-				est_nm_h2.append(float(arr_est[0]))
-				est_nm_h2_se.append(float(arr_est_se[0]))
-				est_total_h2.append(float(arr_est[1]) + float(arr_est[0]))
+				est_med_h2.append(float(arr_est[2]))
+				est_med_h2_se.append(float(arr_est_se[2]))
+				est_nm_h2.append(float(arr_est[1]))
+				est_nm_h2_se.append(float(arr_est_se[1]))
+				est_total_h2.append(float(arr_est[0]))
+				est_total_h2_se.append(float(arr_est_se[0]))
 				est_per_tissue_h2.append(per_tissue_est)
 				est_per_tissue_h2_se.append(per_tissue_est_se)
 				est_per_category_h2.append(per_category_est)
@@ -446,6 +465,8 @@ def power_summary(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_r
 			sim_nm_h2 = np.asarray(sim_nm_h2)
 			est_nm_h2 = np.asarray(est_nm_h2)
 			est_nm_h2_se = np.asarray(est_nm_h2_se)
+			est_total_h2 = np.asarray(est_total_h2)
+			est_total_h2_se = np.asarray(est_total_h2_se)
 
 
 			# Calibration for med h2
@@ -474,6 +495,124 @@ def power_summary(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_r
 
 	return
 
+
+
+def t1e_summary(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, t1e_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, permuted_eqtls=False, variance_weighting=False):
+	pvalue_thresholds  = [.01, .05, .1, .2]
+
+	t = open(t1e_results_summary_file,'w')
+	t.write('method_name\teQTL_ss\tgenetic_element\tpvalue_threshold\tt1e\tt1e_lb\tt1e_ub\n')
+
+
+	for ii,method in enumerate(methods):
+		for eqtl_sample_size in eqtl_sample_sizes:
+			sim_total_h2 = []
+			sim_med_h2 = []
+			sim_nm_h2 = []
+			est_nm_h2 = []
+			est_nm_h2_se = []
+			est_med_h2 = []
+			est_med_h2_se = []
+			est_total_h2 = []
+			est_total_h2_se = []
+			est_per_tissue_h2 =[]
+			est_per_tissue_h2_se = []
+			est_per_category_h2 = []
+			est_per_category_h2_se = []
+			est_eqtl_h2 = []
+			for sim_num in sim_nums:
+				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_' + weighting + '_' + method + '_jk_results.txt'
+
+				if sim_num in invalid_sims:
+					continue
+				if os.path.isfile(filer) == False:
+					print(sim_num)
+					print('miss')
+					continue
+				f = open(filer)
+				arr_est = []
+				arr_names = []
+				arr_est_se = []
+				per_tissue_est = []
+				per_tissue_est_se = []
+				per_category_est = []
+				per_category_est_se = []
+				head_count = 0
+				for line in f:
+					line = line.rstrip()
+					data = line.split()
+					if head_count == 0:
+						head_count = head_count + 1
+						continue
+					arr_est.append(float(data[1]))
+					arr_names.append(data[0])
+					arr_est_se.append(float(data[3]))
+					if data[0].startswith('category_med'):
+						per_category_est.append(float(data[1]))
+						per_category_est_se.append(float(data[3]))
+					if data[0].startswith('dataset_med'):
+						per_tissue_est.append(float(data[1]))
+						per_tissue_est_se.append(float(data[3]))
+				f.close()
+				arr_est = np.asarray(arr_est)
+				arr_names = np.asarray(arr_names)
+				arr_est_se = np.asarray(arr_est_se)
+				per_tissue_est = np.asarray(per_tissue_est)
+				per_tissue_est_se = np.asarray(per_tissue_est_se)
+				per_category_est = np.asarray(per_category_est)
+				per_category_est_se = np.asarray(per_category_est_se)
+
+
+				tmp_total_h2_sim, tmp_total_nm_h2_sim, tmp_total_med_h2_sim = sim_heritabilities[sim_num]
+
+				sim_total_h2.append(tmp_total_h2_sim)
+				sim_med_h2.append(tmp_total_med_h2_sim)
+				sim_nm_h2.append(tmp_total_nm_h2_sim)
+				est_med_h2.append(float(arr_est[2]))
+				est_med_h2_se.append(float(arr_est_se[2]))
+				est_nm_h2.append(float(arr_est[1]))
+				est_nm_h2_se.append(float(arr_est_se[1]))
+				est_total_h2.append(float(arr_est[0]))
+				est_total_h2_se.append(float(arr_est_se[0]))
+				est_per_tissue_h2.append(per_tissue_est)
+				est_per_tissue_h2_se.append(per_tissue_est_se)
+				est_per_category_h2.append(per_category_est)
+				est_per_category_h2_se.append(per_category_est_se)
+				est_eqtl_h2.append(float(arr_est[-1]))	
+
+			est_per_tissue_h2 = np.asarray(est_per_tissue_h2)
+			est_per_category_h2 = np.asarray(est_per_category_h2)
+			est_per_tissue_h2_se = np.asarray(est_per_tissue_h2_se)
+			est_per_category_h2_se = np.asarray(est_per_category_h2_se)
+			sim_med_h2 = np.asarray(sim_med_h2)
+			est_med_h2 = np.asarray(est_med_h2)
+			est_med_h2_se = np.asarray(est_med_h2_se)
+			sim_nm_h2 = np.asarray(sim_nm_h2)
+			est_nm_h2 = np.asarray(est_nm_h2)
+			est_nm_h2_se = np.asarray(est_nm_h2_se)
+			est_total_h2 = np.asarray(est_total_h2)
+			est_total_h2_se = np.asarray(est_total_h2_se)
+
+
+			# Calibration for med h2
+			for pvalue_threshold in pvalue_thresholds:
+
+				# NM H2
+				observed_t1e, observed_t1e_lb, observed_t1e_ub = compute_t1e(est_per_tissue_h2[:,1], est_per_tissue_h2_se[:,1], pvalue_threshold)
+				t.write(clean_method_names[ii] + '\t' + str(eqtl_sample_size) + '\t' + 'non_causal_tissue' + '\t' + str(pvalue_threshold) + '\t' + str(observed_t1e) + '\t' + str(observed_t1e_lb) + '\t' + str(observed_t1e_ub) + '\n')
+
+
+
+
+
+	t.close()
+
+	print(t1e_results_summary_file)
+
+	return
+
+
+
 def confidence_interval_calibration(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, permuted_eqtls=False, variance_weighting=False):
 	coverages = [.5, .7, .9, .95]
 
@@ -497,7 +636,7 @@ def confidence_interval_calibration(sim_nums, eqtl_sample_sizes, trait_med_h2_in
 			est_per_category_h2_se = []
 			est_eqtl_h2 = []
 			for sim_num in sim_nums:
-				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_' + weighting + '_' + method + '_bs_results.txt'
+				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_' + weighting + '_' + method + '_jk_results.txt'
 
 				if sim_num in invalid_sims:
 					continue
@@ -545,11 +684,12 @@ def confidence_interval_calibration(sim_nums, eqtl_sample_sizes, trait_med_h2_in
 				sim_total_h2.append(tmp_total_h2_sim)
 				sim_med_h2.append(tmp_total_med_h2_sim)
 				sim_nm_h2.append(tmp_total_nm_h2_sim)
-				est_med_h2.append(float(arr_est[1]))
-				est_med_h2_se.append(float(arr_est_se[1]))
-				est_nm_h2.append(float(arr_est[0]))
-				est_nm_h2_se.append(float(arr_est_se[0]))
-				est_total_h2.append(float(arr_est[1]) + float(arr_est[0]))
+				est_med_h2.append(float(arr_est[2]))
+				est_med_h2_se.append(float(arr_est_se[2]))
+				est_nm_h2.append(float(arr_est[1]))
+				est_nm_h2_se.append(float(arr_est_se[1]))
+				est_total_h2.append(float(arr_est[0]))
+				est_total_h2_se.append(float(arr_est_se[0]))
 				est_per_tissue_h2.append(per_tissue_est)
 				est_per_tissue_h2_se.append(per_tissue_est_se)
 				est_per_category_h2.append(per_category_est)
@@ -566,10 +706,17 @@ def confidence_interval_calibration(sim_nums, eqtl_sample_sizes, trait_med_h2_in
 			sim_nm_h2 = np.asarray(sim_nm_h2)
 			est_nm_h2 = np.asarray(est_nm_h2)
 			est_nm_h2_se = np.asarray(est_nm_h2_se)
+			est_total_h2 = np.asarray(est_total_h2)
+			est_total_h2_se = np.asarray(est_total_h2_se)
+			sim_total_h2 = np.asarray(sim_total_h2)
 
 
 			# Calibration for med h2
 			for coverage in coverages:
+
+				observed_coverage, observed_coverage_lb, observed_coverage_ub = compute_coverage(sim_total_h2, est_total_h2, est_total_h2_se, coverage)
+				t.write(clean_method_names[ii] + '\t' + str(eqtl_sample_size) + '\t' + 'total_h2' + '\t' + str(coverage) + '\t' + str(observed_coverage) + '\t' + str(observed_coverage_lb) + '\t' + str(observed_coverage_ub) + '\n')
+
 				observed_coverage, observed_coverage_lb, observed_coverage_ub = compute_coverage(sim_nm_h2, est_nm_h2, est_nm_h2_se, coverage)
 				t.write(clean_method_names[ii] + '\t' + str(eqtl_sample_size) + '\t' + 'total_nm_h2' + '\t' + str(coverage) + '\t' + str(observed_coverage) + '\t' + str(observed_coverage_lb) + '\t' + str(observed_coverage_ub) + '\n')
 
@@ -616,8 +763,7 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 			est_eqtl_h2 = []
 			sim_counter = []
 			for sim_num in sim_nums:
-				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_' + weighting + '_' + method + '_bs_results.txt'
-
+				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_' + weighting + '_' + method + '_jk_results.txt'
 				if sim_num in invalid_sims:
 					continue
 				if os.path.isfile(filer) == False:
@@ -664,11 +810,12 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 				sim_total_h2.append(tmp_total_h2_sim)
 				sim_med_h2.append(tmp_total_med_h2_sim)
 				sim_nm_h2.append(tmp_total_nm_h2_sim)
-				est_med_h2.append(float(arr_est[1]))
-				est_med_h2_se.append(float(arr_est_se[1]))
-				est_nm_h2.append(float(arr_est[0]))
-				est_nm_h2_se.append(float(arr_est_se[0]))
-				est_total_h2.append(float(arr_est[1]) + float(arr_est[0]))
+				est_med_h2.append(float(arr_est[2]))
+				est_med_h2_se.append(float(arr_est_se[2]))
+				est_nm_h2.append(float(arr_est[1]))
+				est_nm_h2_se.append(float(arr_est_se[1]))
+				est_total_h2.append(float(arr_est[0]))
+				est_total_h2_se.append(float(arr_est_se[0]))
 				est_per_tissue_h2.append(per_tissue_est)
 				est_per_tissue_h2_se.append(per_tissue_est_se)
 				est_per_category_h2.append(per_category_est)
@@ -685,14 +832,10 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 				continue
 
 			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_total_h2, est_total_h2, 'total_h2')
-			if variance_weighting:
-				t = print_temp_line_accounting_for_variance(clean_method_names[ii], eqtl_sample_size, t, sim_nm_h2, est_nm_h2, est_nm_h2_se, 'nm_h2')
-				t = print_temp_line_accounting_for_variance(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, est_med_h2, est_med_h2_se, 'med_h2')
-				t = print_temp_line_accounting_for_variance(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, est_per_tissue_h2[:,0], est_per_tissue_h2_se[:,0], 'causal_tissue_med_h2')
-			else:
-				t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_nm_h2, est_nm_h2, 'nm_h2')
-				t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, est_med_h2, 'med_h2')
-				t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, est_per_tissue_h2[:,0], 'causal_tissue_med_h2')
+
+			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_nm_h2, est_nm_h2, 'nm_h2')
+			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, est_med_h2, 'med_h2')
+			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, est_per_tissue_h2[:,0], 'causal_tissue_med_h2')
 			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, 0.0, np.sum(est_per_tissue_h2[:,1:],axis=1), 'non_causal_tissue_med_h2')
 			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, (.025 + .05 + .1)/3.0, est_eqtl_h2, 'eqtl_h2')
 		
@@ -703,10 +846,7 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 					simmer = np.copy(sim_med_h2)
 				else:
 					simmer = np.copy(sim_med_h2)*0.0
-				if variance_weighting:
-					t = print_temp_line_accounting_for_variance(clean_method_names[ii], eqtl_sample_size, t, simmer, est_single_tissue, est_per_tissue_h2_se[:,tissue_num], 'med_h2_tissue' + str(tissue_num))
-				else:
-					t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, simmer, est_single_tissue, 'med_h2_tissue' + str(tissue_num))
+				t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, simmer, est_single_tissue, 'med_h2_tissue' + str(tissue_num))
 
 	t.close()
 	print(avg_results_summary_file)
@@ -1201,32 +1341,44 @@ step1_gene_ldscores='mescLassoPlusMarginalSS'
 step1_gene_ldscores='mescLasso'
 
 
+inference_approach="JIVE"
+inference_approach="2SLS"
+
+
 # Create mapping from simulation number to simulated heritabilities
 sim_heritabilities = create_mapping_from_simulation_number_to_simulated_heritabilities(simulated_trait_dir, tmp_simulation_name_string, sim_nums, simulated_gt_architecture)
 
 
 
-run_string = eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh + '_' + step1_gene_ldscores
+run_string = eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh + '_' + step1_gene_ldscores + '_' + inference_approach
 
-avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh+ '_' + step1_gene_ldscores + '_' + weighting + '_sim_results_calibrated_ldsc_summary_averaged.txt'
+avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh+ '_' + step1_gene_ldscores + '_' + inference_approach + '_' + weighting + '_sim_results_calibrated_ldsc_summary_averaged.txt'
 clean_method_names = ['uncalibrated_mesc', 'calibrated_mesc']
 methods = ['uncalibrated_mesc', 'calibrated_mesc']
 average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
 
 
-calibration_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh+ '_' + step1_gene_ldscores + '_' + weighting + '_sim_results_calibration_summary.txt'
+calibration_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh+ '_' + step1_gene_ldscores+ '_' + inference_approach + '_' + weighting + '_sim_results_calibration_summary.txt'
 clean_method_names = ['calibrated_mesc']
 methods = ['calibrated_mesc']
 confidence_interval_calibration(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, calibration_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
 
-power_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh+ '_' + step1_gene_ldscores + '_' + weighting + '_sim_results_power_summary.txt'
+t1e_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh+ '_' + step1_gene_ldscores+ '_' + inference_approach + '_' + weighting + '_sim_results_t1e_summary.txt'
+clean_method_names = ['calibrated_mesc']
+methods = ['calibrated_mesc']
+t1e_summary(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, t1e_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
+
+
+
+
+power_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh+ '_' + step1_gene_ldscores+ '_' + inference_approach + '_' + weighting + '_sim_results_power_summary.txt'
 clean_method_names = ['uncalibrated_mesc','calibrated_mesc']
 methods = ['uncalibrated_mesc','calibrated_mesc']
 power_summary(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, power_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
 
 
 
-fstat_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh+ '_' + step1_gene_ldscores + '_' + weighting + '_sim_results_fstat_summary.txt'
+fstat_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh+ '_' + step1_gene_ldscores+ '_' + inference_approach + '_' + weighting + '_sim_results_fstat_summary.txt'
 clean_method_names = ['calibrated_mesc']
 methods = ['calibrated_mesc']
 fstat_summary(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, fstat_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)

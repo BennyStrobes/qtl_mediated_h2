@@ -266,8 +266,10 @@ def load_in_eqtl_dataset_summary_file(eqtl_summary_file):
 	names = []
 	sample_sizes1 = []
 	sample_sizes2 = []
+	sample_sizesfull = []
 	filers1 = []
 	filers2 = []
+	filersfull = []
 	f = open(eqtl_summary_file)
 	head_count = 0
 	for line in f:
@@ -279,10 +281,12 @@ def load_in_eqtl_dataset_summary_file(eqtl_summary_file):
 		names.append(data[0])
 		sample_sizes1.append(float(data[1]))
 		sample_sizes2.append(float(data[2]))
+		sample_sizesfull.append(float(data[3]))
 		filers1.append(data[4])
 		filers2.append(data[5])
+		filersfull.append(data[6])
 	f.close()
-	return np.asarray(names), np.asarray(sample_sizes1), np.asarray(sample_sizes2), np.asarray(filers1), np.asarray(filers2)
+	return np.asarray(names), np.asarray(sample_sizes1), np.asarray(sample_sizes2), np.asarray(filers1), np.asarray(filers2), np.asarray(sample_sizesfull), np.asarray(filersfull)
 
 
 def update_gene_info_to_include_eqtl_dataset_names(gene_info, squared_eqtl_effect_threshold):
@@ -756,13 +760,16 @@ def single_run_of_uncalibrated_mesc(gwas_variant_ld_scores, gene_ldscores_traini
 	return est_nm_h2s, est_med_h2s, est_dataset_med_h2s
 
 
-def single_run_of_calibrated_mesc(gwas_variant_ld_scores, gene_ldscores_training1, gene_ldscores_validation1,gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq, regression_weights, squared_eqtl_effect_threshold, n_reference_snps, n_genetic_genes1, n_genetic_genes2, full_eqtl_dataset_names, eqtl_dataset_names, step1_regression_method):
+def single_run_of_calibrated_mesc(gwas_variant_ld_scores, gene_ldscores_training1, gene_ldscores_validation1,gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq, regression_weights, squared_eqtl_effect_threshold, n_reference_snps, n_genetic_genes1, n_genetic_genes2, full_eqtl_dataset_names, eqtl_dataset_names, step1_regression_method, inference_approach):
 	##############
 	# Data set 1
 	# Filter regression variables
 	gwas_variant_ld_scores1, gene_ldscores_training1, gene_ldscores_validation1, gwas_E_beta_sq1, regression_weights1 = filter_regression_variables(gwas_variant_ld_scores, gene_ldscores_training1, gene_ldscores_validation1, gwas_E_beta_sq, regression_weights, squared_eqtl_effect_threshold)
 	# Use validation data to extract calibrated gene ldscores
-	calibrated_gene_ldscores1 = use_validation_data_to_get_calibrated_gene_ldscores(gwas_variant_ld_scores1, gene_ldscores_training1, gene_ldscores_validation1, regression_weights1, step1_regression_method)
+	if inference_approach == '2SLS':
+		calibrated_gene_ldscores1 = use_validation_data_to_get_calibrated_gene_ldscores(gwas_variant_ld_scores1, gene_ldscores_training1, gene_ldscores_validation1, regression_weights1, step1_regression_method)
+	elif inference_approach == 'JIVE':
+		calibrated_gene_ldscores1 = use_validation_data_to_get_calibrated_gene_ldscores_JIVE(gwas_variant_ld_scores1, gene_ldscores_training1, gene_ldscores_validation1, regression_weights1, step1_regression_method)
 
 
 	##############
@@ -771,14 +778,24 @@ def single_run_of_calibrated_mesc(gwas_variant_ld_scores, gene_ldscores_training
 	gwas_variant_ld_scores2, gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq2, regression_weights2 = filter_regression_variables(gwas_variant_ld_scores, gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq, regression_weights, squared_eqtl_effect_threshold)
 	##############################
 	# Use validation data to extract calibrated gene ldscores
-	calibrated_gene_ldscores2 = use_validation_data_to_get_calibrated_gene_ldscores(gwas_variant_ld_scores2, gene_ldscores_training2, gene_ldscores_validation2, regression_weights2, step1_regression_method)
-
+	if inference_approach == '2SLS':
+		calibrated_gene_ldscores2 = use_validation_data_to_get_calibrated_gene_ldscores(gwas_variant_ld_scores2, gene_ldscores_training2, gene_ldscores_validation2, regression_weights2, step1_regression_method)
+	elif inference_approach == 'JIVE':
+		calibrated_gene_ldscores2 = use_validation_data_to_get_calibrated_gene_ldscores_JIVE(gwas_variant_ld_scores2, gene_ldscores_training2, gene_ldscores_validation2, regression_weights2, step1_regression_method)
 
 	# Run Mesc in data set 1
 	est_nm_h2s1, est_med_h2s1 = run_mesc(gwas_E_beta_sq1, gwas_variant_ld_scores1, n_reference_snps, calibrated_gene_ldscores1, n_genetic_genes1, regression_weights1)
 	est_dataset_med_h2s1 = get_per_dataset_med_h2(est_med_h2s1, full_eqtl_dataset_names, eqtl_dataset_names)
 	est_nm_h2s2, est_med_h2s2 = run_mesc(gwas_E_beta_sq2, gwas_variant_ld_scores2, n_reference_snps, calibrated_gene_ldscores2, n_genetic_genes2, regression_weights2)
 	est_dataset_med_h2s2 = get_per_dataset_med_h2(est_med_h2s2, full_eqtl_dataset_names, eqtl_dataset_names)
+
+
+
+	#ivolsmod = IV2SLS(gwas_E_beta_sq1, instruments=np.hstack((np.ones(gwas_variant_ld_scores1.shape),gene_ldscores_training1)), endog=gene_ldscores_validation1, exog=gwas_variant_ld_scores1, weights=regression_weights1).fit()
+	#ivolsmod = IVLIML(gwas_E_beta_sq2, instruments=np.hstack((np.ones(gwas_variant_ld_scores2.shape),gene_ldscores_training2)), endog=gene_ldscores_validation2, exog=gwas_variant_ld_scores2, weights=regression_weights2).fit()
+	#ivolsmod = IVGMM(gwas_E_beta_sq2, instruments=np.hstack((np.ones(gwas_variant_ld_scores2.shape),gene_ldscores_training2)), endog=gene_ldscores_validation2, exog=gwas_variant_ld_scores2).fit(cov_type='kernel')
+	#tmp_params = np.asarray(ivolsmod.params)
+
 
 	# Average two
 	est_nm_h2s = (est_nm_h2s1 + est_nm_h2s2)/2.0
@@ -788,48 +805,54 @@ def single_run_of_calibrated_mesc(gwas_variant_ld_scores, gene_ldscores_training
 	return est_nm_h2s, est_med_h2s, est_dataset_med_h2s
 
 
-def run_uncalibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1_full, gene_ldscores_validation1_full, gene_ldscores_training2_full, gene_ldscores_validation2_full, gwas_E_beta_sq_full, regression_weights_full, squared_eqtl_effect_threshold, full_eqtl_dataset_names, eqtl_dataset_names, n_reference_snps, n_genetic_genes1, n_genetic_genes2, avg_eqtl_h2s_1, avg_eqtl_h2s_2, n_bootstraps=10, n_blocks=100):
+def run_uncalibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1_full, gene_ldscores_validation1_full, gene_ldscores_training2_full, gene_ldscores_validation2_full, gwas_E_beta_sq_full, regression_weights_full, squared_eqtl_effect_threshold, full_eqtl_dataset_names, eqtl_dataset_names, n_reference_snps, n_genetic_genes1, n_genetic_genes2, avg_eqtl_h2s_1, avg_eqtl_h2s_2, n_blocks=100):
 	# Dimension of space
 	NN = len(gwas_variant_ld_scores_full)
 
 	# Split indices into blocks
-	blocks = np.array_split(np.arange(NN), n_blocks)	
+	genomic_blocks = np.array_split(np.arange(NN), n_blocks)	
 
-	# Keep track of bootstrapped samples
-	bs_nm_h2s = []
-	bs_med_h2s = []
-	bs_dataset_med_h2s = []
-	bs_total_med_h2s = []
+	# Keep track of jacknifed samples
+	jk_nm_h2s = []
+	jk_med_h2s = []
+	jk_dataset_med_h2s = []
+	jk_total_med_h2s = []
 
-	# Run bootstrap iterations
-	for i in range(n_bootstraps):
-		# Sample blocks with replacement
-		sampled_block_idxs = np.random.choice(n_blocks, size=n_blocks, replace=True)
-		# Gather indices for this bootstrap sample
-		sample_indices = np.concatenate([blocks[idx] for idx in sampled_block_idxs])
+	# Run jacknife iterations
+	for jk_iter in range(n_blocks):
+		# Get blocks corresponding to this JK iteration
+		all_block_indices = np.arange(n_blocks)
+		jk_block_indices = np.concatenate((all_block_indices[:jk_iter], all_block_indices[(jk_iter+1):]))
+
+		# Gather variant indices for this jacknifed sample
+		sample_indices = np.concatenate([genomic_blocks[idx] for idx in jk_block_indices])
 
 		est_nm_h2s, est_med_h2s, est_dataset_med_h2s = single_run_of_uncalibrated_mesc(gwas_variant_ld_scores_full[sample_indices], gene_ldscores_training1_full[sample_indices, :], gene_ldscores_validation1_full[sample_indices, :],gene_ldscores_training2_full[sample_indices,:], gene_ldscores_validation2_full[sample_indices, :], gwas_E_beta_sq_full[sample_indices], regression_weights_full[sample_indices], squared_eqtl_effect_threshold, n_reference_snps, n_genetic_genes1, n_genetic_genes2, full_eqtl_dataset_names, eqtl_dataset_names)
 
-		bs_nm_h2s.append(np.sum(est_nm_h2s))
-		bs_med_h2s.append(est_med_h2s)
-		bs_dataset_med_h2s.append(est_dataset_med_h2s)
-		bs_total_med_h2s.append(np.sum(est_med_h2s))
+		jk_nm_h2s.append(np.sum(est_nm_h2s))
+		jk_med_h2s.append(est_med_h2s)
+		jk_dataset_med_h2s.append(est_dataset_med_h2s)
+		jk_total_med_h2s.append(np.sum(est_med_h2s))
 
-	bs_nm_h2s = np.asarray(bs_nm_h2s)
-	bs_med_h2s = np.asarray(bs_med_h2s)
-	bs_dataset_med_h2s = np.asarray(bs_dataset_med_h2s)
-	bs_total_med_h2s = np.asarray(bs_total_med_h2s)
+	jk_nm_h2s = np.asarray(jk_nm_h2s)
+	jk_med_h2s = np.asarray(jk_med_h2s)
+	jk_dataset_med_h2s = np.asarray(jk_dataset_med_h2s)
+	jk_total_med_h2s = np.asarray(jk_total_med_h2s)
+	jk_total_h2s = jk_nm_h2s + jk_total_med_h2s
+
+
 
 	uncalibrated_mesc_res = {}
-
-	uncalibrated_mesc_res['nm_h2_bs_avg'] = np.mean(bs_nm_h2s)
-	uncalibrated_mesc_res['nm_h2_bs_std'] = np.std(bs_nm_h2s)
-	uncalibrated_mesc_res['med_h2_bs_avg'] = np.mean(bs_med_h2s,axis=0)
-	uncalibrated_mesc_res['med_h2_bs_std'] = np.std(bs_med_h2s,axis=0)
-	uncalibrated_mesc_res['dataset_med_h2_bs_avg'] = np.mean(bs_dataset_med_h2s,axis=0)
-	uncalibrated_mesc_res['dataset_med_h2_bs_std'] = np.std(bs_dataset_med_h2s,axis=0)
-	uncalibrated_mesc_res['total_med_h2_bs_avg'] = np.mean(bs_total_med_h2s)
-	uncalibrated_mesc_res['total_med_h2_bs_std'] = np.std(bs_total_med_h2s)
+	uncalibrated_mesc_res['nm_h2_jk_mean'] = np.mean(jk_nm_h2s)
+	uncalibrated_mesc_res['nm_h2_jk_se'] = np.sqrt(np.var(jk_nm_h2s)*(n_blocks-1))
+	uncalibrated_mesc_res['med_h2_jk_mean'] = np.mean(jk_med_h2s,axis=0)
+	uncalibrated_mesc_res['med_h2_jk_se'] = np.sqrt(np.var(jk_med_h2s,axis=0)*(n_blocks-1))
+	uncalibrated_mesc_res['dataset_med_h2_jk_mean'] = np.mean(jk_dataset_med_h2s,axis=0)
+	uncalibrated_mesc_res['dataset_med_h2_jk_se'] = np.sqrt(np.var(jk_dataset_med_h2s,axis=0)*(n_blocks-1))
+	uncalibrated_mesc_res['total_med_h2_jk_mean'] = np.mean(jk_total_med_h2s)
+	uncalibrated_mesc_res['total_med_h2_jk_se'] = np.sqrt(np.var(jk_total_med_h2s)*(n_blocks-1))
+	uncalibrated_mesc_res['total_h2_jk_mean'] = np.mean(jk_total_h2s)
+	uncalibrated_mesc_res['total_h2_jk_se'] = np.sqrt(np.var(jk_total_h2s)*(n_blocks-1))
 
 
 	est_nm_h2s, est_med_h2s, est_dataset_med_h2s = single_run_of_uncalibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1_full, gene_ldscores_validation1_full,gene_ldscores_training2_full, gene_ldscores_validation2_full, gwas_E_beta_sq_full, regression_weights_full, squared_eqtl_effect_threshold, n_reference_snps, n_genetic_genes1, n_genetic_genes2, full_eqtl_dataset_names, eqtl_dataset_names)
@@ -838,6 +861,7 @@ def run_uncalibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1_f
 	uncalibrated_mesc_res['med_h2'] = est_med_h2s
 	uncalibrated_mesc_res['dataset_med_h2'] = est_dataset_med_h2s
 	uncalibrated_mesc_res['total_med_h2'] = np.mean(np.sum(est_med_h2s))
+	uncalibrated_mesc_res['total_h2'] = np.sum(est_nm_h2s) + np.sum(est_med_h2s)
 
 	agg_mean_eqtl_h2 = np.mean([np.mean(avg_eqtl_h2s_1), np.mean(avg_eqtl_h2s_2)])
 	uncalibrated_mesc_res['eqtl_h2'] = agg_mean_eqtl_h2
@@ -845,7 +869,7 @@ def run_uncalibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1_f
 	return uncalibrated_mesc_res
 
 
-def run_calibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1_full, gene_ldscores_validation1_full, gene_ldscores_training2_full, gene_ldscores_validation2_full, gwas_E_beta_sq_full, regression_weights_full, squared_eqtl_effect_threshold, full_eqtl_dataset_names, eqtl_dataset_names, n_reference_snps, n_genetic_genes1, n_genetic_genes2, avg_eqtl_h2s_1, avg_eqtl_h2s_2, step1_regression_method, n_bootstraps=50, n_blocks=100):
+def run_calibrated_mesc_via_bootstrapping(gwas_variant_ld_scores_full, gene_ldscores_training1_full, gene_ldscores_validation1_full, gene_ldscores_training2_full, gene_ldscores_validation2_full, gwas_E_beta_sq_full, regression_weights_full, squared_eqtl_effect_threshold, full_eqtl_dataset_names, eqtl_dataset_names, n_reference_snps, n_genetic_genes1, n_genetic_genes2, avg_eqtl_h2s_1, avg_eqtl_h2s_2, step1_regression_method, n_bootstraps=50, n_blocks=100):
 	# Dimension of space
 	NN = len(gwas_variant_ld_scores_full)
 
@@ -897,11 +921,79 @@ def run_calibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1_ful
 	calibrated_mesc_res['total_med_h2'] = np.mean(np.sum(est_med_h2s))
 
 
+
 	agg_mean_eqtl_h2 = np.mean([np.mean(avg_eqtl_h2s_1), np.mean(avg_eqtl_h2s_2)])
 	calibrated_mesc_res['eqtl_h2'] = agg_mean_eqtl_h2
 
 
 	return calibrated_mesc_res
+
+
+
+def run_calibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1_full, gene_ldscores_validation1_full, gene_ldscores_training2_full, gene_ldscores_validation2_full, gwas_E_beta_sq_full, regression_weights_full, squared_eqtl_effect_threshold, full_eqtl_dataset_names, eqtl_dataset_names, n_reference_snps, n_genetic_genes1, n_genetic_genes2, avg_eqtl_h2s_1, avg_eqtl_h2s_2, step1_regression_method, inference_approach, n_blocks=100):
+	# Dimension of space
+	NN = len(gwas_variant_ld_scores_full)
+
+	# Split indices into blocks
+	genomic_blocks = np.array_split(np.arange(NN), n_blocks)	
+
+	# Keep track of Jacknifed samples
+	jk_nm_h2s = []
+	jk_med_h2s = []
+	jk_dataset_med_h2s = []
+	jk_total_med_h2s = []
+	'''
+	# Run jacknife iterations
+	for jk_iter in range(n_blocks):
+		# Get blocks corresponding to this JK iteration
+		all_block_indices = np.arange(n_blocks)
+		jk_block_indices = np.concatenate((all_block_indices[:jk_iter], all_block_indices[(jk_iter+1):]))
+
+		# Gather variant indices for this jacknifed sample
+		sample_indices = np.concatenate([genomic_blocks[idx] for idx in jk_block_indices])
+
+		est_nm_h2s, est_med_h2s, est_dataset_med_h2s = single_run_of_calibrated_mesc(gwas_variant_ld_scores_full[sample_indices], gene_ldscores_training1_full[sample_indices, :], gene_ldscores_validation1_full[sample_indices, :],gene_ldscores_training2_full[sample_indices,:], gene_ldscores_validation2_full[sample_indices, :], gwas_E_beta_sq_full[sample_indices], regression_weights_full[sample_indices], squared_eqtl_effect_threshold, n_reference_snps, n_genetic_genes1, n_genetic_genes2, full_eqtl_dataset_names, eqtl_dataset_names, step1_regression_method, inference_approach)
+
+		jk_nm_h2s.append(np.sum(est_nm_h2s))
+		jk_med_h2s.append(est_med_h2s)
+		jk_dataset_med_h2s.append(est_dataset_med_h2s)
+		jk_total_med_h2s.append(np.sum(est_med_h2s))
+
+	jk_nm_h2s = np.asarray(jk_nm_h2s)
+	jk_med_h2s = np.asarray(jk_med_h2s)
+	jk_dataset_med_h2s = np.asarray(jk_dataset_med_h2s)
+	jk_total_med_h2s = np.asarray(jk_total_med_h2s)
+	jk_total_h2s = jk_nm_h2s + jk_total_med_h2s
+
+	calibrated_mesc_res = {}
+	calibrated_mesc_res['nm_h2_jk_mean'] = np.mean(jk_nm_h2s)
+	calibrated_mesc_res['nm_h2_jk_se'] = np.sqrt(np.var(jk_nm_h2s)*(n_blocks-1))
+	calibrated_mesc_res['med_h2_jk_mean'] = np.mean(jk_med_h2s,axis=0)
+	calibrated_mesc_res['med_h2_jk_se'] = np.sqrt(np.var(jk_med_h2s,axis=0)*(n_blocks-1))
+	calibrated_mesc_res['dataset_med_h2_jk_mean'] = np.mean(jk_dataset_med_h2s,axis=0)
+	calibrated_mesc_res['dataset_med_h2_jk_se'] = np.sqrt(np.var(jk_dataset_med_h2s,axis=0)*(n_blocks-1))
+	calibrated_mesc_res['total_med_h2_jk_mean'] = np.mean(jk_total_med_h2s)
+	calibrated_mesc_res['total_med_h2_jk_se'] = np.sqrt(np.var(jk_total_med_h2s)*(n_blocks-1))
+	calibrated_mesc_res['total_h2_jk_mean'] = np.mean(jk_total_h2s)
+	calibrated_mesc_res['total_h2_jk_se'] = np.sqrt(np.var(jk_total_h2s)*(n_blocks-1))
+	'''
+
+	est_nm_h2s, est_med_h2s, est_dataset_med_h2s = single_run_of_calibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1_full, gene_ldscores_validation1_full,gene_ldscores_training2_full, gene_ldscores_validation2_full, gwas_E_beta_sq_full, regression_weights_full, squared_eqtl_effect_threshold, n_reference_snps, n_genetic_genes1, n_genetic_genes2, full_eqtl_dataset_names, eqtl_dataset_names, step1_regression_method, inference_approach)
+	
+	calibrated_mesc_res['nm_h2'] = np.sum(est_nm_h2s)
+	calibrated_mesc_res['med_h2'] = est_med_h2s
+	calibrated_mesc_res['dataset_med_h2'] = est_dataset_med_h2s
+	calibrated_mesc_res['total_med_h2'] = np.sum(est_med_h2s)
+	calibrated_mesc_res['total_h2'] = np.sum(est_nm_h2s) + np.sum(est_med_h2s)
+
+
+	agg_mean_eqtl_h2 = np.mean([np.mean(avg_eqtl_h2s_1), np.mean(avg_eqtl_h2s_2)])
+	calibrated_mesc_res['eqtl_h2'] = agg_mean_eqtl_h2
+
+
+	return calibrated_mesc_res
+
+
 
 def use_validation_data_to_get_fstatistics(gwas_variant_ld_scores, gene_ldscores, val_gene_ldscores, regression_weights, step1_regression_method):
 	intercept = np.ones((gene_ldscores.shape[0], 1))
@@ -967,6 +1059,84 @@ def use_validation_data_to_get_calibrated_gene_ldscores(gwas_variant_ld_scores, 
 
 
 	return calibrated_gene_ldscores
+
+def use_validation_data_to_get_calibrated_gene_ldscores_JIVE(gwas_variant_ld_scores, gene_ldscores, val_gene_ldscores, regression_weights, step1_regression_method, n_blocks=99):
+	if step1_regression_method != 'all_snps':
+		print('assumption eroror: not yet implemented')
+		pdb.set_trace()
+
+
+	intercept = np.ones((gene_ldscores.shape[0], 1))
+	X_mat = np.hstack((intercept, gwas_variant_ld_scores, gene_ldscores))
+	calibrated_gene_ldscores = np.zeros(val_gene_ldscores.shape)
+
+	NN = val_gene_ldscores.shape[0]
+
+	# Split indices into blocks
+	genomic_blocks = np.array_split(np.arange(NN), n_blocks)	
+
+
+	# Lol: chatgpt helped speed this computation up.
+	# But verified it works
+	N, K = val_gene_ldscores.shape
+	_, J = X_mat.shape
+	n_blocks = len(genomic_blocks)
+
+	# Otherwise, just regress without intercept:
+	X_aug = X_mat.copy()
+	J_aug = J
+
+	# 2) Form weighted design and weighted outcomes:
+	sqrt_w = np.sqrt(regression_weights)       # (N,)
+	Xw     = X_aug * sqrt_w[:, None]           # (N, J_aug)
+	Yw     = val_gene_ldscores * sqrt_w[:, None]  # (N, K)
+
+	# 3) Full cross‐products:
+	XtX_full = Xw.T @ Xw       # (J_aug, J_aug)
+	XtY_full = Xw.T @ Yw       # (J_aug, K)
+
+	# 4) Precompute each block’s cross‐products:
+	XtX_blocks = []
+	XtY_blocks = []
+	for blk in genomic_blocks:
+		Xw_blk = Xw[blk, :]       # (|block|, J_aug)
+		Yw_blk = Yw[blk, :]       # (|block|, K)
+		XtX_blocks.append(Xw_blk.T @ Xw_blk)  # (J_aug, J_aug)
+		XtY_blocks.append(Xw_blk.T @ Yw_blk)  # (J_aug, K)
+
+	# 5) Allocate storage for all jackknife‐betas:
+	betas = np.zeros((n_blocks, J_aug, K))
+
+	# 6) Loop over blocks and solve:
+	for b in range(n_blocks):
+		XtX_jack = XtX_full - XtX_blocks[b]    # (J_aug, J_aug)
+		XtY_jack = XtY_full - XtY_blocks[b]    # (J_aug, K)
+
+		# Solve (J_aug × J_aug) · (J_aug × K) = (J_aug × K):
+		#   beta[:, k] = (X^T W X)^{-1} (X^T W y_k),
+		# for all k = 0,…,K-1, in one go.
+		beta_b = np.linalg.solve(XtX_jack, XtY_jack)  # shape (J_aug, K)
+		betas[b, :, :] = beta_b
+
+	# 7) Build a blank prediction array of shape (N, K):
+	calibrated_gene_ldscores = np.zeros((N, K))
+
+	# 8) For each block, take its rows from the unweighted design X_aug,
+	#    multiply by the block‐specific beta, and store into predicted[][]:
+	for b, blk in enumerate(genomic_blocks):
+		# blk is an array of row‐indices to predict (the “left‐out” samples)
+		X_blk = X_aug[blk, :]        # shape = (|blk|, J_aug)
+		beta_b = betas[b, :, :]      # shape = (J_aug, K)
+
+		# Matrix‐multiply to get (|blk| × K) predictions for block b:
+		pred_blk = X_blk @ beta_b    # shape = (|blk|, K)
+
+		# Insert into the right rows of the full N×K prediction matrix:
+		calibrated_gene_ldscores[blk, :] = pred_blk
+
+
+	return calibrated_gene_ldscores
+
 
 def run_mesc(gwas_E_beta_sq, gwas_variant_ld_scores, n_reference_snps, gene_ldscores, n_genetic_genes, regression_weights):
 
@@ -1177,16 +1347,18 @@ def get_bootstrapped_f_stats_from_1st_stage_least_squares(gwas_variant_ld_scores
 
 def print_mesc_regression_results(mesc_obj, output_file):
 	t = open(output_file,'w')
-	t.write('parameter_name\tparameter_estimate\tbs_mean\tbs_std\n')
+	t.write('parameter_name\tparameter_estimate\tJK_mean\tJK_SE\n')
 
-	t.write('nm_h2\t' + str(mesc_obj['nm_h2']) + '\t' + str(mesc_obj['nm_h2_bs_avg']) + '\t' + str(mesc_obj['nm_h2_bs_std']) + '\n')
-	t.write('total_med_h2\t' + str(mesc_obj['total_med_h2']) + '\t' + str(mesc_obj['total_med_h2_bs_avg']) + '\t' + str(mesc_obj['total_med_h2_bs_std']) + '\n')
+	t.write('total_h2\t' + str(mesc_obj['total_h2']) + '\t' + str(mesc_obj['total_h2_jk_mean']) + '\t' + str(mesc_obj['total_h2_jk_se']) + '\n')
+
+	t.write('nm_h2\t' + str(mesc_obj['nm_h2']) + '\t' + str(mesc_obj['nm_h2_jk_mean']) + '\t' + str(mesc_obj['nm_h2_jk_se']) + '\n')
+	t.write('total_med_h2\t' + str(mesc_obj['total_med_h2']) + '\t' + str(mesc_obj['total_med_h2_jk_mean']) + '\t' + str(mesc_obj['total_med_h2_jk_se']) + '\n')
 
 	for ii, eqtl_cat_med_h2 in enumerate(mesc_obj['med_h2']):
-		t.write('category_med_h2_' + str(ii) + '\t' + str(eqtl_cat_med_h2) + '\t' + str(mesc_obj['med_h2_bs_avg'][ii]) + '\t' + str(mesc_obj['med_h2_bs_std'][ii]) + '\n')
+		t.write('category_med_h2_' + str(ii) + '\t' + str(eqtl_cat_med_h2) + '\t' + str(mesc_obj['med_h2_jk_mean'][ii]) + '\t' + str(mesc_obj['med_h2_jk_se'][ii]) + '\n')
 
 	for ii, eqtl_dataset_med_h2 in enumerate(mesc_obj['dataset_med_h2']):
-		t.write('dataset_med_h2_' + str(ii) + '\t' + str(eqtl_dataset_med_h2) + '\t' + str(mesc_obj['dataset_med_h2_bs_avg'][ii]) + '\t' + str(mesc_obj['dataset_med_h2_bs_std'][ii]) + '\n')
+		t.write('dataset_med_h2_' + str(ii) + '\t' + str(eqtl_dataset_med_h2) + '\t' + str(mesc_obj['dataset_med_h2_jk_mean'][ii]) + '\t' + str(mesc_obj['dataset_med_h2_jk_se'][ii]) + '\n')
 
 	t.write('eqtl_h2\t' + str(mesc_obj['eqtl_h2']) + '\t' + str(mesc_obj['eqtl_h2']) + '\t' + str(0.0) + '\n')
 
@@ -1243,6 +1415,35 @@ def extract_mesc_gene_scores(rsid_to_position, eqtl_summary_file, mesc_expressio
 	return global_gene_ldscores
 
 
+def get_temp_gene_ldscores(eqtl_dataset_file, rsid_to_position, rsid_to_variant_stdev):
+	gene_dicti = {}
+	tmp_gene_ldscores = np.zeros(len(rsid_to_position))
+	f = open(eqtl_dataset_file)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		ensid = data[0]
+		rsid = data[1]
+		variant_pos = rsid_to_position[rsid]
+		variant_sdev = rsid_to_variant_stdev[rsid]
+		beta = float(data[6])
+		beta_se = float(data[7])
+		# Update betas and standard errors according to this
+		beta = beta*variant_sdev
+		beta_se = beta_se*variant_sdev
+
+		tmp_gene_ldscores[variant_pos] = tmp_gene_ldscores[variant_pos] + np.square(beta) - np.square(beta_se)
+
+		gene_dicti[ensid] = 1
+	f.close()
+
+	return tmp_gene_ldscores, len(gene_dicti)
+
+
 #####################
 # Parse command line arguments
 #####################
@@ -1279,7 +1480,7 @@ parser.add_argument('--step1-regression-method', default="all_snps", type=str,
 					help='Takes as values "all_snps" or "non_zero_snps"')
 parser.add_argument('--n-expr-cis-h2-bins', default=4, type=int,
 					help='Only used if args.gene_trait_architecture=="stdExpr"')
-parser.add_argument('--inference-approach', default='mle', type=str,
+parser.add_argument('--inference-approach', default='2SLS', type=str,
 					help='How to perform optimization')
 parser.add_argument('--jacknife', default=False, action='store_true',
 					help='Boolean on whether or not to Jacknife the estimtes')
@@ -1332,16 +1533,17 @@ if np.array_equal(gwas_rsids, gwas_rsids_tmp) == False or np.array_equal(gwas_rs
 	print('assumption eroror')
 	pdb.set_trace()
 
-
 # Create mapping from rsid to position
 rsid_to_position = create_mapping_from_rsid_to_position(gwas_rsids)
 
 ##############################
 # Load in eqtl Training data
-eqtl_dataset_names, eqtl_dataset_Ns_training, eqtl_dataset_Ns_validation, eqtl_dataset_files_training, eqtl_dataset_files_validation = load_in_eqtl_dataset_summary_file(args.eqtl_summary_file)
+eqtl_dataset_names, eqtl_dataset_Ns_training, eqtl_dataset_Ns_validation, eqtl_dataset_files_training, eqtl_dataset_files_validation, eqtl_dataset_Ns_full, eqtl_dataset_files_full = load_in_eqtl_dataset_summary_file(args.eqtl_summary_file)
 genes_training, gene_info_training = load_in_eqtl_data(rsid_to_position, args.gene_ldscore_filestem, args.gene_ldscore_filesuffix, eqtl_dataset_names, chrom_arr)
 gene_info_training = fill_in_eqtl_sumstats(gene_info_training, eqtl_dataset_files_training, eqtl_dataset_names, genes_training, chrom_dicti, rsid_to_variant_stdev)
 
+
+tmp_gene_ldscores = get_temp_gene_ldscores(eqtl_dataset_files_training[0], rsid_to_position, rsid_to_variant_stdev)
 
 # Create cis h2 bins
 if args.gene_trait_architecture == 'linear':
@@ -1385,12 +1587,15 @@ if args.gene_trait_architecture == 'linear':
 	avg_eqtl_h2s_1 = np.copy(tmp2)
 	avg_eqtl_h2s_2 = np.copy(tmp1)
 
+pdb.set_trace()
+
+
 
 
 # NOTE: eQTL estimation not in bootstrap. probs ok for now
 un_calibrated_mesc_obj = run_uncalibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1, gene_ldscores_validation1, gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq, regression_weights_full, args.squared_eqtl_effect_threshold, full_eqtl_dataset_names, eqtl_dataset_names, n_reference_snps, n_genes_1*avg_eqtl_h2s_1, n_genes_2*avg_eqtl_h2s_2, avg_eqtl_h2s_1, avg_eqtl_h2s_2)
-print_mesc_regression_results(un_calibrated_mesc_obj, args.output_stem + '_uncalibrated_mesc_bs_results.txt')
-print(args.output_stem + '_uncalibrated_mesc_bs_results.txt')
+print_mesc_regression_results(un_calibrated_mesc_obj, args.output_stem + '_uncalibrated_mesc_jk_results.txt')
+print(args.output_stem + '_uncalibrated_mesc_jk_results.txt')
 
 
 if args.step1_gene_ldscores != "MarginalSS":
@@ -1410,18 +1615,21 @@ if args.step1_gene_ldscores != "MarginalSS":
 
 # Get f-statistics
 bootstrapped_fstats1, parametric_fstats1 = get_bootstrapped_f_stats_from_1st_stage_least_squares(gwas_variant_ld_scores_full, gene_ldscores_training1, gene_ldscores_validation1, gwas_E_beta_sq, regression_weights_full, args.squared_eqtl_effect_threshold, args.step1_regression_method)
-#bootstrapped_fstats2, parametric_fstats2 = get_bootstrapped_f_stats_from_1st_stage_least_squares(gwas_variant_ld_scores_full, gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq, regression_weights_full, args.squared_eqtl_effect_threshold)
-print_fstatistics(bootstrapped_fstats1, parametric_fstats1, [], [], args.output_stem + '_step_1_f_stats.txt')
+bootstrapped_fstats2, parametric_fstats2 = get_bootstrapped_f_stats_from_1st_stage_least_squares(gwas_variant_ld_scores_full, gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq, regression_weights_full, args.squared_eqtl_effect_threshold, args.step1_regression_method)
+print_fstatistics(bootstrapped_fstats1, parametric_fstats1, bootstrapped_fstats2, parametric_fstats2, args.output_stem + '_step_1_f_stats.txt')
 print(args.output_stem + '_step_1_f_stats.txt')
 
 
 
+calibrated_mesc_obj = run_calibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1, gene_ldscores_validation1, gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq, regression_weights_full, args.squared_eqtl_effect_threshold, full_eqtl_dataset_names, eqtl_dataset_names, n_reference_snps, n_genes_1*avg_eqtl_h2s_1, n_genes_2*avg_eqtl_h2s_2, avg_eqtl_h2s_1, avg_eqtl_h2s_2, args.step1_regression_method, args.inference_approach)
+print_mesc_regression_results(calibrated_mesc_obj, args.output_stem + '_calibrated_mesc_jk_results.txt')
+print(args.output_stem + '_calibrated_mesc_jk_results.txt')
 
-calibrated_mesc_obj = run_calibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1, gene_ldscores_validation1, gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq, regression_weights_full, args.squared_eqtl_effect_threshold, full_eqtl_dataset_names, eqtl_dataset_names, n_reference_snps, n_genes_1*avg_eqtl_h2s_1, n_genes_2*avg_eqtl_h2s_2, avg_eqtl_h2s_1, avg_eqtl_h2s_2, args.step1_regression_method)
-print_mesc_regression_results(calibrated_mesc_obj, args.output_stem + '_calibrated_mesc_bs_results.txt')
-print(args.output_stem + '_calibrated_mesc_bs_results.txt')
 
-
+###########
+# TO DO:
+# 2. JK for F-stats
+# 3. Fix Uncalibrated MESC to use the full data
 
 
 

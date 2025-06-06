@@ -135,7 +135,6 @@ done
 fi
 
 
-
 ############################
 # Run default mesc
 ############################
@@ -146,8 +145,15 @@ for simulation_number in $(seq 1 200); do
 done
 fi
 
-
-
+############################
+# Convert mesc lasso runs to per gene effect estimates
+############################
+if false; then
+for simulation_number in $(seq 1 200); do 
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+	sbatch extract_mesc_lasso_per_gene_scores.sh $simulation_number $chrom_string $simulation_name_string $simulation_genotype_dir $mesc_expression_score_dir
+done
+fi
 
 ###############################
 # Calibrated mesc approach
@@ -165,15 +171,11 @@ sh calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simu
 
 
 
-
-
-
-
 ####################
 # Organize results
 ####################
-if false; then
 tmp_simulation_name_string="_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+if false; then
 python3 organize_trait_med_h2_results.py $trait_med_h2_inference_dir $organized_trait_med_h2_results_dir $simulated_trait_dir $tmp_simulation_name_string
 fi
 
