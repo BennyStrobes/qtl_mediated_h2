@@ -325,6 +325,7 @@ def update_gene_info_to_include_eqtl_dataset_names(gene_info, squared_eqtl_effec
 			
 			weights = linear_regression(squared_ld[valid_indices,:], temp_Y[valid_indices])
 
+
 			gene_est_cis_h2 = np.sum(weights*info['n_low_dimensional_snps'])
 			#weights = linear_regression(np.sum(squared_ld,axis=1).reshape(-1,1), eqtl_sq_sumstats[:, eqtl_category_iter])
 			#gene_est_cis_h2 = weights[0]*np.sum(info['n_low_dimensional_snps'])
@@ -1444,6 +1445,122 @@ def get_temp_gene_ldscores(eqtl_dataset_file, rsid_to_position, rsid_to_variant_
 	return tmp_gene_ldscores, len(gene_dicti)
 
 
+def load_in_eqtl_ldscores_for_single_replicate(eqtl_training_data_summary_file, training_data_eqtl_ldscores_type, standardize_gene_training_scores, rsid_to_position, rsid_to_variant_stdev, eqtl_cis_snp_h2_summary_file, replicate_index):
+	scale_variant_effects_by_ref_sdev = False
+	if training_data_eqtl_ldscores_type == 'MarginalSS':
+		scale_variant_effects_by_ref_sdev = True
+
+	#####################################################
+	# First generate mapping from study:gene to cis-snp h2
+	#####################################################
+	study_gene_to_cis_snp_h2 = {}
+	f = open(eqtl_cis_snp_h2_summary_file)
+	study_names = []
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		study_name = data[0]
+		study_names.append(study_name)
+		study_cis_h2_summary_file = data[(3+replicate_index)]
+		head_count2 = 0
+		gg = open(study_cis_h2_summary_file)
+		for line2 in gg:
+			line2 = line2.rstrip()
+			data2 = line2.split('\t')
+			if head_count2 == 0:
+				head_count2 = head_count2 + 1
+				continue
+			gene_name = data2[0]
+			cis_snp_h2 = data2[1]
+			study_gene = study_name + ':' + gene_name
+			if study_gene in study_gene_to_cis_snp_h2:
+				print('assumptione rororor')
+				pdb.set_trace()
+			study_gene_to_cis_snp_h2[study_gene] = float(cis_snp_h2)
+		gg.close()
+	f.close()
+	study_names = np.asarray(study_names)
+
+	#####################################################
+	# Generate gene LD scores
+	#####################################################
+	gene_ldscores = np.zeros((len(rsid_to_position), len(study_names)))
+	n_genes = np.zeros(len(study_names))
+	avg_cis_h2s = np.zeros(len(study_names))
+	f = open(eqtl_training_data_summary_file)
+	head_count = 0
+	study_counter = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		study_name = data[0]
+		if study_name != study_names[study_counter]:
+			print('assumption error')
+			pdb.set_trace()
+		sumstat_file = data[(4+replicate_index)]
+		gg = open(sumstat_file)
+		head_count2 = 0
+		study_genes = {}
+		study_cis_h2s = []
+		for line2 in gg:
+			line2 = line2.rstrip()
+			data2 = line2.split('\t')
+			if head_count2 == 0:
+				head_count2 = head_count2 + 1
+				continue
+			ens_id = data2[0]
+			rsid = data2[1]
+			beta = float(data2[6])
+			beta_se = float(data2[7])
+			if scale_variant_effects_by_ref_sdev:
+				variant_sdev = rsid_to_variant_stdev[rsid]
+				# Update betas and standard errors according to this
+				beta = beta*variant_sdev
+				beta_se = beta_se*variant_sdev
+			variant_pos = rsid_to_position[rsid]
+			gene_ldscores[variant_pos, study_counter] = gene_ldscores[variant_pos, study_counter] + np.square(beta) - np.square(beta_se)
+			if ens_id in study_genes:
+				continue
+			study_genes[ens_id] = 1
+			study_cis_h2s.append(study_gene_to_cis_snp_h2[study_name + ':' + ens_id])
+		gg.close()
+		if len(study_cis_h2s) != len(study_genes):
+			print('assumption eroror')
+			pdb.set_trace()
+		n_genes[study_counter] = len(study_genes)
+		avg_cis_h2s[study_counter] = np.mean(np.asarray(study_cis_h2s))
+		study_counter = study_counter + 1
+	f.close()
+
+	return gene_ldscores, n_genes, avg_cis_h2s, study_names
+
+
+
+
+
+
+
+def load_in_eqtl_ldscores(eqtl_training_data_summary_file, training_data_eqtl_ldscores_type, standardize_gene_training_scores, rsid_to_position, rsid_to_variant_stdev, eqtl_cis_snp_h2_summary_file, training=True):
+	# Do first for replicate 1
+	eqtl_ldscores_rep1, n_genes_rep1, avg_cis_h2s_rep1, dataset_names = load_in_eqtl_ldscores_for_single_replicate(eqtl_training_data_summary_file, training_data_eqtl_ldscores_type, standardize_gene_training_scores, rsid_to_position, rsid_to_variant_stdev, eqtl_cis_snp_h2_summary_file, 0)
+
+	# Do for second replicate
+	eqtl_ldscores_rep2, n_genes_rep2, avg_cis_h2s_rep2, dataset_names = load_in_eqtl_ldscores_for_single_replicate(eqtl_training_data_summary_file, training_data_eqtl_ldscores_type, standardize_gene_training_scores, rsid_to_position, rsid_to_variant_stdev, eqtl_cis_snp_h2_summary_file, 1)
+
+	if training:
+		return eqtl_ldscores_rep1, eqtl_ldscores_rep2, avg_cis_h2s_rep1, n_genes_rep1, avg_cis_h2s_rep2, n_genes_rep2, dataset_names
+	else:
+		return eqtl_ldscores_rep2, eqtl_ldscores_rep1, avg_cis_h2s_rep2, n_genes_rep2, avg_cis_h2s_rep1, n_genes_rep1, dataset_names
+
+
+
 #####################
 # Parse command line arguments
 #####################
@@ -1462,21 +1579,23 @@ parser.add_argument('--regression-snp-ldscore-filestem', default=None, type=str,
 					help='Per chromosome ldscore filestems (corresponding to only regression snps)')
 parser.add_argument('--regression-snp-ldscore-filesuffix', default='.txt', type=str,
 					help='Per chromosome ldscore filesuffix (corresponding to only regression snps)')
-parser.add_argument('--gene-ldscore-filestem', default='None', type=str,
-					help='Per chromosome gene-ldscore-filestem')
-parser.add_argument('--gene-ldscore-filesuffix', default='.txt', type=str,
-					help='Per chromosome gene-ldscore-file suffix')
 parser.add_argument('--variant-stdev-filestem', default='None', type=str,
 					help='Per chromosome file containing standard deviation of each snp')
 parser.add_argument('--chromosome-file', default=None, type=str,
 					help='File containing chromosomes to run analysis on. If None, set to autosomal chromosomes')
-parser.add_argument('--eqtl-summary-file', default=None, type=str,
+parser.add_argument('--eqtl-training-data-summary-file', default=None, type=str,
 					help='File containing one line for each eqtl data set')
+parser.add_argument('--eqtl-validation-data-summary-file', default=None, type=str,
+					help='File containing one line for each eqtl data set')
+parser.add_argument('--standardize-gene-training-scores', default=False, action='store_true',
+					help='Boolean on whether or not to Standardize expression scores used for training')
+parser.add_argument('--standardize-gene-validation-scores', default=False, action='store_true',
+					help='Boolean on whether or not to Standardize expression scores used for validation')
 parser.add_argument('--non-mediated-annotation-version', default="full_anno", type=str,
 					help='Takes as values "genotype_intercept" or "full_anno"')
 parser.add_argument('--gene-trait-architecture', default="stdExpr", type=str,
 					help='Takes as values "linear" or "stdExpr"')
-parser.add_argument('--step1-regression-method', default="all_snps", type=str,
+parser.add_argument('--step1-regression-method', default="all_snps", type=str,   ## SHOULD GET RID OF?
 					help='Takes as values "all_snps" or "non_zero_snps"')
 parser.add_argument('--n-expr-cis-h2-bins', default=4, type=int,
 					help='Only used if args.gene_trait_architecture=="stdExpr"')
@@ -1484,22 +1603,21 @@ parser.add_argument('--inference-approach', default='2SLS', type=str,
 					help='How to perform optimization')
 parser.add_argument('--jacknife', default=False, action='store_true',
 					help='Boolean on whether or not to Jacknife the estimtes')
-parser.add_argument('--fixed-variance', default=False, action='store_true',
-					help='Boolean on whether the variance parameters should be fixed')
-parser.add_argument('--per-dataset-variance', default=False, action='store_true',
-					help='Boolean on whether the variance parameters should be fixed')
-parser.add_argument('--gene-ldscore-type', default="sqaured_marginal_sumstats", type=str,
-					help='Takes as values "sqaured_marginal_sumstats" or other more complicated things')
 parser.add_argument('--squared-eqtl-effect-threshold', default=1.0, type=float,
 					help='Filter out any squared eQTL effect with absolute value greater than this value')
 parser.add_argument('--mesc-expression-score-dir', default=None, type=str,
 					help='Directory containing mesc expression scores')
-parser.add_argument('--step1-gene-ldscores', default="MarginalSS", type=str,
-					help='Directory containing mesc expression scores')
+parser.add_argument('--training-data-eqtl-ldscores-type', default="MarginalSS", type=str,
+					help='type of expression scores used for training data')
+parser.add_argument('--validation-data-eqtl-ldscores-type', default="MarginalSS", type=str,
+					help='type of expression scores used for validation data')
+parser.add_argument('--eqtl-cis-snp-h2-summary-file', default="None", type=str,
+					help='File containing estimated per-gene cis-snp h2s')
 parser.add_argument('--output-stem', default=None, type=str,
 					help='Output file stem to save data to')
 args = parser.parse_args()
 np.random.seed(1)
+
 
 #####################
 # Load in relevent data
@@ -1536,14 +1654,39 @@ if np.array_equal(gwas_rsids, gwas_rsids_tmp) == False or np.array_equal(gwas_rs
 # Create mapping from rsid to position
 rsid_to_position = create_mapping_from_rsid_to_position(gwas_rsids)
 
+
+# Quick concern
+if args.validation_data_eqtl_ldscores_type != 'MarginalSS':
+	print('assumption eroror: need to edit cis-h2 estimates and gene counts I think')
+	pdb.set_trace()
+
+# Load in eQTL LD scores for training data
+gene_ldscores_training1, gene_ldscores_training2, avg_eqtl_h2s_train_1, n_genes_train_1, avg_eqtl_h2s_train_2, n_genes_train_2, eqtl_dataset_names = load_in_eqtl_ldscores(args.eqtl_training_data_summary_file, args.training_data_eqtl_ldscores_type, args.standardize_gene_training_scores, rsid_to_position, rsid_to_variant_stdev, args.eqtl_cis_snp_h2_summary_file, training=True)
+
+# Load in eQTL LD scores for validation data
+gene_ldscores_validation1, gene_ldscores_validation2, avg_eqtl_h2s_1, n_genes_1, avg_eqtl_h2s_2, n_genes_2, eqtl_dataset_names = load_in_eqtl_ldscores(args.eqtl_validation_data_summary_file, args.validation_data_eqtl_ldscores_type, args.standardize_gene_validation_scores, rsid_to_position, rsid_to_variant_stdev, args.eqtl_cis_snp_h2_summary_file, training=False)
+full_eqtl_dataset_names = np.copy(eqtl_dataset_names)
+tmp = np.copy(avg_eqtl_h2s_1)
+avg_eqtl_h2s_1 = np.copy(avg_eqtl_h2s_2)
+avg_eqtl_h2s_2 = np.copy(avg_eqtl_h2s_1)
+
+###########
+# TO DO
+## 2. Get working for raw mesc ld scores
+## 3. Get working for processed mesc ld scores
+## 4. Get working for standardized run.
+
+
+
+
+
+'''
 ##############################
 # Load in eqtl Training data
 eqtl_dataset_names, eqtl_dataset_Ns_training, eqtl_dataset_Ns_validation, eqtl_dataset_files_training, eqtl_dataset_files_validation, eqtl_dataset_Ns_full, eqtl_dataset_files_full = load_in_eqtl_dataset_summary_file(args.eqtl_summary_file)
 genes_training, gene_info_training = load_in_eqtl_data(rsid_to_position, args.gene_ldscore_filestem, args.gene_ldscore_filesuffix, eqtl_dataset_names, chrom_arr)
 gene_info_training = fill_in_eqtl_sumstats(gene_info_training, eqtl_dataset_files_training, eqtl_dataset_names, genes_training, chrom_dicti, rsid_to_variant_stdev)
 
-
-tmp_gene_ldscores = get_temp_gene_ldscores(eqtl_dataset_files_training[0], rsid_to_position, rsid_to_variant_stdev)
 
 # Create cis h2 bins
 if args.gene_trait_architecture == 'linear':
@@ -1586,10 +1729,12 @@ if args.gene_trait_architecture == 'linear':
 	tmp2 = np.copy(avg_eqtl_h2s_2)
 	avg_eqtl_h2s_1 = np.copy(tmp2)
 	avg_eqtl_h2s_2 = np.copy(tmp1)
+'''
 
-pdb.set_trace()
 
-
+# NOTE: Need eqtl_dataset_names and full_eqtl_dataset_names
+# eqtl_dataset_names is ordered list of datasets
+# full_eqtl_dataset_names is ordered list of of number of columns in gene_ldscores_validation (with each element being one of the eqtl_dataset_names)
 
 
 # NOTE: eQTL estimation not in bootstrap. probs ok for now
@@ -1598,7 +1743,7 @@ print_mesc_regression_results(un_calibrated_mesc_obj, args.output_stem + '_uncal
 print(args.output_stem + '_uncalibrated_mesc_jk_results.txt')
 
 
-if args.step1_gene_ldscores != "MarginalSS":
+if args.training_data_eqtl_ldscores_type != "MarginalSS":
 	mesc_gene_scores_training1 = extract_mesc_gene_scores(rsid_to_position, args.eqtl_summary_file, args.mesc_expression_score_dir, 'replicate1', chrom_arr)
 	mesc_gene_scores_training2 = extract_mesc_gene_scores(rsid_to_position, args.eqtl_summary_file, args.mesc_expression_score_dir, 'replicate2', chrom_arr)
 	if args.step1_gene_ldscores == 'mescLassoPlusMarginalSS':

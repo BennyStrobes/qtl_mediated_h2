@@ -61,6 +61,9 @@ mesc_results_dir=$output_root_dir"mesc_results/"
 # Directory containing results of trait med h2 inference
 trait_med_h2_inference_dir=$output_root_dir"trait_mediated_h2_inference/"
 
+# Directory containing estimated cis-snp h2s
+estimated_cis_snp_h2_dir=$output_root_dir"estimated_cis_snp_h2/"
+
 # Directory containing organized results
 organized_trait_med_h2_results_dir=${perm_output_root_dir}"organized_trait_med_h2_results/"
 
@@ -161,13 +164,13 @@ fi
 if false; then
 for simulation_number in $(seq 1 200); do 
 	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
-	sbatch calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $calibrated_mesc_code_dir $mesc_expression_score_dir
+	sbatch calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $calibrated_mesc_code_dir $mesc_expression_score_dir $estimated_cis_snp_h2_dir
 done
 fi
 
 simulation_number="1"
 simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
-sh calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $calibrated_mesc_code_dir $mesc_expression_score_dir
+sh calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $calibrated_mesc_code_dir $mesc_expression_score_dir $estimated_cis_snp_h2_dir
 
 
 
