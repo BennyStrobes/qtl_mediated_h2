@@ -1143,6 +1143,52 @@ organized_trait_med_h2_results_dir = args[2]
 visualize_trait_med_h2_dir = args[3]
 
 
+###################################################
+# Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues
+# Make plot for causal tissue
+# Standardized expression
+
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="stdExpr"
+inference_gt_architecture="stdExpr"
+sq_sumstat_threshold="1000.0"
+weighting = "weighted"
+step1_gene_ldscores="mesc_lasso_corr_standardized"
+step2_gene_ldscores="mesc_lasso_corr_standardized"
+inference_approach="2SLS"
+
+cis_h2_method="greml"
+
+
+run_string = paste0(non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_", sq_sumstat_threshold, "_", cis_h2_method, "_", step1_gene_ldscores, "_", step2_gene_ldscores, "_", inference_approach,"_", weighting)
+joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_calibrated_ldsc_summary_averaged.txt")
+joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+
+joint_ldsc_df$est_h2 = joint_ldsc_df$est_h2 
+joint_ldsc_df$est_h2_lb = joint_ldsc_df$est_h2_lb 
+joint_ldsc_df$est_h2_ub = joint_ldsc_df$est_h2_ub 
+
+
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="bottom"))
+# Combine together with cowplot
+joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_calibrated_mesc_tissue_simulation_causal_tissue_stdExpr_med_vs_non_causal_tissue_med_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.2, height=5.5, units="in")
+print(output_file)
+
+
+
+
+
+
+
 mesc_summary_file <- paste0(organized_trait_med_h2_results_dir, "mesc_med_h2_5_causal_tissue__full_gt_arch_linear_genotypeIntercept_sim_results_calibrated_ldsc_summary_averaged.txt")
 mesc_df <- read.table(mesc_summary_file, header=TRUE, sep="\t")
 
@@ -1187,6 +1233,7 @@ ggsave(joint, file=output_file, width=7.2, height=5.5, units="in")
 }
 
 # Make Jacknifed standard error coverage plots
+if (FALSE) {
 eqtl_snp_representation="bins_20"
 non_med_anno="genotype_intercept"
 simulated_gt_architecture="linear"
@@ -1238,7 +1285,7 @@ pp <- make_coverage_multimethod_standard_error_barplot(df_cal, genetic_element_c
 # Save
 output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_coverage_multimethod_calibrated_mesc_se_barplot.pdf")
 ggsave(pp, file=output_file, width=7.2, height=4.5, units="in")
-
+}
 
 
 
@@ -1258,6 +1305,8 @@ step1_gene_ldscores="mescLasso"
 inference_approach="JIVE"
 inference_approach="2SLS"
 
+
+if (FALSE) {
 run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold, "_", step1_gene_ldscores, "_", inference_approach,"_", weighting)
 
 
@@ -1318,7 +1367,7 @@ pp <- make_t1e_standard_error_barplot(df_t1e)
 # Save
 output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_t1e_calibrated_mesc_se_barplot.pdf")
 ggsave(pp, file=output_file, width=7.2, height=4.5, units="in")
-
+}
 
 
 
@@ -1337,7 +1386,7 @@ step1_gene_ldscores="mescLasso"
 
 inference_approach="JIVE"
 inference_approach="2SLS"
-
+if (FALSE) {
 run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold, "_", step1_gene_ldscores, "_", inference_approach,"_", weighting)
 
 
@@ -1354,7 +1403,7 @@ pp <- make_t1e_multimethod_standard_error_barplot(df_t1e)
 # Save
 output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_t1e_calibrated_multimethod_mesc_se_barplot.pdf")
 ggsave(pp, file=output_file, width=7.2, height=4.5, units="in")
-
+}
 
 
 

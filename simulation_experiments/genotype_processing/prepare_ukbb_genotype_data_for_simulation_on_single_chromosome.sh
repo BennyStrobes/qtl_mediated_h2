@@ -1,10 +1,11 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-8:00                         # Runtime in D-HH:MM format
+#SBATCH -t 0-5:00                         # Runtime in D-HH:MM format
 #SBATCH -p short                           # Partition to run in
-#SBATCH --mem=15GB                         # Memory total in MiB (for all cores)
+#SBATCH --mem=20GB                         # Memory total in MiB (for all cores)
 
 # First three parts ran at 200GB
+# For around 15-20h 
 # Needs to be run for longer (was just running small section)
 
 
@@ -73,11 +74,12 @@ eqtl_individual_stem=${processed_genotype_data_dir}"eqtl_individuals_"
 ref_genotype_individual_file=${processed_genotype_data_dir}"ref_genotype_individuals.txt"
 if false; then
 python3 extract_lists_of_simulated_individuals.py ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} $n_gwas_individuals $gwas_individual_file $eqtl_individual_stem $ref_genotype_individual_file
-
+fi
 
 ###############################
 # Filter UKBB genotype data to only include individuals in simulated gwas data set 
 ###############################
+if false; then
 plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${gwas_individual_file} --make-pgen --keep-allele-order --threads 1 --out ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num}
 
 
@@ -104,7 +106,7 @@ plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep $
 
 # Reference data set
 plink2 --pfile ${processed_genotype_data_dir}"ukb_imp_chr_"${chrom_num} --keep ${ref_genotype_individual_file} --make-pgen --threads 1 --keep-allele-order --out ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num}
-
+fi
 
 ###############################
 # Convert to bgen
@@ -128,12 +130,16 @@ plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size
 
 # Reference genotype
 plink2 --pfile ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num} --keep-allele-order --export bgen-1.2 --out ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num}
-fi
+
+
+
+
 
 
 ###############################
 # Convert to plink1 (needed for mesc)
 ###############################
+if false; then
 # GWAS 
 plink2 --pfile ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num} --keep-allele-order -make-bed --out ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num}
 
@@ -153,7 +159,7 @@ plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size
 
 # Reference genotype
 plink2 --pfile ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num} --keep-allele-order -make-bed --out ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num}
-
+fi
 
 
 

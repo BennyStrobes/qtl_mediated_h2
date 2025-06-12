@@ -36,7 +36,7 @@ variants_to_exclude['rs12033962'] = 1
 kg_rs_ids = extract_list_of_1kg_rsids(kg_genotype_dir + '1000G.EUR.QC.' + chrom_num + '.bim')
 
 
-annot_file = ldsc_baseline_annotation_dir + 'baseline.' + str(chrom_num) + '.annot.gz'
+annot_file = ldsc_baseline_annotation_dir + 'baselineLD.' + str(chrom_num) + '.annot.gz'
 
 t = open(ldsc_annotation_rs_id_file,'w')
 

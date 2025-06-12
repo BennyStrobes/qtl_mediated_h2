@@ -17,7 +17,7 @@ joint_ldsc_code_dir="/n/groups/price/ben/joint_ldsc_dbg/"
 
 calibrated_mesc_code_dir="/n/groups/price/ben/calibrated_mesc/"
 calibrated_mesc_code_dir="/n/groups/price/ben/calibrated_mesc_v2/"
-calibrated_mesc_code_dir="/n/groups/price/ben/calibrated_mesc_v4/"
+calibrated_mesc_code_dir="/n/groups/price/ben/calibrated_mesc_v5/"
 
 
 mesc_code_dir="/n/groups/price/ben/tools/mesc_2_chromosomes/"
@@ -63,6 +63,9 @@ trait_med_h2_inference_dir=$output_root_dir"trait_mediated_h2_inference/"
 
 # Directory containing estimated cis-snp h2s
 estimated_cis_snp_h2_dir=$output_root_dir"estimated_cis_snp_h2/"
+
+# Directory containing lasso estimated gene models
+lasso_gene_models_dir=$output_root_dir"lasso_gene_models_dir/"
 
 # Directory containing organized results
 organized_trait_med_h2_results_dir=${perm_output_root_dir}"organized_trait_med_h2_results/"
@@ -125,6 +128,20 @@ done
 fi
 
 
+
+############################
+# Create lasso gene models
+############################
+alpha_0="0.01"
+if false; then
+for simulation_number in $(seq 1 10); do 
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+	sbatch create_lasso_gene_models.sh $simulation_number $chrom_string $cis_window $simulation_name_string $simulation_genotype_dir $simulated_learned_gene_models_dir $lasso_gene_models_dir $calibrated_mesc_code_dir $cis_window $alpha_0
+done
+fi
+
+
+
 ############################
 # Use MESC to generate expression scores
 ############################
@@ -154,9 +171,11 @@ fi
 if false; then
 for simulation_number in $(seq 1 200); do 
 	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
-	sbatch extract_mesc_lasso_per_gene_scores.sh $simulation_number $chrom_string $simulation_name_string $simulation_genotype_dir $mesc_expression_score_dir
+	sh extract_mesc_lasso_per_gene_scores.sh $simulation_number $chrom_string $simulation_name_string $simulation_genotype_dir $mesc_expression_score_dir
 done
 fi
+
+
 
 ###############################
 # Calibrated mesc approach
@@ -167,11 +186,6 @@ for simulation_number in $(seq 1 200); do
 	sbatch calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $calibrated_mesc_code_dir $mesc_expression_score_dir $estimated_cis_snp_h2_dir
 done
 fi
-
-simulation_number="1"
-simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
-sh calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $calibrated_mesc_code_dir $mesc_expression_score_dir $estimated_cis_snp_h2_dir
-
 
 
 ####################

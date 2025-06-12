@@ -23,5 +23,10 @@ python3 extract_mesc_lasso_per_gene_scores.py $simulation_number $chrom_string $
 fi
 date
 
+if false; then
 python3 extract_mesc_lasso_standardized_per_gene_scores.py $simulation_number $chrom_string $simulation_name_string $simulation_genotype_dir $mesc_expression_score_dir
+fi
 date
+
+
+python3 create_mesc_lasso_eqtl_summary_files.py $simulation_number $simulation_name_string $mesc_expression_score_dir

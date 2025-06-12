@@ -827,6 +827,7 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 			est_per_category_h2 = np.asarray(est_per_category_h2)
 			est_per_tissue_h2_se = np.asarray(est_per_tissue_h2_se)
 			est_per_category_h2_se = np.asarray(est_per_category_h2_se)
+			print(len(est_total_h2))
 
 			if len(sim_total_h2) == 0:
 				continue
@@ -1298,7 +1299,8 @@ tmp_simulation_name_string = sys.argv[4]
 sim_nums = np.arange(1,201)
 eqtl_sample_sizes = np.asarray(['100','200','300','1000'])
 eqtl_sample_sizes = np.asarray(['100', '200'])
-eqtl_sample_sizes = np.asarray(['100','200','300','1000', '100-1000'])
+eqtl_sample_sizes = np.asarray(['100', '200', '300', '1000', '100-1000'])
+eqtl_sample_sizes = np.asarray(['100', '200', '300', '1000', '100-1000'])
 
 
 
@@ -1319,15 +1321,17 @@ invalid_sims[162] = 1 # These will get re-run
 eqtl_snp_representation = 'pca_95'
 eqtl_snp_representation = 'pca_90'
 eqtl_snp_representation = 'bins_20'
-beta_squared_thresh = '100.0'
+beta_squared_thresh = '1000.0'
 
 non_med_anno = 'full_anno'
 non_med_anno = 'genotype_intercept'
 
+
 inference_gt_architecture = 'linear'
 simulated_gt_architecture = 'linear'
-inference_gt_architecture = 'linear'
-simulated_gt_architecture = 'linear'
+
+inference_gt_architecture = 'stdExpr'
+simulated_gt_architecture = 'stdExpr'
 
 
 gene_ld_score_type = 'ldsc_style_pred'
@@ -1341,22 +1345,31 @@ step1_gene_ldscores='mescLassoPlusMarginalSS'
 step1_gene_ldscores='mescLasso'
 
 
+
 inference_approach="JIVE"
 inference_approach="2SLS"
 
+
+cis_snp_h2_method="greml"
+training_data_gene_ldscores_type="mesc_lasso_corr_standardized"
+validation_data_gene_ldscores_type="mesc_lasso_corr_standardized"
+
+cis_h2_thresh='.025'
 
 # Create mapping from simulation number to simulated heritabilities
 sim_heritabilities = create_mapping_from_simulation_number_to_simulated_heritabilities(simulated_trait_dir, tmp_simulation_name_string, sim_nums, simulated_gt_architecture)
 
 
+#run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh  + '_' + cis_snp_h2_method + '_' + training_data_gene_ldscores_type + '_' + inference_approach + '_' + cis_h2_thresh
+run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh  + '_' + cis_snp_h2_method + '_' + training_data_gene_ldscores_type + '_'+ validation_data_gene_ldscores_type + '_' + inference_approach + '_' + 'cc'
 
-run_string = eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh + '_' + step1_gene_ldscores + '_' + inference_approach
-
-avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh+ '_' + step1_gene_ldscores + '_' + inference_approach + '_' + weighting + '_sim_results_calibrated_ldsc_summary_averaged.txt'
+avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + run_string + '_' + weighting + '_sim_results_calibrated_ldsc_summary_averaged.txt'
 clean_method_names = ['uncalibrated_mesc', 'calibrated_mesc']
 methods = ['uncalibrated_mesc', 'calibrated_mesc']
 average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
 
+
+'''
 
 calibration_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh+ '_' + step1_gene_ldscores+ '_' + inference_approach + '_' + weighting + '_sim_results_calibration_summary.txt'
 clean_method_names = ['calibrated_mesc']
@@ -1383,7 +1396,7 @@ clean_method_names = ['calibrated_mesc']
 methods = ['calibrated_mesc']
 fstat_summary(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, fstat_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
 
-
+'''
 
 
 
