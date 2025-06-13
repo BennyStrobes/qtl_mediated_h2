@@ -230,7 +230,7 @@ for tissue_iter in range(5):
 			study_name = 'tissue' + str(tissue_iter) + '_' + replicate_name + '_' + eqtl_ss
 			study_names.append(study_name)
 
-			output_file = tissue_sumstat1_output_file = mesc_expression_score_dir + simulation_name_string + '_tissue' + str(tissue_iter) + '_' + str(eqtl_ss) + '_' + replicate_name + '_mesc_lasso_standardized_pred_eqtl_sumstats.txt'
+			output_file = mesc_expression_score_dir + simulation_name_string + '_tissue' + str(tissue_iter) + '_' + str(eqtl_ss) + '_' + replicate_name + '_mesc_lasso_standardized_pred_eqtl_sumstats.txt'
 			t[study_name] = open(output_file,'w')
 			t[study_name].write('gene_id\trsid\tchr\tpos\ta1\ta2\tbeta\tbeta_se\tz\tin_sample_sdev\n')
 

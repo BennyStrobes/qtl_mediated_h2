@@ -134,9 +134,22 @@ fi
 ############################
 alpha_0="0.01"
 if false; then
-for simulation_number in $(seq 1 10); do 
+for simulation_number in $(seq 11 200); do 
 	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
 	sbatch create_lasso_gene_models.sh $simulation_number $chrom_string $cis_window $simulation_name_string $simulation_genotype_dir $simulated_learned_gene_models_dir $lasso_gene_models_dir $calibrated_mesc_code_dir $cis_window $alpha_0
+done
+fi
+
+
+
+############################
+# Convert lasso runs to per gene effect estimates
+############################
+alpha_0="0.01"
+if false; then
+for simulation_number in $(seq 1 2); do 
+	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
+	sbatch extract_lasso_gene_ld_scores.sh $simulation_number $chrom_string $simulation_name_string $simulation_genotype_dir $mesc_expression_score_dir $lasso_gene_models_dir $calibrated_mesc_code_dir $alpha_0
 done
 fi
 
