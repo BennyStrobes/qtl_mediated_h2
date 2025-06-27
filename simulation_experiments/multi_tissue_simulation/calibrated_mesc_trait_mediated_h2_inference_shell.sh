@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-1:30                         # Runtime in D-HH:MM format
+#SBATCH -t 0-4:30                         # Runtime in D-HH:MM format
 #SBATCH -p short                          # Partition to run in
 #SBATCH --mem=10GB                         # Memory total in MiB (for all cores)
 
@@ -19,20 +19,22 @@ chrom_string="${10}"
 calibrated_mesc_code_dir="${11}"
 mesc_expression_score_dir="${12}"
 estimated_cis_snp_h2_dir="${13}"
+lasso_gene_models_dir="${14}"
 
 echo "SIMULATION"$simulation_number
 
 
 chrom_nums_file="/n/groups/price/ben/joint_ldsc_temp_data/simulation_chromosomes.txt"
 
-if false; then
 ####################
 # Step 1: Create Cis snp heritability files
+if false; then
 eqtl_sample_size_arr=( "100" "200" "300" "1000" "100-1000")
-
+module load R/4.0.1
 for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
 do
-	eqtl_snp_representation="bins_20"
+	echo $eqtl_sample_size
+	eqtl_snp_representation="bins_10"
 	gene_ldscore_filestem=${simulation_genotype_dir}"gene_level_ld_chr"
 	gene_ldscore_filesuffix="_"${eqtl_snp_representation}"_summary_file.txt"
 	eqtl_summary_file=$simulated_learned_gene_models_dir${simulation_name_string}"_"${eqtl_sample_size}"_replicate_eqtl_sumstats_xt_summary.txt"
@@ -43,8 +45,7 @@ done
 fi
 
 
-
-
+source ~/.bash_profile
 
 
 simulated_gt_architecture="linear"
@@ -379,9 +380,12 @@ fi
 
 
 
+
+
+
+
 simulated_gt_architecture="stdExpr"
 inference_gt_architecture="stdExpr"
-echo $simulated_gt_architecture"_"$inference_gt_architecture
 
 #####################
 non_med_anno_arr=("genotype_intercept" "full_anno")
@@ -402,7 +406,7 @@ validation_data_gene_ldscores_type="mesc_lasso_corr_standardized"
 inference_approach_arr=("2SLS" "JIVE")
 inference_approach_arr=("2SLS" )
 
-
+if false; then
 for non_med_anno in "${non_med_anno_arr[@]}"
 do
 for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
@@ -459,6 +463,305 @@ done
 done
 done
 done
+fi
+
+
+
+if false; then
+simulated_gt_architecture="stdExpr"
+inference_gt_architecture="stdExpr"
+echo $simulated_gt_architecture"_"$inference_gt_architecture
+
+#####################
+non_med_anno_arr=("genotype_intercept" "full_anno")
+non_med_anno_arr=("genotype_intercept")
+cis_snp_h2_method_arr=( "greml" )
+
+eqtl_sample_size_arr=( "100" "200" "300" "1000" "100-1000")
+
+
+eqtl_beta_sq_filter_arr=( "0.5" "1.0" "2.0" "5.0" "10.0" "100.0" "10000.0")
+eqtl_beta_sq_filter_arr=( "100.0" "500.0" "1000.0")
+eqtl_beta_sq_filter_arr=( "1000.0")
+
+training_data_gene_ldscores_type_arr=("MarginalSS" "mescLassoCorr" "mescLasso" "mescLassoPlusMarginalSS")
+training_data_gene_ldscores_type_arr=("lasso_CV_corr_standardized")
+validation_data_gene_ldscores_type="lasso_CV_corr_standardized"
+
+
+inference_approach_arr=("2SLS" "JIVE")
+inference_approach_arr=("2SLS" )
+
+for non_med_anno in "${non_med_anno_arr[@]}"
+do
+for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
+do
+for eqtl_beta_sq_filter in "${eqtl_beta_sq_filter_arr[@]}"
+do
+for training_data_gene_ldscores_type in "${training_data_gene_ldscores_type_arr[@]}"
+do
+for inference_approach in "${inference_approach_arr[@]}"
+do
+for cis_snp_h2_method in "${cis_snp_h2_method_arr[@]}"
+do
+
+
+
+gwas_sumstat_file=$simulated_gwas_dir${simulation_name_string}"_gt_arch_"${simulated_gt_architecture}"_simualated_gwas_results.txt"
+variant_ldscore_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
+variant_stdev_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_genotype_stdev_chrom"
+regression_snp_ldscore_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_hm3_ldscores_chrom"
+eqtl_cis_snp_h2_summary_file=${estimated_cis_snp_h2_dir}${simulation_name_string}"_"${eqtl_sample_size}"_"${cis_snp_h2_method}"_est_cis_snp_h2_summary.txt"
+
+pred_eqtl_summary_file=$lasso_gene_models_dir${simulation_name_string}"_"${eqtl_sample_size}"_"${training_data_gene_ldscores_type}"_replicate_eqtl_sumstats_xt_summary.txt"
+variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
+	
+
+	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${eqtl_beta_sq_filter}"_"${cis_snp_h2_method}"_"${training_data_gene_ldscores_type}"_"${validation_data_gene_ldscores_type}"_"${inference_approach}"_"${eqtl_sample_size}"_weighted"
+	date
+	python3 ${calibrated_mesc_code_dir}run_calibrated_mesc.py \
+		--gwas-sumstat-file $gwas_sumstat_file \
+		--gwas-N ${n_gwas_individuals} \
+		--variant-ldscore-filestem ${variant_ldscore_filestem} \
+		--variant-M-filestem ${variant_m_filestem} \
+		--variant-stdev-filestem ${variant_stdev_filestem} \
+		--regression-snp-ldscore-filestem $regression_snp_ldscore_filestem \
+		--chromosome-file ${chrom_nums_file} \
+		--eqtl-training-data-summary-file ${pred_eqtl_summary_file} \
+		--eqtl-validation-data-summary-file ${pred_eqtl_summary_file} \
+		--non-mediated-annotation-version ${non_med_anno} \
+		--gene-trait-architecture ${inference_gt_architecture} \
+		--inference-approach ${inference_approach} \
+		--squared-eqtl-effect-threshold ${eqtl_beta_sq_filter} \
+		--mesc-expression-score-dir $mesc_expression_score_dir \
+		--training-data-eqtl-ldscores-type ${training_data_gene_ldscores_type} \
+		--validation-data-eqtl-ldscores-type ${validation_data_gene_ldscores_type} \
+		--eqtl-cis-snp-h2-summary-file ${eqtl_cis_snp_h2_summary_file} \
+		--output-stem ${output_stem}
+
+
+	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${eqtl_beta_sq_filter}"_"${cis_snp_h2_method}"_"${training_data_gene_ldscores_type}"_"${validation_data_gene_ldscores_type}"_"${inference_approach}"_cc_"${eqtl_sample_size}"_weighted"
+	date
+	python3 ${calibrated_mesc_code_dir}run_calibrated_mesc.py \
+		--gwas-sumstat-file $gwas_sumstat_file \
+		--gwas-N ${n_gwas_individuals} \
+		--variant-ldscore-filestem ${variant_ldscore_filestem} \
+		--variant-M-filestem ${variant_m_filestem} \
+		--variant-stdev-filestem ${variant_stdev_filestem} \
+		--regression-snp-ldscore-filestem $regression_snp_ldscore_filestem \
+		--chromosome-file ${chrom_nums_file} \
+		--eqtl-training-data-summary-file ${pred_eqtl_summary_file} \
+		--eqtl-validation-data-summary-file ${pred_eqtl_summary_file} \
+		--non-mediated-annotation-version ${non_med_anno} \
+		--gene-trait-architecture ${inference_gt_architecture} \
+		--inference-approach ${inference_approach} \
+		--squared-eqtl-effect-threshold ${eqtl_beta_sq_filter} \
+		--mesc-expression-score-dir $mesc_expression_score_dir \
+		--training-data-eqtl-ldscores-type ${training_data_gene_ldscores_type} \
+		--validation-data-eqtl-ldscores-type ${validation_data_gene_ldscores_type} \
+		--eqtl-cis-snp-h2-summary-file ${eqtl_cis_snp_h2_summary_file} \
+		--covariance-calibration \
+		--output-stem ${output_stem}
+	date
+
+
+done
+done
+done
+done
+done
+done
+fi
+
+
+
+
+
+
+
+##**#*#*#*#*#
+if false; then
+simulated_gt_architecture="stdExpr"
+inference_gt_architecture="stdExpr"
+echo $simulated_gt_architecture"_"$inference_gt_architecture
+
+#####################
+non_med_anno_arr=("genotype_intercept" "full_anno")
+non_med_anno_arr=("genotype_intercept")
+cis_snp_h2_method_arr=( "ldsc" "avgChisq" "greml" )
+validation_data_gene_ldscores_type="MarginalSS"
+
+eqtl_sample_size_arr=( "100" "200" "300" "1000" "100-1000")
+eqtl_sample_size_arr=( "100" "200" "300" "1000" "100-1000")
+
+
+eqtl_beta_sq_filter_arr=( "0.5" "1.0" "2.0" "5.0" "10.0" "100.0" "10000.0")
+eqtl_beta_sq_filter_arr=( "100.0" "500.0" "1000.0")
+eqtl_beta_sq_filter_arr=( "100.0" "1000.0")
+
+training_data_gene_ldscores_type_arr=("MarginalSS" "mescLassoCorr" "mescLasso" "mescLassoPlusMarginalSS")
+training_data_gene_ldscores_type_arr=("lasso_CV_corr_standardized")
+cis_h2_threshold_arr=(".01" ".025")
+
+inference_approach_arr=("2SLS")
+
+for non_med_anno in "${non_med_anno_arr[@]}"
+do
+for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
+do
+for eqtl_beta_sq_filter in "${eqtl_beta_sq_filter_arr[@]}"
+do
+for training_data_gene_ldscores_type in "${training_data_gene_ldscores_type_arr[@]}"
+do
+for inference_approach in "${inference_approach_arr[@]}"
+do
+for cis_snp_h2_method in "${cis_snp_h2_method_arr[@]}"
+do
+for cis_h2_threshold in "${cis_h2_threshold_arr[@]}"
+do
+
+
+gwas_sumstat_file=$simulated_gwas_dir${simulation_name_string}"_gt_arch_"${simulated_gt_architecture}"_simualated_gwas_results.txt"
+variant_ldscore_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
+variant_stdev_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_genotype_stdev_chrom"
+regression_snp_ldscore_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_hm3_ldscores_chrom"
+eqtl_cis_snp_h2_summary_file=${estimated_cis_snp_h2_dir}${simulation_name_string}"_"${eqtl_sample_size}"_"${cis_snp_h2_method}"_est_cis_snp_h2_summary.txt"
+
+marginal_eqtl_summary_file=$simulated_learned_gene_models_dir${simulation_name_string}"_"${eqtl_sample_size}"_replicate_eqtl_sumstats_xt_summary.txt"
+pred_eqtl_summary_file=$mesc_expression_score_dir${simulation_name_string}"_"${eqtl_sample_size}"_"${training_data_gene_ldscores_type}"_replicate_eqtl_sumstats_xt_summary.txt"
+pred_eqtl_summary_file=$lasso_gene_models_dir${simulation_name_string}"_"${eqtl_sample_size}"_"${training_data_gene_ldscores_type}"_replicate_eqtl_sumstats_xt_summary.txt"
+
+variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
+	
+
+	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${eqtl_beta_sq_filter}"_"${cis_snp_h2_method}"_"${training_data_gene_ldscores_type}"_"${inference_approach}"_"${cis_h2_threshold}"_"${eqtl_sample_size}"_weighted"
+	date
+	python3 ${calibrated_mesc_code_dir}run_calibrated_mesc.py \
+		--gwas-sumstat-file $gwas_sumstat_file \
+		--gwas-N ${n_gwas_individuals} \
+		--variant-ldscore-filestem ${variant_ldscore_filestem} \
+		--variant-M-filestem ${variant_m_filestem} \
+		--variant-stdev-filestem ${variant_stdev_filestem} \
+		--regression-snp-ldscore-filestem $regression_snp_ldscore_filestem \
+		--chromosome-file ${chrom_nums_file} \
+		--eqtl-training-data-summary-file ${pred_eqtl_summary_file} \
+		--eqtl-validation-data-summary-file ${marginal_eqtl_summary_file} \
+		--non-mediated-annotation-version ${non_med_anno} \
+		--gene-trait-architecture ${inference_gt_architecture} \
+		--inference-approach ${inference_approach} \
+		--squared-eqtl-effect-threshold ${eqtl_beta_sq_filter} \
+		--mesc-expression-score-dir $mesc_expression_score_dir \
+		--training-data-eqtl-ldscores-type ${training_data_gene_ldscores_type} \
+		--validation-data-eqtl-ldscores-type ${validation_data_gene_ldscores_type} \
+		--eqtl-cis-snp-h2-summary-file ${eqtl_cis_snp_h2_summary_file} \
+		--standardize-gene-validation-scores \
+		--cis-h2-thresh ${cis_h2_threshold} \
+		--output-stem ${output_stem}
+	date
+
+
+done
+done
+done
+done
+done
+done
+done
+fi
+
+
+
+
+
+#######################
+# Binned approach
+
+
+simulated_gt_architecture="stdExpr"
+inference_gt_architecture="linear"
+echo $simulated_gt_architecture"_"$inference_gt_architecture
+
+#####################
+non_med_anno_arr=("genotype_intercept" "full_anno")
+non_med_anno_arr=("genotype_intercept")
+cis_snp_h2_method_arr=( "ldsc" "avgChisq" "greml" )
+validation_data_gene_ldscores_type="MarginalSS"
+
+eqtl_sample_size_arr=( "100" "200" "300" "1000" "100-1000")
+eqtl_sample_size_arr=( "100" "200" "300" "1000" "100-1000")
+
+
+eqtl_beta_sq_filter_arr=( "0.5" "1.0" "2.0" "5.0" "10.0" "100.0" "10000.0")
+eqtl_beta_sq_filter_arr=( "100.0" "500.0" "1000.0")
+eqtl_beta_sq_filter_arr=( "1000.0")
+
+training_data_gene_ldscores_type_arr=("MarginalSS" "mescLassoCorr" "mescLasso" "mescLassoPlusMarginalSS")
+training_data_gene_ldscores_type_arr=("lasso_CV_corr" "lasso_CV_corr_standardized")
+
+inference_approach_arr=("binned_2SLS")
+
+for non_med_anno in "${non_med_anno_arr[@]}"
+do
+for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
+do
+for eqtl_beta_sq_filter in "${eqtl_beta_sq_filter_arr[@]}"
+do
+for training_data_gene_ldscores_type in "${training_data_gene_ldscores_type_arr[@]}"
+do
+for inference_approach in "${inference_approach_arr[@]}"
+do
+for cis_snp_h2_method in "${cis_snp_h2_method_arr[@]}"
+do
+
+
+
+gwas_sumstat_file=$simulated_gwas_dir${simulation_name_string}"_gt_arch_"${simulated_gt_architecture}"_simualated_gwas_results.txt"
+variant_ldscore_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
+variant_stdev_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_genotype_stdev_chrom"
+regression_snp_ldscore_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_hm3_ldscores_chrom"
+eqtl_cis_snp_h2_summary_file=${estimated_cis_snp_h2_dir}${simulation_name_string}"_"${eqtl_sample_size}"_"${cis_snp_h2_method}"_est_cis_snp_h2_summary.txt"
+
+marginal_eqtl_summary_file=$simulated_learned_gene_models_dir${simulation_name_string}"_"${eqtl_sample_size}"_replicate_eqtl_sumstats_xt_summary.txt"
+pred_eqtl_summary_file=$mesc_expression_score_dir${simulation_name_string}"_"${eqtl_sample_size}"_"${training_data_gene_ldscores_type}"_replicate_eqtl_sumstats_xt_summary.txt"
+pred_eqtl_summary_file=$lasso_gene_models_dir${simulation_name_string}"_"${eqtl_sample_size}"_"${training_data_gene_ldscores_type}"_replicate_eqtl_sumstats_xt_summary.txt"
+
+variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
+	
+
+	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${eqtl_beta_sq_filter}"_"${cis_snp_h2_method}"_"${training_data_gene_ldscores_type}"_"${validation_data_gene_ldscores_type}"_"${inference_approach}"_"${eqtl_sample_size}"_weighted"
+	date
+	python3 ${calibrated_mesc_code_dir}run_calibrated_binned_mesc.py \
+		--gwas-sumstat-file $gwas_sumstat_file \
+		--gwas-N ${n_gwas_individuals} \
+		--variant-ldscore-filestem ${variant_ldscore_filestem} \
+		--variant-M-filestem ${variant_m_filestem} \
+		--variant-stdev-filestem ${variant_stdev_filestem} \
+		--regression-snp-ldscore-filestem $regression_snp_ldscore_filestem \
+		--chromosome-file ${chrom_nums_file} \
+		--eqtl-training-data-summary-file ${pred_eqtl_summary_file} \
+		--eqtl-validation-data-summary-file ${marginal_eqtl_summary_file} \
+		--non-mediated-annotation-version ${non_med_anno} \
+		--gene-trait-architecture ${inference_gt_architecture} \
+		--inference-approach ${inference_approach} \
+		--squared-eqtl-effect-threshold ${eqtl_beta_sq_filter} \
+		--mesc-expression-score-dir $mesc_expression_score_dir \
+		--training-data-eqtl-ldscores-type ${training_data_gene_ldscores_type} \
+		--validation-data-eqtl-ldscores-type ${validation_data_gene_ldscores_type} \
+		--eqtl-cis-snp-h2-summary-file ${eqtl_cis_snp_h2_summary_file} \
+		--output-stem ${output_stem}
+	date
+
+
+done
+done
+done
+done
+done
+done
+
+
+
+
 
 
 

@@ -1154,15 +1154,32 @@ simulated_gt_architecture="stdExpr"
 inference_gt_architecture="stdExpr"
 sq_sumstat_threshold="1000.0"
 weighting = "weighted"
-step1_gene_ldscores="mesc_lasso_corr_standardized"
-step2_gene_ldscores="mesc_lasso_corr_standardized"
+step1_gene_ldscores="lasso_CV_corr_standardized"
+step2_gene_ldscores="lasso_CV_corr_standardized"
 inference_approach="2SLS"
 
 cis_h2_method="greml"
 
+#run_string = paste0(non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_", sq_sumstat_threshold, "_", cis_h2_method, "_", step1_gene_ldscores, "_", step2_gene_ldscores, "_", inference_approach,"_", weighting)
 
-run_string = paste0(non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_", sq_sumstat_threshold, "_", cis_h2_method, "_", step1_gene_ldscores, "_", step2_gene_ldscores, "_", inference_approach,"_", weighting)
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="stdExpr"
+inference_gt_architecture="stdExpr"
+sq_sumstat_threshold="1000.0"
+weighting = "weighted"
+step1_gene_ldscores="lasso_CV_corr_standardized"
+inference_approach="2SLS"
+
+cis_h2_method="avgChisq"
+cis_h2_thresh=".01"
+
+run_string = paste0(non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_", sq_sumstat_threshold, "_", cis_h2_method, "_", step1_gene_ldscores, "_", inference_approach, "_", cis_h2_thresh,"_", weighting)
+
+
+
 joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_calibrated_ldsc_summary_averaged.txt")
+print(joint_ldsc_summary_file)
 joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
 
 joint_ldsc_df$est_h2 = joint_ldsc_df$est_h2 
@@ -1188,7 +1205,7 @@ print(output_file)
 
 
 
-
+if (FALSE) {
 mesc_summary_file <- paste0(organized_trait_med_h2_results_dir, "mesc_med_h2_5_causal_tissue__full_gt_arch_linear_genotypeIntercept_sim_results_calibrated_ldsc_summary_averaged.txt")
 mesc_df <- read.table(mesc_summary_file, header=TRUE, sep="\t")
 
@@ -1211,6 +1228,7 @@ step1_gene_ldscores="mescLasso"
 
 inference_approach="JIVE"
 inference_approach="2SLS"
+}
 if (FALSE) {
 run_string = paste0(eqtl_snp_representation, "_", non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_squared_marginal_sumstats_", sq_sumstat_threshold, "_", step1_gene_ldscores, "_", inference_approach,"_", weighting)
 joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_calibrated_ldsc_summary_averaged.txt")

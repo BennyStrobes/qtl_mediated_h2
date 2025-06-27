@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-30:30                         # Runtime in D-HH:MM format
-#SBATCH -p medium                           # Partition to run in
+#SBATCH -t 0-4:30                         # Runtime in D-HH:MM format
+#SBATCH -p short                           # Partition to run in
 #SBATCH --mem=10GB                         # Memory total in MiB (for all cores)
 
 
@@ -49,7 +49,8 @@ fi
 gene_trait_architecture="linear"
 gene_trait_architecture="stdExpr"
 gene_trait_architecture_arr=( "linear" "stdExpr" ) 
-if false; then
+gene_trait_architecture_arr=( "stdExpr" ) 
+
 for gene_trait_architecture in "${gene_trait_architecture_arr[@]}"
 do
 	echo $gene_trait_architecture
@@ -68,7 +69,7 @@ do
 	echo "Simulation Step 3"
 	python3 run_gwas_on_simulated_trait.py $simulation_number $chrom_string $gwas_simulation_name_string $processed_genotype_data_dir $simulated_trait_dir $simulated_gwas_dir
 done
-fi
+
 
 
 
@@ -85,9 +86,9 @@ do
 	python3 simulate_sample_replicate_gene_expression_and_compute_eqtl_ss.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $eqtl_sample_size $n_tissues
 done
 fi
-
+if false; then
 python3 add_tissue_imbalence_sample_replicate_sim.py $simulation_number $chrom_string $simulated_gene_expression_dir $simulated_learned_gene_models_dir $simulation_name_string $processed_genotype_data_dir $n_tissues
-
+fi
 
 
 

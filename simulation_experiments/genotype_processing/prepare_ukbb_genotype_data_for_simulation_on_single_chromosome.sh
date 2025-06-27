@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-5:00                         # Runtime in D-HH:MM format
+#SBATCH -t 0-6:00                         # Runtime in D-HH:MM format
 #SBATCH -p short                           # Partition to run in
-#SBATCH --mem=20GB                         # Memory total in MiB (for all cores)
+#SBATCH --mem=25GB                         # Memory total in MiB (for all cores)
 
 # First three parts ran at 200GB
 # For around 15-20h 
@@ -111,6 +111,7 @@ fi
 ###############################
 # Convert to bgen
 ###############################
+if false; then
 # GWAS 
 plink2 --pfile ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num} --keep-allele-order --export bgen-1.2 --out ${processed_genotype_data_dir}"simulated_gwas_data_"${chrom_num}
 
@@ -130,7 +131,7 @@ plink2 --pfile ${processed_genotype_data_dir}"simulated_eqtl_"${eqtl_sample_size
 
 # Reference genotype
 plink2 --pfile ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num} --keep-allele-order --export bgen-1.2 --out ${processed_genotype_data_dir}"simulated_reference_genotype_data_"${chrom_num}
-
+fi
 
 
 
@@ -164,12 +165,11 @@ fi
 
 
 
-if false; then
 module load gcc/9.2.0
 module load python/3.9.14
 module load cuda/12.1
 source /n/groups/price/ben/environments/tf_new/bin/activate
-fi
+
 genotype_version="reference_genotype_data"
 
 # Extract variant level LD scores
@@ -199,9 +199,8 @@ fi
 # Limit to protein coding genes
 cis_window="500000"
 simulated_gene_position_file=${processed_genotype_data_dir}"gene_positions_chr"${chrom_num}".txt"
-if false; then
 python3 prepare_simulated_gene_position_list.py $chrom_num $gencode_gene_annotation_file $simulated_gene_position_file $cis_window
-fi
+
 
 
 

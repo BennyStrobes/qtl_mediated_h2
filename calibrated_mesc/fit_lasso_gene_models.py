@@ -6,6 +6,132 @@ import time
 import argparse
 from bgen import BgenReader
 from sklearn.linear_model import Lasso
+from sklearn.linear_model import LassoCV, Lasso
+from sklearn.base import BaseEstimator, RegressorMixin, clone
+from sklearn.utils.validation import check_is_fitted
+
+
+
+
+
+class NonZeroLassoCV_OLD(BaseEstimator, RegressorMixin):
+	"""
+	LassoCV that refuses to choose an alpha whose final model is all-zero.
+
+	Parameters
+	----------
+	alphas : array-like, shape (n_alphas,), optional
+		Grid of α’s to search.  If None, uses the same default grid as LassoCV.
+	cv : int or cross-validation generator, default=5
+	min_nonzero : int, default=1
+		Minimum number of non-zero coefficients required for an α to be eligible.
+	**lasso_kwargs
+		Extra keyword arguments forwarded to both LassoCV and Lasso
+		(e.g. `fit_intercept`, `max_iter`, `tol`, …).
+	"""
+	def __init__(self, alphas=None, cv=5, min_nonzero=1, **lasso_kwargs):
+		self.alphas        = alphas
+		self.cv            = cv
+		self.min_nonzero   = min_nonzero
+		self.lasso_kwargs  = lasso_kwargs
+
+	# --------------------------------------------------------------------- #
+	def fit(self, X, y):
+		# 1) ordinary LassoCV to get CV errors for every α
+		self._lasso_cv_ = LassoCV(alphas=self.alphas,
+								  cv=self.cv,
+								  **self.lasso_kwargs).fit(X, y)
+		#print(np.sum(self._lasso_cv_.coef_))
+		#print(self._lasso_cv_.alpha_)
+
+		alphas     = self._lasso_cv_.alphas_
+		mse_mean   = self._lasso_cv_.mse_path_.mean(axis=1)
+
+		# 2) run a brief Lasso fit at each α on the full data
+		nz_mask = []
+		for a in alphas:
+			coef = Lasso(alpha=a, **self.lasso_kwargs).fit(X, y).coef_
+			nz_mask.append(np.count_nonzero(coef) >= self.min_nonzero)
+		nz_mask = np.array(nz_mask)
+
+		# 3) select the α with *lowest CV error* among those that passed
+		if nz_mask.any():
+			eligible_mse      = mse_mean.copy()
+			eligible_mse[~nz_mask] = np.inf          # make them ineligible
+			best_idx          = int(np.argmin(eligible_mse))
+		else:                  # nobody passed → fall back to LassoCV’s choice
+			best_idx = int(np.argmin(mse_mean))
+
+		self.alpha_     = float(alphas[best_idx])
+
+		# 4) final refit with the chosen α
+		self._model_    = Lasso(alpha=self.alpha_, **self.lasso_kwargs).fit(X, y)
+		self.coef_      = self._model_.coef_
+		self.intercept_ = self._model_.intercept_
+		return self
+
+	# --------------------------------------------------------------------- #
+	def predict(self, X):
+		check_is_fitted(self, "_model_")
+		return self._model_.predict(X)
+
+	# compatible score() delegates to the underlying Lasso
+	def score(self, X, y):
+		check_is_fitted(self, "_model_")
+		return self._model_.score(X, y)
+
+	# convenience: same API as LassoCV
+	@property
+	def n_iter_(self):
+		check_is_fitted(self, "_model_")
+		return self._model_.n_iter_
+
+class NonZeroLassoCV(BaseEstimator, RegressorMixin):
+    """
+    LassoCV that refuses to choose an alpha whose final model is all-zero.
+
+    Parameters
+    ----------
+    alphas : array-like, shape (n_alphas,), optional
+        Grid of α’s to search.  If None, uses the same default grid as LassoCV.
+    cv : int or cross-validation generator, default=5
+    min_nonzero : int, default=1
+        Minimum number of non-zero coefficients required for an α to be eligible.
+    **lasso_kwargs
+        Extra keyword arguments forwarded to both LassoCV and Lasso
+        (e.g. `fit_intercept`, `max_iter`, `tol`, …).
+    """
+    def __init__(self, alphas=None, cv=5, min_nonzero=1, **lasso_kwargs):
+        self.alphas        = alphas
+        self.cv            = cv
+        self.min_nonzero   = min_nonzero
+        self.lasso_kwargs  = lasso_kwargs
+
+    # --------------------------------------------------------------------- #
+    def fit(self, X, y):
+        # 1) ordinary LassoCV to get CV errors for every α
+        self._lasso_cv_ = LassoCV(alphas=self.alphas,
+                                  cv=self.cv,
+                                  **self.lasso_kwargs).fit(X, y)
+
+        alphas     = self._lasso_cv_.alphas_
+        mse_mean   = self._lasso_cv_.mse_path_.mean(axis=1)
+
+        # Non-zero coef off the bat
+        if np.sum(self._lasso_cv_.coef_ != 0.0) > 0:
+            return self._lasso_cv_, True
+        else:
+            for alpha_index in np.argsort(mse_mean):
+                alpha = alphas[alpha_index]
+                lasso_fit = Lasso(alpha=alpha, **self.lasso_kwargs).fit(X, y)
+                lasso_coef = lasso_fit.coef_
+                if np.count_nonzero(lasso_coef) >= self.min_nonzero:
+                    break
+            self.alpha_ = float(alpha)
+            self.coef_ = np.copy(lasso_coef)
+            return self, False
+
+
 
 
 def load_in_ref_alt_allele_arr(pvar_file):
@@ -123,6 +249,8 @@ parser.add_argument('--alpha', default=0.01, type=float,
 					help='Lasso regularization parameter')
 parser.add_argument('--cis-window', default=500000.0, type=float,
 					help='BP region around gene to call cis-eqtls')
+parser.add_argument('--cross-val-alpha', default=False, action='store_true',
+					help='Boolean on whether or not to use cross validation to get alpha for a given gene')
 parser.add_argument('--output', default=None, type=str,
 					help='Output file stem to save data to')
 args = parser.parse_args()
@@ -132,7 +260,7 @@ np.random.seed(1)
 # Open output file handle
 t = open(args.output,'w')
 # Print header
-t.write('GENE\tCHR\tSNP\tSNP_POS\tA1\tA2\tDOSAGE_EFFECT\tSPARSITY_PARAM\tNON_SPARSITY_LEVEL\n')
+t.write('GENE\tCHR\tSNP\tSNP_POS\tA1\tA2\tDOSAGE_EFFECT\tSPARSITY_PARAM\tNON_SPARSITY_LEVEL\tCV_boolean\n')
 
 
 # Extract array of chromosomes
@@ -143,6 +271,8 @@ expr_sample_names = extract_expression_file_sample_names(args.expr)
 
 
 counter = 0
+aa = []
+t_old = time.time()
 # Loop through chromosomes
 for chrom_num in chromosome_arr:
 
@@ -186,8 +316,13 @@ for chrom_num in chromosome_arr:
 		# Skip genes not on current chromosome
 		if line_chrom_num != chrom_num:
 			continue
-		#print(counter)
 		counter = counter + 1
+
+		if np.mod(counter,100) == 0:
+			print(counter)
+			t_cur = time.time()
+			print(t_cur-t_old)
+			t_old = t_cur
 
 		# Extract vector of gene expression 
 		expr_vec = np.asarray(data[3:]).astype(float)
@@ -223,10 +358,18 @@ for chrom_num in chromosome_arr:
 
 
 		# Fit lasso model
-		lasso_obj = Lasso(alpha=args.alpha, max_iter=100000).fit(G_cis_std, expr_vec)
-		std_beta_hat = lasso_obj.coef_
+		#print('#####')
+		if args.cross_val_alpha:
+			lasso_obj, booler = NonZeroLassoCV(cv=5,alphas=np.arange(.01, .5, .02), max_iter=50000).fit(G_cis_std, expr_vec)
+			std_beta_hat = lasso_obj.coef_
+			sparsity_param = np.copy(lasso_obj.alpha_)*1.0
+		else:
+			lasso_obj = Lasso(alpha=args.alpha, max_iter=100000).fit(G_cis_std, expr_vec)
+			std_beta_hat = lasso_obj.coef_
+			sparsity_param = np.copy(args.alpha)*1.0
+			booler = 'NA'
+		#print(np.mean(aa))
 
-		sparsity_param = np.copy(args.alpha)*1.0
 		non_sparsity_level = np.sum(std_beta_hat!=0)/len(std_beta_hat)
 		if non_sparsity_level == 0.0:
 			std_beta_hat, sparsity_param = get_non_zero_beta(G_cis_std, expr_vec, args.alpha, ens_id)
@@ -246,7 +389,7 @@ for chrom_num in chromosome_arr:
 			snp_a1 = cis_ref_alt_alleles[snp_iter, 1]
 			snp_a2 = cis_ref_alt_alleles[snp_iter, 0]
 			# print
-			t.write(ens_id + '\t' + str(chrom_num) + '\t' + snp_rsid + '\t' + str(snp_pos) + '\t' + snp_a1 + '\t' + snp_a2 + '\t' + str(tmp_beta) + '\t' + str(sparsity_param) + '\t' + str(non_sparsity_level) + '\n')
+			t.write(ens_id + '\t' + str(chrom_num) + '\t' + snp_rsid + '\t' + str(snp_pos) + '\t' + snp_a1 + '\t' + snp_a2 + '\t' + str(tmp_beta) + '\t' + str(sparsity_param) + '\t' + str(non_sparsity_level) + '\t' + str(booler) + '\n')
 	f.close()
 t.close()
 

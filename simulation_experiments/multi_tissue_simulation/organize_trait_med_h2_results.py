@@ -788,13 +788,13 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 						continue
 					arr_est.append(float(data[1]))
 					arr_names.append(data[0])
-					arr_est_se.append(float(data[3]))
+					#arr_est_se.append(float(data[3]))
 					if data[0].startswith('category_med'):
 						per_category_est.append(float(data[1]))
-						per_category_est_se.append(float(data[3]))
+						#per_category_est_se.append(float(data[3]))
 					if data[0].startswith('dataset_med'):
 						per_tissue_est.append(float(data[1]))
-						per_tissue_est_se.append(float(data[3]))
+						#per_tissue_est_se.append(float(data[3]))
 				f.close()
 				arr_est = np.asarray(arr_est)
 				arr_names = np.asarray(arr_names)
@@ -811,15 +811,15 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 				sim_med_h2.append(tmp_total_med_h2_sim)
 				sim_nm_h2.append(tmp_total_nm_h2_sim)
 				est_med_h2.append(float(arr_est[2]))
-				est_med_h2_se.append(float(arr_est_se[2]))
+				#est_med_h2_se.append(float(arr_est_se[2]))
 				est_nm_h2.append(float(arr_est[1]))
-				est_nm_h2_se.append(float(arr_est_se[1]))
+				#est_nm_h2_se.append(float(arr_est_se[1]))
 				est_total_h2.append(float(arr_est[0]))
-				est_total_h2_se.append(float(arr_est_se[0]))
+				#est_total_h2_se.append(float(arr_est_se[0]))
 				est_per_tissue_h2.append(per_tissue_est)
-				est_per_tissue_h2_se.append(per_tissue_est_se)
+				#est_per_tissue_h2_se.append(per_tissue_est_se)
 				est_per_category_h2.append(per_category_est)
-				est_per_category_h2_se.append(per_category_est_se)
+				#est_per_category_h2_se.append(per_category_est_se)
 				est_eqtl_h2.append(float(arr_est[-1]))
 				sim_counter.append(sim_num)
 
@@ -1330,7 +1330,7 @@ non_med_anno = 'genotype_intercept'
 inference_gt_architecture = 'linear'
 simulated_gt_architecture = 'linear'
 
-inference_gt_architecture = 'stdExpr'
+inference_gt_architecture = 'linear'
 simulated_gt_architecture = 'stdExpr'
 
 
@@ -1347,21 +1347,23 @@ step1_gene_ldscores='mescLasso'
 
 
 inference_approach="JIVE"
-inference_approach="2SLS"
+inference_approach="binned_2SLS"
 
 
-cis_snp_h2_method="greml"
-training_data_gene_ldscores_type="mesc_lasso_corr_standardized"
-validation_data_gene_ldscores_type="mesc_lasso_corr_standardized"
+cis_snp_h2_method="avgChisq"
+cis_snp_h2_method="ldsc"
 
-cis_h2_thresh='.025'
+training_data_gene_ldscores_type="lasso_CV_corr_standardized"
+validation_data_gene_ldscores_type="MarginalSS"
+
 
 # Create mapping from simulation number to simulated heritabilities
 sim_heritabilities = create_mapping_from_simulation_number_to_simulated_heritabilities(simulated_trait_dir, tmp_simulation_name_string, sim_nums, simulated_gt_architecture)
 
 
 #run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh  + '_' + cis_snp_h2_method + '_' + training_data_gene_ldscores_type + '_' + inference_approach + '_' + cis_h2_thresh
-run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh  + '_' + cis_snp_h2_method + '_' + training_data_gene_ldscores_type + '_'+ validation_data_gene_ldscores_type + '_' + inference_approach + '_' + 'cc'
+#run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh  + '_' + cis_snp_h2_method + '_' + training_data_gene_ldscores_type + '_'+ validation_data_gene_ldscores_type + '_' + inference_approach 
+run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh  + '_' + cis_snp_h2_method + '_' + training_data_gene_ldscores_type + '_'+ validation_data_gene_ldscores_type + '_' + inference_approach 
 
 avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + run_string + '_' + weighting + '_sim_results_calibrated_ldsc_summary_averaged.txt'
 clean_method_names = ['uncalibrated_mesc', 'calibrated_mesc']

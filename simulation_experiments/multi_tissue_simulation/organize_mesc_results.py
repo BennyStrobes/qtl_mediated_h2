@@ -1298,6 +1298,7 @@ sim_nums = np.arange(1,201)
 eqtl_sample_sizes = np.asarray(['100','200','300','1000'])
 eqtl_sample_sizes = np.asarray(['100', '200'])
 eqtl_sample_sizes = np.asarray(['100','200','300','1000', '100-1000'])
+eqtl_sample_sizes = np.asarray(['100'])
 
 
 
