@@ -333,6 +333,28 @@ def extract_posterior_cis_snp_h2(greml_dataset_cis_h2_file, posterior_greml_data
 	os.system('rm ' +tmp_output_stem)
 	return
 
+def print_true_cis_h2_file(true_cis_snp_h2_file, dataset_cis_h2_file, dataset_iter):
+	f = open(true_cis_snp_h2_file)
+	t = open(dataset_cis_h2_file,'w')
+	t.write('gene_id\tcis_snp_h2\n')
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		ensamble_id = data[0]
+		cis_snp_h2 = data[(1+dataset_iter)]
+		if float(cis_snp_h2) == 0.0:
+			continue
+		t.write(ensamble_id + '\t' + cis_snp_h2 + '\n')
+
+
+	f.close()
+	t.close()
+	return
+
 
 
 
@@ -345,6 +367,7 @@ eqtl_sample_size = sys.argv[6]
 est_cis_snp_h2_dir = sys.argv[7]
 simulation_name_string = sys.argv[8]
 mesc_expression_score_dir = sys.argv[9]
+simulated_trait_dir = sys.argv[10]
 
 # Names of chromosomes to run analysis on
 chrom_arr, chrom_dicti = extract_chromosome_names(chrom_nums_file)
@@ -363,6 +386,44 @@ gene_info = extract_gene_info(gene_ldscore_filestem, gene_ldscore_filesuffix, eq
 
 
 
+##############################
+# Extract cis-snp h2s using unknown truth
+##############################
+'''
+# Create global output file
+global_output_file = est_cis_snp_h2_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_true_est_cis_snp_h2_summary.txt'
+tt = open(global_output_file,'w')
+tt.write('tissue_name\tN_rep1\tN_rep2\tcis_h2_rep1_file\tcis_h2_rep2_file\n')
+
+
+# Loop through eqtl data sets
+gene_to_ldsc_cis_h2s = {}
+for dataset_iter, eqtl_dataset_name in enumerate(eqtl_dataset_names):
+
+	true_cis_snp_h2_file = simulated_trait_dir + simulation_name_string + '_gt_arch_stdExpr_true_expression_cis_snp_h2.txt'
+	dataset_cis_h2_file = est_cis_snp_h2_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_' + eqtl_dataset_name + '_true_cis_snp_h2.txt'
+
+	print_true_cis_h2_file(true_cis_snp_h2_file, dataset_cis_h2_file, dataset_iter)
+
+	###################
+	# Replicate 1
+	###################
+	N_training = eqtl_dataset_Ns_training[dataset_iter]
+	training_data_file = eqtl_dataset_files_training[dataset_iter]
+
+	###################
+	# Replicate 2
+	###################
+	N_validation = eqtl_dataset_Ns_validation[dataset_iter]
+	validation_data_file = eqtl_dataset_files_validation[dataset_iter]
+
+
+	tt.write(eqtl_dataset_name + '\t' + str(N_training) + '\t' + str(N_validation) + '\t' + dataset_cis_h2_file + '\t' + dataset_cis_h2_file + '\n')
+tt.close()
+print(global_output_file)
+'''
+
+'''
 ##############################
 # Extract cis-snp h2s using LDSC
 ##############################
@@ -487,7 +548,7 @@ for line in f:
 f.close()
 tt.close()
 print(global_output_file)
-
+'''
 
 
 ##############################
@@ -528,7 +589,7 @@ print(global_output_file)
 
 
 
-
+'''
 ##############################
 # Extract cis-snp h2s using posterior avg_chi_sq estimates
 ##############################
@@ -579,7 +640,7 @@ tt.close()
 print(global_output_file)
 
 
-
+'''
 
 
 

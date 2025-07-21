@@ -50,7 +50,7 @@ eqtl_sss = ['100', '200', '300', '1000', '100-1000']
 for eqtl_ss in eqtl_sss:
 
 	output_file = mesc_expression_score_dir + simulation_name_string + '_' + eqtl_ss + '_' + 'lasso_' + alpha_0 + '_corr_replicate_eqtl_sumstats_xt_summary.txt'
-	#generate_xt_eqtl_summary_file(mesc_expression_score_dir,simulation_name_string, eqtl_ss, 'lasso' + str(alph), output_file)
+	generate_xt_eqtl_summary_file(mesc_expression_score_dir,simulation_name_string, eqtl_ss, 'lasso_' + str(alpha_0), output_file)
 
 	output_file = mesc_expression_score_dir + simulation_name_string + '_' + eqtl_ss + '_' + 'lasso_' + alpha_0 + '_corr_standardized_replicate_eqtl_sumstats_xt_summary.txt'
 	generate_xt_eqtl_summary_file(mesc_expression_score_dir,simulation_name_string, eqtl_ss, 'lasso_' + str(alpha_0) + '_standardized', output_file)

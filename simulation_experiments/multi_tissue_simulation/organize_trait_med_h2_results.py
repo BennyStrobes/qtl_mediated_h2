@@ -763,7 +763,7 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 			est_eqtl_h2 = []
 			sim_counter = []
 			for sim_num in sim_nums:
-				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_' + weighting + '_' + method + '_jk_results.txt'
+				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_weighted' + '_' + method + '_jk_results.txt'
 				if sim_num in invalid_sims:
 					continue
 				if os.path.isfile(filer) == False:
@@ -833,11 +833,16 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 				continue
 
 			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_total_h2, est_total_h2, 'total_h2')
-
 			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_nm_h2, est_nm_h2, 'nm_h2')
-			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, est_med_h2, 'med_h2')
-			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, est_per_tissue_h2[:,0], 'causal_tissue_med_h2')
-			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, 0.0, np.sum(est_per_tissue_h2[:,1:],axis=1), 'non_causal_tissue_med_h2')
+
+			if clean_method_names[ii] == 'uncalibrated_mesc':
+				t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, np.asarray(est_med_h2), 'med_h2')
+				t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, est_per_tissue_h2[:,0], 'causal_tissue_med_h2')
+				t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, 0.0, np.sum(est_per_tissue_h2[:,1:],axis=1), 'non_causal_tissue_med_h2')
+			else:
+				t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, est_med_h2, 'med_h2')
+				t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, sim_med_h2, est_per_tissue_h2[:,0], 'causal_tissue_med_h2')
+				t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, 0.0, np.sum(est_per_tissue_h2[:,1:],axis=1), 'non_causal_tissue_med_h2')
 			t = print_temp_line(clean_method_names[ii], eqtl_sample_size, t, (.025 + .05 + .1)/3.0, est_eqtl_h2, 'eqtl_h2')
 		
 
@@ -1350,29 +1355,122 @@ inference_approach="JIVE"
 inference_approach="binned_2SLS"
 
 
-cis_snp_h2_method="avgChisq"
 cis_snp_h2_method="ldsc"
+cis_snp_h2_method="ldsc"
+cis_snp_h2_method="greml"
+cis_snp_h2_method="avgChisq"
+cis_snp_h2_method="true"
+
+n_bins="6"
+
 
 training_data_gene_ldscores_type="lasso_CV_corr_standardized"
 validation_data_gene_ldscores_type="MarginalSS"
 
-
 # Create mapping from simulation number to simulated heritabilities
 sim_heritabilities = create_mapping_from_simulation_number_to_simulated_heritabilities(simulated_trait_dir, tmp_simulation_name_string, sim_nums, simulated_gt_architecture)
 
+'''
 
 #run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh  + '_' + cis_snp_h2_method + '_' + training_data_gene_ldscores_type + '_' + inference_approach + '_' + cis_h2_thresh
 #run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh  + '_' + cis_snp_h2_method + '_' + training_data_gene_ldscores_type + '_'+ validation_data_gene_ldscores_type + '_' + inference_approach 
-run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh  + '_' + cis_snp_h2_method + '_' + training_data_gene_ldscores_type + '_'+ validation_data_gene_ldscores_type + '_' + inference_approach 
+run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh  + '_' + cis_snp_h2_method + '_' + training_data_gene_ldscores_type + '_'+ validation_data_gene_ldscores_type + '_' + inference_approach + '_' + n_bins
 
-avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + run_string + '_' + weighting + '_sim_results_calibrated_ldsc_summary_averaged.txt'
+avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + run_string + '_sim_results_calibrated_ldsc_summary_averaged.txt'
 clean_method_names = ['uncalibrated_mesc', 'calibrated_mesc']
 methods = ['uncalibrated_mesc', 'calibrated_mesc']
 average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
+'''
+
+
+
+
+# Inf sample size
+inference_approach="binned_2SLS"
+inference_gt_architecture = 'linear'
+simulated_gt_architecture = 'stdExpr'
+beta_squared_thresh = '1000.0'
+cis_snp_h2_method="true"
+n_bins_arr = ['3', '4', '5', '6', '7']
+
+for n_bins in n_bins_arr:
+	eqtl_sample_sizes = np.asarray(['INF_SS'])
+
+
+	run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh  + '_' + cis_snp_h2_method  + '_' + inference_approach + '_' + n_bins
+
+	avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + run_string + '_INF_SS_sim_results_calibrated_ldsc_summary_averaged.txt'
+	clean_method_names = ['uncalibrated_mesc', 'calibrated_mesc']
+	methods = ['uncalibrated_mesc', 'calibrated_mesc']
+	#average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
+
+
+inference_approach="2SLS"
+inference_gt_architecture = 'stdExpr'
+simulated_gt_architecture = 'stdExpr'
+beta_squared_thresh = '1000.0'
+cis_snp_h2_method="true"
+
+eqtl_sample_sizes = np.asarray(['INF_SS'])
+
+run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh   + '_' + inference_approach 
+
+avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + run_string + '_INF_SS_weighted_sim_results_calibrated_ldsc_summary_averaged.txt'
+clean_method_names = ['uncalibrated_mesc', 'calibrated_mesc']
+methods = ['uncalibrated_mesc', 'calibrated_mesc']
+average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
+print(avg_results_summary_file)
 
 
 '''
+inference_approach="2SLS"
+inference_gt_architecture = 'linear'
+simulated_gt_architecture = 'stdExpr'
+beta_squared_thresh = '1000.0'
+cis_snp_h2_method="true"
 
+eqtl_sample_sizes = np.asarray(['INF_SS'])
+
+run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh   + '_' + inference_approach 
+
+avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + run_string + '_INF_SS_sim_results_calibrated_ldsc_summary_averaged.txt'
+clean_method_names = ['uncalibrated_mesc', 'calibrated_mesc']
+methods = ['uncalibrated_mesc', 'calibrated_mesc']
+average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
+print(avg_results_summary_file)
+
+
+# Create mapping from simulation number to simulated heritabilities
+simulated_gt_architecture = 'linear'
+sim_heritabilities = create_mapping_from_simulation_number_to_simulated_heritabilities(simulated_trait_dir, tmp_simulation_name_string, sim_nums, simulated_gt_architecture)
+
+inference_approach="2SLS"
+inference_gt_architecture = 'linear'
+simulated_gt_architecture = 'linear'
+beta_squared_thresh = '1000.0'
+cis_snp_h2_method="true"
+
+eqtl_sample_sizes = np.asarray(['INF_SS'])
+
+run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh   + '_' + inference_approach 
+
+avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + run_string + '_INF_SS_sim_results_calibrated_ldsc_summary_averaged.txt'
+clean_method_names = ['uncalibrated_mesc', 'calibrated_mesc']
+methods = ['uncalibrated_mesc', 'calibrated_mesc']
+average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
+print(avg_results_summary_file)
+
+'''
+
+
+
+
+
+
+
+
+
+'''
 calibration_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + eqtl_snp_representation + '_' + non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + gene_ld_score_type + '_' + beta_squared_thresh+ '_' + step1_gene_ldscores+ '_' + inference_approach + '_' + weighting + '_sim_results_calibration_summary.txt'
 clean_method_names = ['calibrated_mesc']
 methods = ['calibrated_mesc']

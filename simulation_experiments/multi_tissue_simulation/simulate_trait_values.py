@@ -51,10 +51,28 @@ def extract_boolean_matrix_of_cis_heritable_genes(simulated_expression_summary_f
 
 	return boolean_mat
 
+def extract_cis_snp_h2_in_causal_tissues(cis_snp_h2_output):
+	cis_snp_h2_arr = []
+	gene_names_arr = []
+
+	f = open(cis_snp_h2_output)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		gene_names_arr.append(data[0])
+		cis_snp_h2_arr.append(float(data[1]))
+	f.close()
 
 
-def simulate_expression_mediated_gene_causal_effect_sizes(simulated_expression_summary_file, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, expression_mediated_causal_effects_output, ge_h2, gene_trait_architecture):
-	simulate_expression_mediated_gene_causal_effect_sizes_one_causal_tissues(simulated_expression_summary_file, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, expression_mediated_causal_effects_output,ge_h2, gene_trait_architecture)
+	return np.asarray(cis_snp_h2_arr), np.asarray(gene_names_arr)
+
+
+def simulate_expression_mediated_gene_causal_effect_sizes(simulated_expression_summary_file, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, expression_mediated_causal_effects_output, ge_h2, gene_trait_architecture, cis_snp_h2_output):
+	simulate_expression_mediated_gene_causal_effect_sizes_one_causal_tissues(simulated_expression_summary_file, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, expression_mediated_causal_effects_output,ge_h2, gene_trait_architecture, cis_snp_h2_output)
 
 	return
 
@@ -62,7 +80,11 @@ def simulate_expression_mediated_gene_causal_effect_sizes(simulated_expression_s
 
 
 # Simulate mediated gene-expression causal effect sizes
-def simulate_expression_mediated_gene_causal_effect_sizes_one_causal_tissues(simulated_expression_summary_file, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, expression_mediated_causal_effects_output, ge_h2, gene_trait_architecture):
+def simulate_expression_mediated_gene_causal_effect_sizes_one_causal_tissues(simulated_expression_summary_file, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, expression_mediated_causal_effects_output, ge_h2, gene_trait_architecture, cis_snp_h2_output, constant_h2=.00053):
+	
+	# Extract cis snp h2 in causal genes
+	gene_cis_snp_h2s, ordered_gene_names2 = extract_cis_snp_h2_in_causal_tissues(cis_snp_h2_output)
+
 	# Extract list of ordered gene names
 	ordered_gene_names = extract_ordered_gene_names_from_gene_summary_file(simulated_expression_summary_file)
 	total_genes = len(ordered_gene_names)
@@ -73,8 +95,15 @@ def simulate_expression_mediated_gene_causal_effect_sizes_one_causal_tissues(sim
 
 
 	# Quick error checking
+	if np.array_equal(ordered_gene_names2, ordered_gene_names) == False:
+		print('assumption errror')
+		pdb.set_trace()
 	if cis_h2_gene_boolean_matrix.shape[0] != total_genes:
 		print('assumption eroror')
+		pdb.set_trace()
+
+	if np.array_equal(1.0*(gene_cis_snp_h2s!=0), cis_h2_gene_boolean_matrix[:,0]) == False:
+		print('assumption erororor')
 		pdb.set_trace()
 
 	# Calculate number of causal genes
@@ -105,6 +134,17 @@ def simulate_expression_mediated_gene_causal_effect_sizes_one_causal_tissues(sim
 		gene_causal_effect_sizes[tissue_med_causal_gene_indices, 0] = np.random.normal(loc=0.0, scale=np.sqrt(per_element_heritability/avg_ge_h2),size=n_causal_genes_per_causal_tissue)
 	elif gene_trait_architecture == 'stdExpr':
 		gene_causal_effect_sizes[tissue_med_causal_gene_indices, 0] = np.random.normal(loc=0.0, scale=np.sqrt(per_element_heritability),size=n_causal_genes_per_causal_tissue)
+	elif gene_trait_architecture == 'exprH2Linear':
+		for gene_index in tissue_med_causal_gene_indices:
+			gene_cis_snp_h2 = gene_cis_snp_h2s[gene_index]
+			if gene_cis_snp_h2 == 0.0:
+				print('assumption errror')
+				pdb.set_trace()
+
+			slope = (per_element_heritability - constant_h2)/(-avg_ge_h2)
+			gene_heritability = constant_h2 - gene_cis_snp_h2*slope
+			gene_causal_effect_sizes[gene_index, 0] = np.random.normal(loc=0.0, scale=np.sqrt(gene_heritability/avg_ge_h2))
+
 	else:
 		print('not yet implemented')
 		pdb.set_trace()
@@ -254,6 +294,28 @@ def load_in_alt_allele_genotype_dosage_mat(bfile, window_indices, ref_alt_allele
 	return np.transpose(dosages)
 
 
+def compute_cis_h2_single_gene(genotype_obj, ref_alt_alleles, causal_eqtl_effect_sizes, eqtl_snp_indices):
+	# Total number of snps
+	global_n_snps = len(eqtl_snp_indices)
+
+	# Extract eqtl variant names
+	eqtl_index_positions = np.arange(global_n_snps)[eqtl_snp_indices].astype(int)
+
+	# Extract genotype matrix for these snps
+	genotype_dosage = load_in_alt_allele_genotype_dosage_mat(genotype_obj, eqtl_index_positions, ref_alt_alleles)
+	stand_eqtl_genotype = standardize_genotype_dosage_matrix(genotype_dosage)
+	#eqtl_genotype = np.asarray(genotype_obj.sel(variant=eqtl_index_names))
+	#stand_eqtl_genotype = mean_impute_and_standardize_genotype(eqtl_genotype)
+
+	# NOTE: THE FOLLOWING TWO VERSIONS GIVE EQUIVALENT RESULTS
+	# IT WAS MORE PLACED HERE FOR  A TEACHING EXCERCISE
+	genetically_predicted_gene_expression = np.dot(stand_eqtl_genotype, causal_eqtl_effect_sizes)  # Matrix of number of samplesXnumber of tissues
+
+
+	return np.var(genetically_predicted_gene_expression,axis=0)
+
+
+
 def compute_expression_mediated_trait_values_for_single_gene(genotype_obj, ref_alt_alleles, gene_trait_effect_size_vec, causal_eqtl_effect_sizes, eqtl_snp_indices, gene_trait_architecture):
 	# Total number of snps
 	global_n_snps = len(eqtl_snp_indices)
@@ -269,7 +331,7 @@ def compute_expression_mediated_trait_values_for_single_gene(genotype_obj, ref_a
 
 	# NOTE: THE FOLLOWING TWO VERSIONS GIVE EQUIVALENT RESULTS
 	# IT WAS MORE PLACED HERE FOR  A TEACHING EXCERCISE
-	if gene_trait_architecture == 'linear':
+	if gene_trait_architecture == 'linear' or gene_trait_architecture == 'exprH2Linear':
 		# Get genetically predicted gene expression (in each tissue)
 		genetically_predicted_gene_expression = np.dot(stand_eqtl_genotype, causal_eqtl_effect_sizes)  # Matrix of number of samplesXnumber of tissues
 
@@ -299,7 +361,100 @@ def compute_expression_mediated_trait_values_for_single_gene(genotype_obj, ref_a
 		print('assumption eroror')
 		pdb.set_trace()
 
-	return expr_med_trait_for_current_gene
+	return expr_med_trait_for_current_gene, np.var(genetically_predicted_gene_expression)
+
+
+
+def compute_expression_mediated_trait_values_for_single_gene_v2(genotype_obj, ref_alt_alleles, gene_trait_effect_size_vec, causal_eqtl_effect_sizes, eqtl_snp_indices, gene_trait_architecture, snp_names, snp_gene_effects_dicti, gene_name):
+	# Total number of snps
+	global_n_snps = len(eqtl_snp_indices)
+
+	# Extract eqtl variant names
+	eqtl_index_positions = np.arange(global_n_snps)[eqtl_snp_indices].astype(int)
+
+	# Extract genotype matrix for these snps
+	genotype_dosage = load_in_alt_allele_genotype_dosage_mat(genotype_obj, eqtl_index_positions, ref_alt_alleles)
+	stand_eqtl_genotype = standardize_genotype_dosage_matrix(genotype_dosage)
+	#eqtl_genotype = np.asarray(genotype_obj.sel(variant=eqtl_index_names))
+	#stand_eqtl_genotype = mean_impute_and_standardize_genotype(eqtl_genotype)
+
+	# NOTE: THE FOLLOWING TWO VERSIONS GIVE EQUIVALENT RESULTS
+	# IT WAS MORE PLACED HERE FOR  A TEACHING EXCERCISE
+	if gene_trait_architecture == 'linear' or gene_trait_architecture == 'exprH2Linear':
+		# Get genetically predicted gene expression (in each tissue)
+		genetically_predicted_gene_expression = np.dot(stand_eqtl_genotype, causal_eqtl_effect_sizes)  # Matrix of number of samplesXnumber of tissues
+
+		# Get expression mediated trait values
+		expr_med_trait_for_current_gene = np.dot(genetically_predicted_gene_expression, gene_trait_effect_size_vec)
+	elif gene_trait_architecture == 'stdExpr':
+		genetically_predicted_gene_expression = np.dot(stand_eqtl_genotype, causal_eqtl_effect_sizes)  # Matrix of number of samplesXnumber of tissues
+		
+		genetically_predicted_gene_expression_sdev = np.std(genetically_predicted_gene_expression,axis=0)
+
+		# Quick error check
+		if np.sum((genetically_predicted_gene_expression_sdev==0) & (gene_trait_effect_size_vec > 0)) != 0:
+			print('assumption error')
+			pdb.set_trace()
+
+		# hack to get rid of nans in tissues for this gene that are not genetically heritable
+		genetically_predicted_gene_expression_sdev[genetically_predicted_gene_expression_sdev==0] = 1
+
+		# Standardize genetically predicted gene expression
+		standardized_genetically_predicted_gene_expression = genetically_predicted_gene_expression/genetically_predicted_gene_expression_sdev
+
+		# Get expression mediated trait values
+		expr_med_trait_for_current_gene = np.dot(standardized_genetically_predicted_gene_expression, gene_trait_effect_size_vec)
+
+
+	else:
+		print('assumption eroror')
+		pdb.set_trace()
+
+
+	orig_effects = []
+	new_effects = []
+	for snp_iter, snp_id in enumerate(snp_names):
+		gene_snp_name = gene_name + '_' + snp_id
+		if gene_snp_name not in snp_gene_effects_dicti:
+			continue
+		orig_effect = snp_gene_effects_dicti[gene_snp_name]
+		new_effect = sm.OLS(standardized_genetically_predicted_gene_expression[:,0], sm.add_constant(stand_eqtl_genotype[:,snp_iter])).fit().params[1]
+		orig_effects.append(orig_effect)
+		new_effects.append(new_effect)
+	print(np.corrcoef(orig_effects, new_effects)[0,1])
+	print(sm.OLS(orig_effects, new_effects).fit().params)
+
+
+	return expr_med_trait_for_current_gene, np.var(genetically_predicted_gene_expression)
+
+
+
+def create_gene_snp_effect_mapping(file_name):
+	dicti = {}
+
+	f = open(file_name)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+
+		gene_id = data[0]
+		rs_id = data[1]
+
+		effect_size = float(data[6])
+		gene_snp_pair = gene_id + '_' + rs_id
+		if gene_snp_pair in dicti:
+			print('assumptione rororor')
+			pdb.set_trace()
+		dicti[gene_snp_pair] = effect_size
+
+	f.close()
+
+	return dicti
 
 
 def compute_expression_mediated_trait_values(simulated_expression_summary_file, expression_mediated_causal_effects_file, processed_genotype_data_dir, chrom_string, expression_mediated_trait_values_output, n_gwas_individuals, gene_trait_architecture):
@@ -338,6 +493,7 @@ def compute_expression_mediated_trait_values(simulated_expression_summary_file, 
 		chrom_rsids = np.asarray(genotype_obj.rsids())
 
 		total_n_chrom_genome_snps = len(ref_alt_alleles)
+
 
 		# Loop through genes in simulated_expression_summary_file (should be of same length as ordered_gene_names) and only stop at genes with non-zero gene-trait-effect sizes
 		f = open(simulated_expression_summary_file)
@@ -388,7 +544,8 @@ def compute_expression_mediated_trait_values(simulated_expression_summary_file, 
 				pdb.set_trace()
 
 			# Compute expression-mediated trait value coming from this single gene (across tissues)
-			expr_med_trait_for_current_gene = compute_expression_mediated_trait_values_for_single_gene(genotype_obj, ref_alt_alleles, gene_trait_effect_size_vec, causal_eqtl_effect_sizes, eqtl_snp_indices, gene_trait_architecture)
+			expr_med_trait_for_current_gene, cis_snp_h2 = compute_expression_mediated_trait_values_for_single_gene(genotype_obj, ref_alt_alleles, gene_trait_effect_size_vec, causal_eqtl_effect_sizes, eqtl_snp_indices, gene_trait_architecture)
+
 
 			# Now add current gene to total
 			expr_med_trait = expr_med_trait + expr_med_trait_for_current_gene
@@ -399,10 +556,95 @@ def compute_expression_mediated_trait_values(simulated_expression_summary_file, 
 
 	# Save to output
 	np.savetxt(expression_mediated_trait_values_output, expr_med_trait, fmt="%s", delimiter='\n')
-
 	print('mediated h2: ' + str(np.var(expr_med_trait)))
 
 	return
+
+
+def compute_true_cis_snp_h2(simulated_expression_summary_file, processed_genotype_data_dir, chrom_string, n_gwas_individuals, gene_trait_architecture, cis_snp_h2_output):
+
+
+	# Initialize expression mediated trait values
+	expr_med_trait = np.zeros(n_gwas_individuals)
+
+
+	# Get chromosomes corresponding to chrom_string
+	if chrom_string == '1_2':
+		chrom_arr = np.asarray([1,2])
+
+	t = open(cis_snp_h2_output,'w')
+	t.write('gene')
+	for tissue_iter in range(5):
+		t.write('\tcis_h2_tissue' + str(tissue_iter))
+	t.write('\n')
+
+	gene_counter = 0
+	for chrom_num in chrom_arr:
+		gwas_plink_stem = processed_genotype_data_dir + 'simulated_gwas_data_' + str(chrom_num)  # Genotype directory
+
+		# Load in genotype object
+		genotype_obj = BgenReader(gwas_plink_stem + '.bgen')
+
+		# Load in ref-alt alleles
+		ref_alt_alleles = load_in_ref_alt_allele_arr(gwas_plink_stem + '.pvar')
+		chrom_rsids = np.asarray(genotype_obj.rsids())
+
+		total_n_chrom_genome_snps = len(ref_alt_alleles)
+
+		# Loop through genes in simulated_expression_summary_file (should be of same length as ordered_gene_names) and only stop at genes with non-zero gene-trait-effect sizes
+		f = open(simulated_expression_summary_file)
+		head_count = 0
+		for line in f:
+			line = line.rstrip()
+			data = line.split('\t')
+			if head_count == 0:
+				head_count = head_count + 1
+				continue
+			# This corresponds to a single gene
+			# Extract relevent fields for this gene
+			gene_name = data[0]
+			line_chrom_num = data[1]
+			causal_eqtl_effect_file = data[3]
+			eqtl_snp_id_file = data[4]
+			eqtl_snp_indices_file = data[5]
+			
+
+			if line_chrom_num != str(chrom_num):
+				continue
+
+			print(gene_counter)
+
+
+			# We are at a gene that has a non-zero effect on the trait
+		
+			# Load in causal eqtl effect sizes for this gene
+			causal_eqtl_effect_sizes = np.load(causal_eqtl_effect_file)
+
+
+			# Load in "global" indices of snps defining causal eqtl effect sizes
+			eqtl_snp_indices_raw = np.load(eqtl_snp_indices_file)
+			eqtl_snp_indices = np.asarray([False]*total_n_chrom_genome_snps)
+			eqtl_snp_indices[eqtl_snp_indices_raw] = True
+
+			# Quick error checking
+			if np.array_equal(chrom_rsids[eqtl_snp_indices], np.load(eqtl_snp_id_file)) == False:
+				print('assumption eroror')
+				pdb.set_trace()
+
+
+			# Compute expression-mediated trait value coming from this single gene (across tissues)
+			per_tissue_cis_snp_h2 = compute_cis_h2_single_gene(genotype_obj, ref_alt_alleles, causal_eqtl_effect_sizes, eqtl_snp_indices)
+
+			t.write(gene_name + '\t' + '\t'.join(per_tissue_cis_snp_h2.astype(str)) + '\n')
+
+			# Update gene counter
+			gene_counter = gene_counter + 1
+		f.close()
+
+	t.close()
+
+	return
+
 
 
 def simulate_trait_values(expression_mediated_trait_values_file, variant_mediated_trait_values_file, trait_values_output):
@@ -539,19 +781,32 @@ gene_trait_architecture = sys.argv[15]
 # Set seed
 np.random.seed(simulation_number)
 
+
+####################################################
+# Extract true cis-snp heritabilities
+####################################################
+simulated_expression_summary_file = simulated_gene_expression_dir + simulation_name_string + '_causal_eqtl_effect_summary.txt'  # This file contains a line for each gene, and we will use it to select which genes in which tissue are used
+cis_snp_h2_output = simulated_trait_dir + gwas_simulation_name_string + '_true_expression_cis_snp_h2.txt'
+#compute_true_cis_snp_h2(simulated_expression_summary_file, processed_genotype_data_dir, chrom_string, n_gwas_individuals, gene_trait_architecture, cis_snp_h2_output)
+
+
+
 ####################################################
 # Simulate mediated gene-expression causal effect sizes
 ####################################################
 simulated_expression_summary_file = simulated_gene_expression_dir + simulation_name_string + '_causal_eqtl_effect_summary.txt'  # This file contains a line for each gene, and we will use it to select which genes in which tissue are used
 expression_mediated_causal_effects_output = simulated_trait_dir + gwas_simulation_name_string + '_expression_mediated_gene_causal_effect_sizes.txt'
-simulate_expression_mediated_gene_causal_effect_sizes(simulated_expression_summary_file, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, expression_mediated_causal_effects_output, ge_h2, gene_trait_architecture)
+#simulate_expression_mediated_gene_causal_effect_sizes(simulated_expression_summary_file, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, expression_mediated_causal_effects_output, ge_h2, gene_trait_architecture, cis_snp_h2_output)
+
 
 ####################################################
 # Simulate non-mediated variant causal effect sizes
 ####################################################
 # Need to remove dependency on annotations
 non_mediated_causal_effects_output = simulated_trait_dir + gwas_simulation_name_string + '_non_mediated_variant_causal_effect_sizes.txt'
-simulate_non_mediated_variant_causal_effect_sizes(processed_genotype_data_dir, chrom_string, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, non_mediated_causal_effects_output)
+#simulate_non_mediated_variant_causal_effect_sizes(processed_genotype_data_dir, chrom_string, per_element_heritability, total_heritability, fraction_expression_mediated_heritability, non_mediated_causal_effects_output)
+
+
 
 ####################################################
 # Extract component of trait values coming from genetically predicted gene expression
@@ -560,6 +815,8 @@ simulated_expression_summary_file = simulated_gene_expression_dir + simulation_n
 expression_mediated_causal_effects_file = simulated_trait_dir + gwas_simulation_name_string + '_expression_mediated_gene_causal_effect_sizes.txt'  # File containing gene-to-trait effect sizes
 expression_mediated_trait_values_output = simulated_trait_dir + gwas_simulation_name_string + '_expression_mediated_trait_values.txt'  # Output file
 compute_expression_mediated_trait_values(simulated_expression_summary_file, expression_mediated_causal_effects_file, processed_genotype_data_dir, chrom_string, expression_mediated_trait_values_output, n_gwas_individuals, gene_trait_architecture)
+
+
 
 ####################################################
 # Extract component of trait values coming from non-mediated variant effects

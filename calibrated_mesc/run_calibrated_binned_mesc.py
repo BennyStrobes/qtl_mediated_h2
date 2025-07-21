@@ -767,7 +767,7 @@ def single_run_of_calibrated_mesc(gwas_variant_ld_scores, gene_ldscores_training
 	# Filter regression variables
 	gwas_variant_ld_scores1, gene_ldscores_training1, gene_ldscores_validation1, gwas_E_beta_sq1, regression_weights1 = filter_regression_variables(gwas_variant_ld_scores, gene_ldscores_training1, gene_ldscores_validation1, gwas_E_beta_sq, regression_weights, squared_eqtl_effect_threshold)
 	# Use validation data to extract calibrated gene ldscores
-	if inference_approach == '2SLS' or inference_approach == 'binned_2SLS':
+	if inference_approach == '2SLS' or inference_approach == 'binned_2SLS' or inference_approach == 'seperately_binned_2SLS' or inference_approach == 'binned_2SLS_no_train_bin':
 		calibrated_gene_ldscores1 = use_validation_data_to_get_calibrated_gene_ldscores(gwas_variant_ld_scores1, gene_ldscores_training1, gene_ldscores_validation1, regression_weights1, step1_regression_method, covariance_calibration)
 	elif inference_approach == 'JIVE':
 		calibrated_gene_ldscores1 = use_validation_data_to_get_calibrated_gene_ldscores_JIVE(gwas_variant_ld_scores1, gene_ldscores_training1, gene_ldscores_validation1, regression_weights1, step1_regression_method)
@@ -779,10 +779,12 @@ def single_run_of_calibrated_mesc(gwas_variant_ld_scores, gene_ldscores_training
 	gwas_variant_ld_scores2, gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq2, regression_weights2 = filter_regression_variables(gwas_variant_ld_scores, gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq, regression_weights, squared_eqtl_effect_threshold)
 	##############################
 	# Use validation data to extract calibrated gene ldscores
-	if inference_approach == '2SLS' or inference_approach == 'binned_2SLS':
+	if inference_approach == '2SLS' or inference_approach == 'binned_2SLS' or inference_approach == 'seperately_binned_2SLS' or inference_approach == 'binned_2SLS_no_train_bin':
 		calibrated_gene_ldscores2 = use_validation_data_to_get_calibrated_gene_ldscores(gwas_variant_ld_scores2, gene_ldscores_training2, gene_ldscores_validation2, regression_weights2, step1_regression_method, covariance_calibration)
 	elif inference_approach == 'JIVE':
 		calibrated_gene_ldscores2 = use_validation_data_to_get_calibrated_gene_ldscores_JIVE(gwas_variant_ld_scores2, gene_ldscores_training2, gene_ldscores_validation2, regression_weights2, step1_regression_method)
+
+
 
 	# Run Mesc in data set 1
 	est_nm_h2s1, est_med_h2s1 = run_mesc(gwas_E_beta_sq1, gwas_variant_ld_scores1, n_reference_snps, calibrated_gene_ldscores1, n_genetic_genes1, regression_weights1)
@@ -1051,7 +1053,6 @@ def use_validation_data_to_get_calibrated_gene_ldscores(gwas_variant_ld_scores, 
 		cov_calibration_scores = np.asarray(cov_calibration_scores)
 	else:
 		cov_calibration_scores = np.ones(val_gene_ldscores.shape[1]) 
-
 
 	calibrated_gene_ldscores = np.zeros(val_gene_ldscores.shape)
 	parametric_fstats = []
@@ -2079,6 +2080,7 @@ else:
 	regression_snp_ldscores_full, regression_snp_rsids = get_regression_snp_ldscores(args.regression_snp_ldscore_filestem, args.regression_snp_ldscore_filesuffix, chrom_arr)
 	regression_weights_full = 1.0/regression_snp_ldscores_full
 
+
 # QUick error checking
 if np.array_equal(gwas_rsids, gwas_rsids_tmp) == False or np.array_equal(gwas_rsids, regression_snp_rsids) == False:
 	print('assumption eroror')
@@ -2091,17 +2093,18 @@ rsid_to_position = create_mapping_from_rsid_to_position(gwas_rsids)
 # Quick concern
 if args.validation_data_eqtl_ldscores_type != 'MarginalSS' and args.gene_trait_architecture == 'linear':
 	print('assumption eroror: need to edit cis-h2 estimates and gene counts I think')
-	pdb.set_trace()
+
 
 
 # Load in eQTL LD scores for training data
 gene_ldscores_training1, gene_ldscores_training2, avg_eqtl_h2s_train_1, n_genes_train_1, avg_eqtl_h2s_train_2, n_genes_train_2, study_gene_to_study_bin_assignments_rep1, study_gene_to_study_bin_assignments_rep2, full_eqtl_dataset_names = load_in_binned_eqtl_ldscores_training(args.eqtl_training_data_summary_file, args.training_data_eqtl_ldscores_type, args.standardize_gene_training_scores, rsid_to_position, rsid_to_variant_stdev, args.eqtl_cis_snp_h2_summary_file, args.cis_h2_thresh, args.n_expr_cis_h2_bins)
 
-
 # Load in eQTL LD scores for validation data
 gene_ldscores_validation1, gene_ldscores_validation2, avg_eqtl_h2s_1, n_genes_1, avg_eqtl_h2s_2, n_genes_2, full_eqtl_dataset_names = load_in_binned_eqtl_ldscores_validation(args.eqtl_validation_data_summary_file, args.validation_data_eqtl_ldscores_type, args.standardize_gene_validation_scores, rsid_to_position, rsid_to_variant_stdev, args.eqtl_cis_snp_h2_summary_file, args.cis_h2_thresh, args.n_expr_cis_h2_bins, study_gene_to_study_bin_assignments_rep1, study_gene_to_study_bin_assignments_rep2)
 eqtl_dataset_names = np.sort(np.unique(full_eqtl_dataset_names))
 
+if args.inference_approach == 'seperately_binned_2SLS':
+	gene_ldscores_validation2, gene_ldscores_validation1, avg_eqtl_h2s_train_1_tmp, n_genes_train_1_tmp, avg_eqtl_h2s_train_2_tmp, n_genes_train_2_tmp, study_gene_to_study_bin_assignments_rep1_tmp, study_gene_to_study_bin_assignments_rep2_tmp, full_eqtl_dataset_names_tmp = load_in_binned_eqtl_ldscores_training(args.eqtl_validation_data_summary_file, args.validation_data_eqtl_ldscores_type, args.standardize_gene_validation_scores, rsid_to_position, rsid_to_variant_stdev, args.eqtl_cis_snp_h2_summary_file, args.cis_h2_thresh, args.n_expr_cis_h2_bins)
 
 
 print(np.sort(gene_ldscores_validation1[:,0]))
@@ -2119,6 +2122,7 @@ if args.gene_trait_architecture == 'stdExpr':
 
 
 # NOTE: eQTL estimation not in bootstrap. probs ok for now
+
 un_calibrated_mesc_obj = run_uncalibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1, gene_ldscores_validation1, gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq, regression_weights_full, args.squared_eqtl_effect_threshold, full_eqtl_dataset_names, eqtl_dataset_names, n_reference_snps, n_genes_1*avg_eqtl_h2s_1, n_genes_2*avg_eqtl_h2s_2, avg_eqtl_h2s_1, avg_eqtl_h2s_2)
 print_mesc_regression_results(un_calibrated_mesc_obj, args.output_stem + '_uncalibrated_mesc_jk_results.txt')
 print(args.output_stem + '_uncalibrated_mesc_jk_results.txt')
@@ -2139,15 +2143,15 @@ elif args.training_data_eqtl_ldscores_type == 'mescLassoPlusMarginalSS':
 
 
 
-
+'''
+bootstrapped_fstats1, parametric_fstats1 = get_bootstrapped_f_stats_from_1st_stage_least_squares(gwas_variant_ld_scores_full, gene_ldscores_training1, gene_ldscores_validation1, gwas_E_beta_sq, regression_weights_full, args.squared_eqtl_effect_threshold, args.step1_regression_method)
 
 # Get f-statistics
 bootstrapped_fstats1, parametric_fstats1 = get_bootstrapped_f_stats_from_1st_stage_least_squares(gwas_variant_ld_scores_full, gene_ldscores_training1, gene_ldscores_validation1, gwas_E_beta_sq, regression_weights_full, args.squared_eqtl_effect_threshold, args.step1_regression_method)
 bootstrapped_fstats2, parametric_fstats2 = get_bootstrapped_f_stats_from_1st_stage_least_squares(gwas_variant_ld_scores_full, gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq, regression_weights_full, args.squared_eqtl_effect_threshold, args.step1_regression_method)
 print_fstatistics(bootstrapped_fstats1, parametric_fstats1, bootstrapped_fstats2, parametric_fstats2, args.output_stem + '_step_1_f_stats.txt')
 print(args.output_stem + '_step_1_f_stats.txt')
-
-
+'''
 
 calibrated_mesc_obj = run_calibrated_mesc(gwas_variant_ld_scores_full, gene_ldscores_training1, gene_ldscores_validation1, gene_ldscores_training2, gene_ldscores_validation2, gwas_E_beta_sq, regression_weights_full, args.squared_eqtl_effect_threshold, full_eqtl_dataset_names, eqtl_dataset_names, n_reference_snps, n_genes_1*avg_eqtl_h2s_1, n_genes_2*avg_eqtl_h2s_2, avg_eqtl_h2s_1, avg_eqtl_h2s_2, args.step1_regression_method, args.inference_approach, args.covariance_calibration)
 print_mesc_regression_results(calibrated_mesc_obj, args.output_stem + '_calibrated_mesc_jk_results.txt')

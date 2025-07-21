@@ -1178,6 +1178,24 @@ run_string = paste0(non_med_anno, "_", simulated_gt_architecture, "_",inference_
 
 
 
+eqtl_snp_representation="bins_20"
+non_med_anno="genotype_intercept"
+simulated_gt_architecture="stdExpr"
+inference_gt_architecture="linear"
+sq_sumstat_threshold="1000.0"
+weighting = "weighted"
+step1_gene_ldscores="lasso_CV_corr"
+step2_gene_ldscores="MarginalSS"
+inference_approach="binned_2SLS"
+
+cis_h2_method="true"
+cis_h2_thresh=".01"
+
+#run_string = paste0(non_med_anno, "_", simulated_gt_architecture, "_",inference_gt_architecture,"_", sq_sumstat_threshold, "_", cis_h2_method, "_", step1_gene_ldscores, "_", step2_gene_ldscores, "_", inference_approach,"_", weighting)
+
+
+
+
 joint_ldsc_summary_file <- paste0(organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_", run_string,"_sim_results_calibrated_ldsc_summary_averaged.txt")
 print(joint_ldsc_summary_file)
 joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")

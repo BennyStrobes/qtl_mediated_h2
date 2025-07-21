@@ -51,7 +51,7 @@ def create_dictionary_mapping_from_rsid_to_cm_position(sldsc_annotation_file):
 	f.close()
 	return cm_dicti
 
-def create_causal_eqtl_effect_mapping(lasso_summary_file, tmp_chrom, rsid_to_sdev):
+def create_causal_eqtl_effect_mapping(lasso_summary_file, tmp_chrom, rsid_to_sdev, dont_standardize_snp_effects_bool):
 	dicti = {}
 	head_count = 0
 	genes = []
@@ -70,8 +70,9 @@ def create_causal_eqtl_effect_mapping(lasso_summary_file, tmp_chrom, rsid_to_sde
 		effect = float(data[6])
 		genes.append(gene_id)
 
-		snp_sdev = rsid_to_sdev[rsid]
-		effect = effect*snp_sdev
+		if dont_standardize_snp_effects_bool == False:
+			snp_sdev = rsid_to_sdev[rsid]
+			effect = effect*snp_sdev
 
 		if gene_id not in dicti:
 			dicti[gene_id] = {}
@@ -255,6 +256,8 @@ parser.add_argument('--cm-window', default=1.0, type=float,
 					help='CM window used to cutoff LD')
 parser.add_argument('--standardize', default=False, action='store_true',
 					help='Boolean on whether or not to standardize cis predicted gene expression')
+parser.add_argument('--dont-standardize-snp-effects', default=False, action='store_true',
+					help='Boolean on whether or not to standardize snp effects or not')
 parser.add_argument('--output-dir', default=None, type=str,
 					help='Output directory stem to save data to')
 args = parser.parse_args()
@@ -322,7 +325,7 @@ for chrom_num in chromosome_arr:
 	for study_iter, study_name in enumerate(study_names):
 		study_lasso_file = study_lasso_files[study_iter]
 		
-		study_dicti, study_genes = create_causal_eqtl_effect_mapping(study_lasso_file, str(chrom_num), rsid_to_sdev)
+		study_dicti, study_genes = create_causal_eqtl_effect_mapping(study_lasso_file, str(chrom_num), rsid_to_sdev, args.dont_standardize_snp_effects)
 		lasso_effect_dicti[study_name] = study_dicti
 		all_genes.append(study_genes)
 	all_genes = np.unique(np.hstack(all_genes))
