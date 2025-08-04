@@ -26,6 +26,8 @@ joint_ldsc_code_dir="/n/groups/price/ben/joint_ldsc/"
 # Calibrated mesc code dir
 calibrated_mesc_code_dir="/n/groups/price/ben/calibrated_mesc_v3/"
 
+plink2_dir="/n/groups/price/ben/tools/plink2_linux_x86_64_20250707/"
+
 
 ############################
 # Output data
@@ -53,11 +55,11 @@ processed_genotype_data_dir="/n/scratch/users/b/bes710/qtl_mediated_h2/simulatio
 n_gwas_individuals="100000"
 if false; then
 chrom_num="1"
-sh prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file $calibrated_mesc_code_dir
-
+sbatch prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file $calibrated_mesc_code_dir $plink2_dir
 chrom_num="2"
-sh prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file $calibrated_mesc_code_dir
+sbatch prepare_ukbb_genotype_data_for_simulation_on_single_chromosome.sh $ukbb_genotype_dir $processed_genotype_data_dir $chrom_num $n_gwas_individuals $ldsc_baseline_hg19_annotation_dir $kg_genotype_dir $hm3_snp_list_dir $quasi_independent_dir $gencode_gene_annotation_file $calibrated_mesc_code_dir $plink2_dir
 fi
+
 
 
 
@@ -66,10 +68,9 @@ fi
 # 2. compare to original. make sure same number of rows and base ldscores are the same
 # 3. Switch filenames so new is main and tmp is deleted
 # 4. Run below on it.
-
-if false; then
 gene_snp_representation_arr=( "bins_10" "bins_20" "pca_90" "pca_95" "pca_99")
 gene_snp_representation_arr=( "bins_10")
+if false; then
 for gene_snp_representation in "${gene_snp_representation_arr[@]}"
 do
 	chrom_num="1"
@@ -78,6 +79,7 @@ do
 	sbatch prepare_gene_ld_files.sh $chrom_num $processed_genotype_data_dir $ldsc_baseline_hg19_annotation_dir $gene_snp_representation $joint_ldsc_code_dir $n_gwas_individuals
 done
 fi
+
 
 
 

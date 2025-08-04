@@ -231,6 +231,45 @@ def load_in_alt_allele_sdevs(bfile, window_indices, rsids):
 	return dicti
 
 
+def create_mapping_from_study_gene_to_cis_h2(filer):
+	study_gene_dicti = {}
+	alt_study_names = []
+
+	f = open(filer)
+	head_count = 0
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		if head_count == 0:
+			head_count = head_count + 1
+			continue
+		study_name = data[0]
+		cis_h2_file = data[3]
+		alt_study_names.append(study_name)
+
+		g = open(cis_h2_file)
+		head_count2 = 0
+		for line2 in g:
+			line2 = line2.rstrip()
+			data2 = line2.split('\t')
+			if head_count2 == 0:
+				head_count2 = head_count2 + 1
+				continue
+			gene_name = data2[0]
+			gene_cis_h2 = float(data2[1])
+			study_gene_name = study_name + ':' + gene_name
+			if study_gene_name in study_gene_dicti:
+				print('assumptione rororor')
+				pdb.set_trace()
+			study_gene_dicti[study_gene_name] = gene_cis_h2
+		g.close()
+	f.close()
+
+
+	return study_gene_dicti, np.asarray(alt_study_names)
+
+
+
 #####################
 # Parse command line arguments
 #####################
@@ -258,15 +297,19 @@ parser.add_argument('--standardize', default=False, action='store_true',
 					help='Boolean on whether or not to standardize cis predicted gene expression')
 parser.add_argument('--dont-standardize-snp-effects', default=False, action='store_true',
 					help='Boolean on whether or not to standardize snp effects or not')
+parser.add_argument('--gene-cis-h2-file', default=None, type=str,
+					help='File containing gene cis h2s')
 parser.add_argument('--output-dir', default=None, type=str,
 					help='Output directory stem to save data to')
 args = parser.parse_args()
 
 
-
-
 # Extract array of chromosomes
 chromosome_arr = extract_array_of_chromosomes(args.chromosome_file)
+
+
+if args.gene_cis_h2_file is not None:
+	study_gene_to_cis_h2, alt_study_names = create_mapping_from_study_gene_to_cis_h2(args.gene_cis_h2_file)
 
 
 
@@ -286,8 +329,10 @@ for line in f:
 	study_name = data[0]
 	study_names.append(study_name)
 	study_lasso_files.append(data[1])
-	if args.standardize:
+	if args.standardize and args.gene_cis_h2_file is None:
 		output_file = args.output_dir + study_name + '_standardized_pred_eqtl_sumstats.txt'
+	elif args.standardize and args.gene_cis_h2_file is not None:
+		output_file = args.output_dir + study_name + '_in_samp_standardized_pred_eqtl_sumstats.txt'
 	else:
 		output_file = args.output_dir + study_name + '_pred_eqtl_sumstats.txt'
 	t[study_name] = open(output_file,'w')
@@ -351,7 +396,23 @@ for chrom_num in chromosome_arr:
 		# Extract cis regression snps
 		cis_start_pos = gene_tss - args.cis_window
 		cis_end_pos = gene_tss + args.cis_window
-		cis_regr_snp_indices = (snp_pos >= cis_start_pos) & (snp_pos <= cis_end_pos) & (hm3_boolean)
+		
+
+		# Extract indices of cis snps for gene
+		cis_snp_indices = (snp_pos >= cis_start_pos) & (snp_pos <= cis_end_pos)
+		cis_window_cm = snp_cm[cis_snp_indices]
+		# Now get ref positions of gene snp id lb and ub
+		cis_window_cm_lb = np.min(cis_window_cm)
+		cis_window_cm_ub = np.max(cis_window_cm)
+
+		# Gene window cm lb and ub
+		big_window_cm_lb = cis_window_cm_lb - args.cm_window
+		big_window_cm_ub = cis_window_cm_ub + args.cm_window
+
+		#old_cis_regr_snp_indices = (snp_pos >= cis_start_pos) & (snp_pos <= cis_end_pos) & (hm3_boolean)
+		cis_regr_snp_indices = (snp_cm >= big_window_cm_lb) & (snp_cm <= big_window_cm_ub) & (hm3_boolean)
+
+
 		cis_rsids = ordered_rsids[cis_regr_snp_indices]
 		regression_snp_indices_raw = snp_integers[cis_regr_snp_indices]
 		regression_snp_genotype_dosage = load_in_alt_allele_genotype_dosage_mat(genotype_obj, regression_snp_indices_raw)
@@ -359,7 +420,7 @@ for chrom_num in chromosome_arr:
 		regression_snp_pos = snp_pos[regression_snp_indices_raw]
 
 		# Now loop through studies
-		for study_name in study_names:
+		for study_iter, study_name in enumerate(study_names):
 			# Ignore studies for which gene has no estimated effect
 			if gene_id not in lasso_effect_dicti[study_name]:
 				continue
@@ -384,8 +445,14 @@ for chrom_num in chromosome_arr:
 			gene_var = np.dot(np.dot(causal_eqtl_effects, tiny_R), causal_eqtl_effects)
 
 			if args.standardize:
-				std_causal_eqtl_effects = causal_eqtl_effects/np.sqrt(gene_var)
-				marginal_effect_est = np.dot(R_sub, std_causal_eqtl_effects)
+				if args.gene_cis_h2_file is None:
+					std_causal_eqtl_effects = causal_eqtl_effects/np.sqrt(gene_var)
+					marginal_effect_est = np.dot(R_sub, std_causal_eqtl_effects)
+				else:
+					alt_study_name = alt_study_names[study_iter]
+					in_sample_gene_var = study_gene_to_cis_h2[alt_study_name + ':' + gene_id]
+					std_causal_eqtl_effects = causal_eqtl_effects/np.sqrt(in_sample_gene_var)
+					marginal_effect_est = np.dot(R_sub, std_causal_eqtl_effects)
 			else:
 				marginal_effect_est = np.dot(R_sub, causal_eqtl_effects)
 

@@ -742,7 +742,7 @@ def confidence_interval_calibration(sim_nums, eqtl_sample_sizes, trait_med_h2_in
 
 
 
-def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, permuted_eqtls=False, variance_weighting=False):
+def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, permuted_eqtls=False, variance_weighting=False, weighted=True):
 	t = open(avg_results_summary_file,'w')
 	t.write('method\teqtl_sample_size\theritability_type\tsim_h2\test_h2\test_h2_lb\test_h2_ub\n')
 	for ii,method in enumerate(methods):
@@ -763,7 +763,10 @@ def average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_siz
 			est_eqtl_h2 = []
 			sim_counter = []
 			for sim_num in sim_nums:
-				filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_weighted' + '_' + method + '_jk_results.txt'
+				if weighted:
+					filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_weighted' + '_' + method + '_jk_results.txt'
+				else:
+					filer = trait_med_h2_inference_dir + 'simulation_' + str(sim_num) + '_chrom1_2_cis_window_500000_ss_100000_ge_h2_05_qtl_arch_default_n_tiss_5_' + run_string + '_' + str(eqtl_sample_size) + '_unweighted' + '_' + method + '_jk_results.txt'
 				if sim_num in invalid_sims:
 					continue
 				if os.path.isfile(filer) == False:
@@ -1391,7 +1394,7 @@ inference_gt_architecture = 'linear'
 simulated_gt_architecture = 'stdExpr'
 beta_squared_thresh = '1000.0'
 cis_snp_h2_method="true"
-n_bins_arr = ['3', '4', '5', '6', '7']
+n_bins_arr = ['1', '2', '3', '4', '5', '6', '7']
 
 for n_bins in n_bins_arr:
 	eqtl_sample_sizes = np.asarray(['INF_SS'])
@@ -1399,11 +1402,11 @@ for n_bins in n_bins_arr:
 
 	run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_architecture + '_' + beta_squared_thresh  + '_' + cis_snp_h2_method  + '_' + inference_approach + '_' + n_bins
 
-	avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + run_string + '_INF_SS_sim_results_calibrated_ldsc_summary_averaged.txt'
+	avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + run_string + '_INF_SS_weighted_sim_results_calibrated_ldsc_summary_averaged.txt'
 	clean_method_names = ['uncalibrated_mesc', 'calibrated_mesc']
 	methods = ['uncalibrated_mesc', 'calibrated_mesc']
-	#average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
-
+	average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False, weighted=True)
+	print(avg_results_summary_file)
 
 inference_approach="2SLS"
 inference_gt_architecture = 'stdExpr'
@@ -1418,7 +1421,7 @@ run_string = non_med_anno + '_' + simulated_gt_architecture + '_' +inference_gt_
 avg_results_summary_file = visualize_trait_med_h2_dir+ 'med_h2_5_causal_tissue_' + run_string + '_INF_SS_weighted_sim_results_calibrated_ldsc_summary_averaged.txt'
 clean_method_names = ['uncalibrated_mesc', 'calibrated_mesc']
 methods = ['uncalibrated_mesc', 'calibrated_mesc']
-average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False)
+average_results_across_simulations_5_causal_tissue(sim_nums, eqtl_sample_sizes, trait_med_h2_inference_dir, avg_results_summary_file, methods, clean_method_names, invalid_sims, run_string, weighting, sim_heritabilities, variance_weighting=False, weighted=True)
 print(avg_results_summary_file)
 
 

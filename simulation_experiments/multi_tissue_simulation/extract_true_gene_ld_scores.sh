@@ -1,18 +1,19 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-7:10                         # Runtime in D-HH:MM format
+#SBATCH -t 0-9:10                         # Runtime in D-HH:MM format
 #SBATCH -p short                           # Partition to run in
 #SBATCH --mem=10GB                         # Memory total in MiB (for all cores)
 
 
 
-simulation_number="1"
+simulation_number="$1"
 chrom_string="$2"
 simulation_name_string="$3"
 simulation_genotype_dir="$4"
 simulated_gene_expression_dir="$5"
 calibrated_mesc_code_dir="$6"
 
+echo $simulation_number
 
 
 causal_eqtl_summary_file=${simulated_gene_expression_dir}${simulation_name_string}"_causal_eqtl_effect_summary.txt"
@@ -22,9 +23,8 @@ bgen_file_stem=${simulation_genotype_dir}"simulated_reference_genotype_data_"
 
 study_names_file=${simulated_gene_expression_dir}${simulation_name_string}"_all_study_names.txt"
 
-if false; then
 python3 extract_true_gene_causal_effects.py $causal_eqtl_summary_file $bgen_file_stem $simulated_gene_expression_dir $simulation_name_string $study_names_file
-fi
+
 
 
 hm3_rsid_file_stem="/n/scratch/users/b/bes710/qtl_mediated_h2/simulation_experiments/genotype_processing/hm3_rsids_chr"
@@ -35,7 +35,9 @@ gene_summary_file_stem=${simulation_genotype_dir}"gene_positions_chr"
 chromosome_file="/n/groups/price/ben/qtl_mediated_h2/simulation_chromosomes.txt"
 
 
-if false; then
+
+
+
 #STANDARDIZED FORM
 python3 ${calibrated_mesc_code_dir}compute_predicted_marginal_summary_statistics.py \
 	--study-names-file $study_names_file \
@@ -60,7 +62,7 @@ python3 ${calibrated_mesc_code_dir}compute_predicted_marginal_summary_statistics
 	--gene-summary-file-suffix ".txt" \
 	--dont-standardize-snp-effects \
 	--output-dir $simulated_gene_expression_dir
-fi
+
 
 
 

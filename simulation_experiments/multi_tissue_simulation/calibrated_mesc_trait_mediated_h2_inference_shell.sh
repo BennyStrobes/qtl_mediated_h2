@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-0:30                         # Runtime in D-HH:MM format
+#SBATCH -t 0-2:20                         # Runtime in D-HH:MM format
 #SBATCH -p short                          # Partition to run in
 #SBATCH --mem=10GB                         # Memory total in MiB (for all cores)
 
@@ -877,9 +877,7 @@ fi
 
 #######################
 # Binned approach
-# unWeighted
 # Infinite SAMPLE SIZE
-if false; then
 simulated_gt_architecture="stdExpr"
 inference_gt_architecture="linear"
 echo $simulated_gt_architecture"_"$inference_gt_architecture
@@ -900,7 +898,7 @@ eqtl_beta_sq_filter_arr=( "1000.0")
 
 
 inference_approach_arr=( "binned_2SLS")
-n_bins_arr=("3" "4" "5" "6" "7")
+n_bins_arr=("1" "2" "3" "4" "5" "6" "7")
 
 
 eqtl_sample_size="100"
@@ -929,7 +927,7 @@ echo $pred_eqtl_summary_file
 
 variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
 	
-	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${eqtl_beta_sq_filter}"_"${cis_snp_h2_method}"_"${inference_approach}"_"${n_bins}"_INF_SS"
+	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${eqtl_beta_sq_filter}"_"${cis_snp_h2_method}"_"${inference_approach}"_"${n_bins}"_INF_SS_weighted"
 	echo $output_stem
 	date
 	python3 ${calibrated_mesc_code_dir}run_calibrated_binned_mesc.py \
@@ -939,6 +937,7 @@ variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ld
 		--variant-M-filestem ${variant_m_filestem} \
 		--variant-stdev-filestem ${variant_stdev_filestem} \
 		--chromosome-file ${chrom_nums_file} \
+		--regression-snp-ldscore-filestem $regression_snp_ldscore_filestem \
 		--eqtl-training-data-summary-file ${pred_eqtl_summary_file} \
 		--eqtl-validation-data-summary-file ${marginal_eqtl_summary_file} \
 		--non-mediated-annotation-version ${non_med_anno} \
@@ -957,7 +956,7 @@ done
 done
 done
 done
-fi
+
 
 
 simulated_gt_architecture="stdExpr"
@@ -1036,8 +1035,11 @@ fi
 
 
 
+
+
 simulated_gt_architecture="stdExpr"
 inference_gt_architecture="stdExpr"
+if false; then
 echo $simulated_gt_architecture"_"$inference_gt_architecture
 
 #####################
@@ -1108,14 +1110,12 @@ done
 done
 done
 done
+fi
 
 
 
 
 
-
-
-if false; then
 simulated_gt_architecture="stdExpr"
 inference_gt_architecture="linear"
 echo $simulated_gt_architecture"_"$inference_gt_architecture
@@ -1126,8 +1126,8 @@ non_med_anno_arr=("genotype_intercept")
 cis_snp_h2_method_arr=( "true" "avgChisq" "ldsc" "greml" )
 cis_snp_h2_method_arr=( "true" )
 
-validation_data_gene_ldscores_type="lasso_CV_corr_standardized"
-training_data_gene_ldscores_type="lasso_CV_corr_standardized"
+validation_data_gene_ldscores_type="lasso_CV_corr"
+training_data_gene_ldscores_type="lasso_CV_corr"
 
 
 eqtl_beta_sq_filter_arr=( "0.5" "1.0" "2.0" "5.0" "10.0" "100.0" "10000.0")
@@ -1139,6 +1139,7 @@ inference_approach_arr=( "2SLS")
 
 
 eqtl_sample_size="100"
+if false; then
 for cis_snp_h2_method in "${cis_snp_h2_method_arr[@]}"
 do
 for non_med_anno in "${non_med_anno_arr[@]}"
@@ -1162,7 +1163,7 @@ echo $pred_eqtl_summary_file
 
 variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
 	
-	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${eqtl_beta_sq_filter}"_"${inference_approach}"_INF_SS"
+	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${eqtl_beta_sq_filter}"_"${inference_approach}"_INF_SS_weighted"
 	echo $output_stem
 	date
 	python3 ${calibrated_mesc_code_dir}run_calibrated_mesc.py \
@@ -1172,6 +1173,7 @@ variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ld
 		--variant-M-filestem ${variant_m_filestem} \
 		--variant-stdev-filestem ${variant_stdev_filestem} \
 		--chromosome-file ${chrom_nums_file} \
+		--regression-snp-ldscore-filestem $regression_snp_ldscore_filestem \
 		--eqtl-training-data-summary-file ${pred_eqtl_summary_file} \
 		--eqtl-validation-data-summary-file ${marginal_eqtl_summary_file} \
 		--non-mediated-annotation-version ${non_med_anno} \
@@ -1188,7 +1190,7 @@ done
 done
 done
 done
-
+fi
 
 
 
@@ -1202,8 +1204,8 @@ non_med_anno_arr=("genotype_intercept")
 cis_snp_h2_method_arr=( "true" "avgChisq" "ldsc" "greml" )
 cis_snp_h2_method_arr=( "true" )
 
-validation_data_gene_ldscores_type="lasso_CV_corr_standardized"
-training_data_gene_ldscores_type="lasso_CV_corr_standardized"
+validation_data_gene_ldscores_type="lasso_CV_corr"
+training_data_gene_ldscores_type="lasso_CV_corr"
 
 
 eqtl_beta_sq_filter_arr=( "0.5" "1.0" "2.0" "5.0" "10.0" "100.0" "10000.0")
@@ -1215,6 +1217,7 @@ inference_approach_arr=( "2SLS")
 
 
 eqtl_sample_size="100"
+if false; then
 for cis_snp_h2_method in "${cis_snp_h2_method_arr[@]}"
 do
 for non_med_anno in "${non_med_anno_arr[@]}"
@@ -1238,7 +1241,7 @@ echo $pred_eqtl_summary_file
 
 variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
 	
-	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${eqtl_beta_sq_filter}"_"${inference_approach}"_INF_SS"
+	output_stem=${trait_med_h2_inference_dir}${simulation_name_string}"_"${non_med_anno}"_"${simulated_gt_architecture}"_"${inference_gt_architecture}"_"${eqtl_beta_sq_filter}"_"${inference_approach}"_INF_SS_weighted"
 	echo $output_stem
 	date
 	python3 ${calibrated_mesc_code_dir}run_calibrated_mesc.py \
@@ -1246,6 +1249,7 @@ variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ld
 		--gwas-N ${n_gwas_individuals} \
 		--variant-ldscore-filestem ${variant_ldscore_filestem} \
 		--variant-M-filestem ${variant_m_filestem} \
+		--regression-snp-ldscore-filestem $regression_snp_ldscore_filestem \
 		--variant-stdev-filestem ${variant_stdev_filestem} \
 		--chromosome-file ${chrom_nums_file} \
 		--eqtl-training-data-summary-file ${pred_eqtl_summary_file} \

@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-40:00                         # Runtime in D-HH:MM format
+#SBATCH -t 0-30:00                         # Runtime in D-HH:MM format
 #SBATCH -p medium                           # Partition to run in
 #SBATCH --mem=20GB                         # Memory total in MiB (for all cores)
 
@@ -17,10 +17,7 @@ n_gwas_individuals="${6}"
 
 echo ${chrom_num}"_"${gene_snp_representation}
 
-module load gcc/9.2.0
-module load python/3.9.14
-module load cuda/12.1
-source /n/groups/price/ben/environments/tf_new/bin/activate
+source ~/.bash_profile
 
 
 processed_genotype_data_dir=${processed_genotype_data_root_dir}"gwas_sample_size_"${n_gwas_individuals}"/"
