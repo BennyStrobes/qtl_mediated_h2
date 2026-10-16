@@ -39,6 +39,8 @@ sample_split_arr=( "full" "replicate1" "replicate2")
 sample_split_arr=( "replicate1" "replicate2")
 
 
+
+
 for eqtl_ss in "${eqtl_sample_size_arr[@]}"; do
 for sample_split in "${sample_split_arr[@]}"; do
 

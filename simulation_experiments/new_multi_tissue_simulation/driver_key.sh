@@ -140,20 +140,18 @@ done
 fi
 
 
+
 ############################
 # Create lasso gene models with CV alpha
 ############################
 if false; then
-for simulation_number in $(seq 1 10); do 
+for simulation_number in $(seq 1 200); do 
 for tissue_num in $(seq 0 4); do
 	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
 	sbatch create_lasso_gene_models_cv_alpha.sh $simulation_number $chrom_string $cis_window $simulation_name_string $simulation_genotype_dir $simulated_learned_gene_models_dir $lasso_gene_models_dir $calibrated_mesc_code_dir $cis_window $tissue_num
 done
 done
 fi
-
-
-
 
 
 
@@ -169,12 +167,11 @@ for simulation_number in $(seq 1 200); do
 done
 fi
 
-
 ############################
 # Convert true causal eqtl effects to gene ld scores
 ############################
 if false; then
-for simulation_number in $(seq 1 500); do 
+for simulation_number in $(seq 1 200); do 
 	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
 	sbatch extract_true_gene_ld_scores.sh $simulation_number $chrom_string $simulation_name_string $simulation_genotype_dir $simulated_gene_expression_dir $calibrated_mesc_code_dir
 done
@@ -223,12 +220,11 @@ fi
 # Calibrated mesc approach
 ###############################
 if false; then
-for simulation_number in $(seq 1 500); do 
+for simulation_number in $(seq 1 200); do 
 	simulation_name_string="simulation_"${simulation_number}"_chrom"${chrom_string}"_cis_window_"${cis_window}"_ss_"${n_gwas_individuals}"_ge_h2_"${ge_h2}"_qtl_arch_"${eqtl_architecture}"_n_tiss_"${n_tissues}
 	sbatch calibrated_mesc_trait_mediated_h2_inference_shell.sh $simulation_number $simulation_name_string $simulated_trait_dir $simulated_gwas_dir $simulation_genotype_dir $simulated_learned_gene_models_dir $n_gwas_individuals $trait_med_h2_inference_dir $simulated_gene_expression_dir $chrom_string $calibrated_mesc_code_dir $mesc_expression_score_dir $estimated_cis_snp_h2_dir $lasso_gene_models_dir
 done
 fi
-
 
 ####################
 # Organize results
@@ -245,11 +241,9 @@ python3 organize_mesc_results.py $mesc_results_dir $organized_trait_med_h2_resul
 fi
 
 
-if false; then
-module load R/3.5.1
-
+source ~/.bash_profile
 Rscript visualize_trait_med_h2_results.R $trait_med_h2_inference_dir $organized_trait_med_h2_results_dir $visualize_trait_med_h2_dir
-fi
+
 
 
 

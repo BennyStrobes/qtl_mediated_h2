@@ -336,7 +336,7 @@ for line in f:
 	else:
 		output_file = args.output_dir + study_name + '_pred_eqtl_sumstats.txt'
 	t[study_name] = open(output_file,'w')
-	t[study_name].write('gene_id\trsid\tchr\tpos\ta1\ta2\tbeta\tbeta_se\tz\tin_sample_sdev\n')
+	t[study_name].write('gene_id\trsid\tchr\tpos\ta1\ta2\tbeta\tbeta_se\tz\tin_sample_sdev\tgene_var\n')
 f.close()
 study_names = np.asarray(study_names)
 study_lasso_files = np.asarray(study_lasso_files)
@@ -457,7 +457,7 @@ for chrom_num in chromosome_arr:
 				marginal_effect_est = np.dot(R_sub, causal_eqtl_effects)
 
 			for regression_snp_index, regression_snp in enumerate(cis_rsids):
-				t[study_name].write(gene_id + '\t' + regression_snp + '\t' + str(chrom_num) + '\t' + str(regression_snp_pos[regression_snp_index]) + '\t' + str(regression_snp_alleles[regression_snp_index,1]) + '\t' + str(regression_snp_alleles[regression_snp_index,0]) + '\t' + str(marginal_effect_est[regression_snp_index]) + '\t' + '0.0' + '\t' + 'NA' + '\t' + 'NA\n')
+				t[study_name].write(gene_id + '\t' + regression_snp + '\t' + str(chrom_num) + '\t' + str(regression_snp_pos[regression_snp_index]) + '\t' + str(regression_snp_alleles[regression_snp_index,1]) + '\t' + str(regression_snp_alleles[regression_snp_index,0]) + '\t' + str(marginal_effect_est[regression_snp_index]) + '\t' + '0.0' + '\t' + 'NA' + '\t' + 'NA' + '\t' + str(gene_var) + '\n')
 
 
 

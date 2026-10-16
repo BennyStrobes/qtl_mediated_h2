@@ -15,6 +15,8 @@ calibrated_mesc_code_dir="$6"
 
 echo $simulation_number
 
+source ~/.bash_profile
+
 
 causal_eqtl_summary_file=${simulated_gene_expression_dir}${simulation_name_string}"_causal_eqtl_effect_summary.txt"
 

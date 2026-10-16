@@ -46,6 +46,7 @@ do
 done
 
 
+echo $trait_med_h2_inference_dir
 
 
 
@@ -128,7 +129,8 @@ done
 fi
 
 
-
+#**********
+if false; then
 simulated_gt_architecture="linear"
 inference_gt_architecture="linear"
 echo $simulated_gt_architecture"_"$inference_gt_architecture
@@ -136,7 +138,7 @@ echo $simulated_gt_architecture"_"$inference_gt_architecture
 #####################
 non_med_anno_arr=("genotype_intercept" "full_anno")
 non_med_anno_arr=("genotype_intercept")
-cis_snp_h2_method_arr=( "greml" )
+cis_snp_h2_method_arr=( "avgChisq" )
 validation_data_gene_ldscores_type="MarginalSS"
 
 eqtl_sample_size_arr=( "100" "200" "300" "1000" "100-1000")
@@ -145,11 +147,10 @@ eqtl_beta_sq_filter_arr=( "0.5" "1.0" "2.0" "5.0" "10.0" "100.0" "10000.0")
 eqtl_beta_sq_filter_arr=( "100.0")
 
 training_data_gene_ldscores_type_arr=("MarginalSS" "mescLassoCorr" "mescLasso" "mescLassoPlusMarginalSS")
-training_data_gene_ldscores_type_arr=("mesc_lasso_corr")
+training_data_gene_ldscores_type_arr=("lasso_CV_corr")
 
 inference_approach_arr=("2SLS" "JIVE")
 inference_approach_arr=("2SLS")
-if false; then
 for non_med_anno in "${non_med_anno_arr[@]}"
 do
 for eqtl_sample_size in "${eqtl_sample_size_arr[@]}"
@@ -171,7 +172,10 @@ regression_snp_ldscore_filestem=${simulation_genotype_dir}"variant_reference_gen
 eqtl_cis_snp_h2_summary_file=${estimated_cis_snp_h2_dir}${simulation_name_string}"_"${eqtl_sample_size}"_"${cis_snp_h2_method}"_est_cis_snp_h2_summary.txt"
 
 marginal_eqtl_summary_file=$simulated_learned_gene_models_dir${simulation_name_string}"_"${eqtl_sample_size}"_replicate_eqtl_sumstats_xt_summary.txt"
-pred_eqtl_summary_file=$mesc_expression_score_dir${simulation_name_string}"_"${eqtl_sample_size}"_"${training_data_gene_ldscores_type}"_replicate_eqtl_sumstats_xt_summary.txt"
+#pred_eqtl_summary_file=$mesc_expression_score_dir${simulation_name_string}"_"${eqtl_sample_size}"_"${training_data_gene_ldscores_type}"_replicate_eqtl_sumstats_xt_summary.txt"
+pred_eqtl_summary_file=$lasso_gene_models_dir${simulation_name_string}"_"${eqtl_sample_size}"_"${training_data_gene_ldscores_type}"_replicate_eqtl_sumstats_xt_summary.txt"
+
+
 variant_m_filestem=${simulation_genotype_dir}"variant_reference_genotype_data_ldscores_chrom"
 	
 
@@ -677,7 +681,7 @@ fi
 #######################
 # Binned approach
 # Weighted
-if false; then
+#**********
 simulated_gt_architecture="stdExpr"
 inference_gt_architecture="linear"
 echo $simulated_gt_architecture"_"$inference_gt_architecture
@@ -685,7 +689,7 @@ echo $simulated_gt_architecture"_"$inference_gt_architecture
 #####################
 non_med_anno_arr=("genotype_intercept" "full_anno")
 non_med_anno_arr=("genotype_intercept")
-cis_snp_h2_method_arr=( "true" "avgChisq" "ldsc" "greml" )
+cis_snp_h2_method_arr=( "true" "avgChisq" )
 
 validation_data_gene_ldscores_type="MarginalSS"
 
@@ -698,7 +702,7 @@ eqtl_beta_sq_filter_arr=( "100.0" "500.0" "1000.0")
 eqtl_beta_sq_filter_arr=( "1000.0")
 
 training_data_gene_ldscores_type_arr=("MarginalSS" "mescLassoCorr" "mescLasso" "mescLassoPlusMarginalSS")
-training_data_gene_ldscores_type_arr=("lasso_CV_corr" "lasso_CV_corr_standardized")
+training_data_gene_ldscores_type_arr=("lasso_CV_corr")
 
 inference_approach_arr=("seperately_binned_2SLS" "binned_2SLS")
 
@@ -765,7 +769,7 @@ done
 done
 done
 done
-fi
+
 
 
 
@@ -874,7 +878,7 @@ fi
 
 # INFINITE SS
 # Inverse variance arch
-
+#**********
 simulated_gt_architecture="stdExpr"
 inference_gt_architecture="stdExpr"
 echo $simulated_gt_architecture"_"$inference_gt_architecture
@@ -952,6 +956,7 @@ done
 #######################
 # Binned approach
 # Infinite SAMPLE SIZE
+#**********
 simulated_gt_architecture="stdExpr"
 inference_gt_architecture="linear"
 echo $simulated_gt_architecture"_"$inference_gt_architecture
@@ -1030,6 +1035,10 @@ done
 done
 done
 done
+
+
+
+
 
 
 

@@ -370,7 +370,6 @@ mesc_expression_score_dir = sys.argv[9]
 simulated_trait_dir = sys.argv[10]
 
 
-'''
 # Names of chromosomes to run analysis on
 chrom_arr, chrom_dicti = extract_chromosome_names(chrom_nums_file)
 
@@ -385,7 +384,6 @@ eqtl_dataset_names, eqtl_dataset_Ns_training, eqtl_dataset_Ns_validation, eqtl_d
 ##############################
 # Load in gene info (ldscores and what not)
 gene_info = extract_gene_info(gene_ldscore_filestem, gene_ldscore_filesuffix, eqtl_dataset_names, chrom_arr)
-'''
 
 
 ##############################
@@ -555,7 +553,6 @@ print(global_output_file)
 ##############################
 # Extract cis-snp h2s using avg_chi_sq
 ##############################
-'''
 # Create global output file
 global_output_file = est_cis_snp_h2_dir + simulation_name_string + '_' + str(eqtl_sample_size) + '_avgChisq_est_cis_snp_h2_summary.txt'
 tt = open(global_output_file,'w')
@@ -588,7 +585,10 @@ for dataset_iter, eqtl_dataset_name in enumerate(eqtl_dataset_names):
 	tt.write(eqtl_dataset_name + '\t' + str(N_training) + '\t' + str(N_validation) + '\t' + dataset_cis_h2_rep1_file + '\t' + dataset_cis_h2_rep2_file + '\n')
 tt.close()
 print(global_output_file)
-'''
+
+
+
+
 
 '''
 ##############################

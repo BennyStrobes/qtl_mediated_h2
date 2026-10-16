@@ -14,7 +14,9 @@ poster_figure_theme <- function() {
 	return(theme(plot.title = element_text(face="plain",size=30), text = element_text(size=25),axis.text=element_text(size=30), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank(), axis.line = element_line(colour = "black"), legend.text = element_text(size=30), legend.title = element_text(size=30)))
 }
 
-
+r35_figure_theme <- function() {
+	return(theme(plot.title = element_text(face="plain",size=11), text = element_text(size=9),axis.text=element_text(size=9), panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank(), axis.line = element_line(colour = "black"), legend.text = element_text(size=9), legend.title = element_text(size=9)))
+}
 
 
 make_se_barplot_for_nm_h2_old <- function(df, method) {
@@ -293,6 +295,39 @@ make_multimethod_se_barplot_for_noncausal_tissue_med_h2 <- function(df, methods)
 
   	return(pp)
 }
+
+make_multimethod_se_barplot_for_noncausal_tissue_med_h2_R35 <- function(df, methods) {
+	df2 <- df[as.character(df$method)%in%methods,]
+
+	df2$method[df2$method == "mesc"] <- "MESC"
+	df2$method[df2$method == "calibrated_mesc"] <- "MPMH"
+	df2$method = factor(df2$method,levels=c("MESC", "MPMH"))
+	sample_sizes <- c("100", "200", "300", "1000")
+	df2 <- df2[as.character(df2$eqtl_sample_size)%in%sample_sizes,]
+
+
+	df2 <- df2[as.character(df2$heritability_type)=="non_causal_tissue_med_h2",]
+	
+	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c("100","200","300","1000"))
+	df2$heritability_type = factor(df2$heritability_type, levels=c("non_causal_tissue_med_h2"))
+
+	sim_h2 = df2$sim_h2[1]
+
+
+
+	pp<-ggplot(data=df2, aes(x=eqtl_sample_size, y=est_h2, fill=method)) +
+  		geom_bar(stat="identity", position=position_dodge(), width=.8) +
+  		geom_errorbar(aes(ymin=est_h2_lb, ymax=est_h2_ub), width=.32, position=position_dodge(.8))  +
+  		scale_fill_manual(values=c("#b2b2b2", "#1f78b4"))+
+  		#scale_fill_brewer(palette="Set1") +
+  		r35_figure_theme() +
+  		labs(x="QTL sample size", y="Null QTL\nmediated h2", fill="") +
+  		geom_hline(yintercept=sim_h2, color='#b2182b', linetype=2, linewidth=.6) +
+  		guides(fill = guide_legend(keywidth = 0.77, keyheight = 0.75))
+
+  	return(pp)
+}
+
 
 
 make_single_method_mediated_h2_se_barplot_for_permuted_and_unpermuted <- function(df, method) {
@@ -1196,12 +1231,156 @@ make_multimethod_se_barplot_for_causal_tissue_med_h2 <- function(df, methods) {
 }
 
 
+make_multimethod_se_barplot_for_causal_tissue_med_h2_R35 <- function(df, methods) {
+	df2 <- df[as.character(df$method)%in%methods,]
+
+	sample_sizes <- c("100", "200", "300", "1000")
+	df2 <- df2[as.character(df2$eqtl_sample_size)%in%sample_sizes,]
+
+	df2 <- df2[as.character(df2$heritability_type)=="causal_tissue_med_h2",]
+
+	df2$method[df2$method == "mesc"] <- "MESC"
+	df2$method[df2$method == "uncalibrated_mesc"] <- "MESC"
+
+	df2$method[df2$method == "calibrated_mesc"] <- "MPMH"
+	df2$method = factor(df2$method,levels=c("MESC", "MPMH"))
+
+	
+	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c("100","200","300","1000"))
+	df2$heritability_type = factor(df2$heritability_type, levels=c("causal_tissue_med_h2"))
+
+	sim_h2 = df2$sim_h2[1]
+
+
+	pp<-ggplot(data=df2, aes(x=eqtl_sample_size, y=est_h2, fill=method)) +
+  		geom_bar(stat="identity", position=position_dodge(), width=.8) +
+  		geom_errorbar(aes(ymin=est_h2_lb, ymax=est_h2_ub), width=.32, position=position_dodge(.8))  +
+  		scale_fill_manual(values=c("#b2b2b2", "#1f78b4"))+
+  		#scale_fill_brewer(palette="Set1") +
+  		r35_figure_theme() +
+  		labs(x="QTL sample size", y="Causal QTL\nmediated h2", fill="") +
+  		geom_hline(yintercept=sim_h2, color='#b2182b', linetype=2,linewidth=.6) +
+  		guides(fill = guide_legend(keywidth = 0.77, keyheight = 0.75))
+
+  	return(pp)
+}
+
+make_multimethod_se_barplot_for_total_tissue_med_h2_R35 <- function(df, methods) {
+	df2 <- df[as.character(df$method)%in%methods,]
+
+	sample_sizes <- c("100", "200", "300", "1000")
+	df2 <- df2[as.character(df2$eqtl_sample_size)%in%sample_sizes,]
+
+	df2 <- df2[as.character(df2$heritability_type)=="med_h2",]
+
+	df2$method[df2$method == "mesc"] <- "MESC"
+	df2$method[df2$method == "uncalibrated_mesc"] <- "MESC"
+
+	df2$method[df2$method == "calibrated_mesc"] <- "MPMH"
+
+	df2$method = factor(df2$method,levels=c("MESC", "MPMH"))
+
+	
+	df2$eqtl_sample_size <- factor(df2$eqtl_sample_size, levels=c("100","200","300","1000"))
+	df2$heritability_type = factor(df2$heritability_type, levels=c("med_h2"))
+
+	sim_h2 = df2$sim_h2[1]
+
+
+	pp<-ggplot(data=df2, aes(x=eqtl_sample_size, y=est_h2, fill=method)) +
+  		geom_bar(stat="identity", position=position_dodge(), width=.8) +
+  		geom_errorbar(aes(ymin=est_h2_lb, ymax=est_h2_ub), width=.32, position=position_dodge(.8))  +
+  		scale_fill_manual(values=c("#b2b2b2", "#1f78b4"))+
+  		#scale_fill_brewer(palette="Set1") +
+  		r35_figure_theme() +
+  		labs(x="QTL sample size", y="Total QTL\nmediated h2", fill="") +
+  		geom_hline(yintercept=sim_h2, color='#b2182b', linetype=2,linewidth=.6) +
+  		guides(fill = guide_legend(keywidth = 0.77, keyheight = 0.75))
+
+  	return(pp)
+}
+
+
 ########################
 # Command line args
 ########################
 trait_med_h2_inference_dir = args[1]
 organized_trait_med_h2_results_dir = args[2]
 visualize_trait_med_h2_dir = args[3]
+
+
+
+
+#########################
+# Run grant analysis
+#########################
+old_organized_trait_med_h2_results_dir = "/n/groups/price/ben/qtl_mediated_h2/simulation_experiments/multi_tissue_simulation/organized_trait_med_h2_results/old/"
+
+old_organized_trait_med_h2_results_dir="/n/groups/price/ben/qtl_mediated_h2/simulation_experiments/new_multi_tissue_simulation/organized_trait_med_h2_results/old/"
+
+mesc_summary_file <- paste0(old_organized_trait_med_h2_results_dir, "mesc_med_h2_5_causal_tissue__full_gt_arch_linear_genotypeIntercept_sim_results_calibrated_ldsc_summary_averaged.txt")
+mesc_df <- read.table(mesc_summary_file, header=TRUE, sep="\t")
+
+joint_ldsc_summary_file <- paste0(old_organized_trait_med_h2_results_dir, "med_h2_5_causal_tissue_bins_20_genotype_intercept_linear_linear_squared_marginal_sumstats_100.0_mescLasso_weighted_sim_results_calibrated_ldsc_summary_averaged.txt")
+joint_ldsc_df <- read.table(joint_ldsc_summary_file, header=TRUE, sep="\t")
+
+joint_ldsc_df <- rbind(mesc_df, joint_ldsc_df)
+
+
+if (FALSE) {
+total_med_plot <- make_multimethod_se_barplot_for_total_tissue_med_h2_R35(joint_ldsc_df, c("mesc","calibrated_mesc"))
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, "R35_calibrated_mesc_tissue_simulation_total_tissue_med_se_barplot.pdf")
+ggsave(total_med_plot, file=output_file, width=3.75, height=2.45, units="in")
+print(output_file)
+
+total_med_plot <- make_multimethod_se_barplot_for_total_tissue_med_h2_R35(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+# Save
+output_file <- paste0(visualize_trait_med_h2_dir, "R35_calibrated_mesc_tissue_simulation_total_tissue_med_se_barplot_v2.pdf")
+ggsave(total_med_plot, file=output_file, width=3.75, height=2.45, units="in")
+}
+
+if (FALSE) {
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2_R35(joint_ldsc_df, c("mesc","calibrated_mesc"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_noncausal_tissue_med_h2_R35(joint_ldsc_df, c("mesc","calibrated_mesc"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="right"))
+# Combine together with cowplot
+#joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+
+legender <- get_legend(non_causal_med_plot + theme(legend.position="top"))
+
+joint1 <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), ncol=2, labels=c("a", "b"), label_size=12,label_y = 1.07)
+joint <- plot_grid(legender, joint1, ncol=1, rel_heights=c(.18, 1.0))
+output_file <- paste0(visualize_trait_med_h2_dir, "R35_calibrated_mesc_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot.pdf")
+ggsave(joint, file=output_file, width=7.0, height=1.4, units="in")
+print(output_file)
+}
+
+
+causal_med_plot <- make_multimethod_se_barplot_for_causal_tissue_med_h2_R35(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+# Make plot for non-causal tissue
+non_causal_med_plot <- make_multimethod_se_barplot_for_total_tissue_med_h2_R35(joint_ldsc_df, c("uncalibrated_mesc","calibrated_mesc"))
+# Get legend
+legender <- get_legend(non_causal_med_plot + theme(legend.position="right"))
+# Combine together with cowplot
+#joint <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), legender, ncol=1, rel_heights=c(1,1,.2))
+
+
+legender <- get_legend(non_causal_med_plot + theme(legend.position="top"))
+
+joint1 <- plot_grid(causal_med_plot+ theme(legend.position="none"), non_causal_med_plot+ theme(legend.position="none"), ncol=2, labels=c("a", "b"), label_size=12,label_y = 1.02)
+joint <- plot_grid(joint1,legender, ncol=1, rel_heights=c(1.0, .18))
+
+    joint <- ggdraw() + 
+        draw_plot(joint1 + theme(legend.position='none') + labs(title=""),0.0,0.0,1.0,1.0) + 
+        draw_plot(legender,.03,-.43,1,1) 
+
+output_file <- paste0(visualize_trait_med_h2_dir, "R35_calibrated_mesc_tissue_simulation_causal_tissue_med_vs_non_causal_tissue_med_se_barplot_v2.pdf")
+ggsave(joint, file=output_file, width=7.0, height=1.4, units="in")
+print(output_file)
 
 
 
@@ -1219,6 +1398,7 @@ inference_approach="2SLS"
 
 cis_h2_method="greml"
 
+if (FALSE) {
 run_strings <- c()
 method_names <- c()
 for (bin_iter in 1:7) {
@@ -1238,7 +1418,7 @@ joint<-plot_mediated_h2_inf_ss(method_names, run_strings, organized_trait_med_h2
 output_file <- paste0(visualize_trait_med_h2_dir, run_string, "_calibrated_mesc_tissue_simulation_causal_tissue_stdExpr_med_vs_non_causal_tissue_med_se_barplot_INF.pdf")
 ggsave(joint, file=output_file, width=7.2, height=4.5, units="in")
 print(output_file)
-
+}
 if (FALSE) {
 ###################################################
 # Joint plot showing mediated heritability in causal tissue and mediated heritability in non-causal tissues

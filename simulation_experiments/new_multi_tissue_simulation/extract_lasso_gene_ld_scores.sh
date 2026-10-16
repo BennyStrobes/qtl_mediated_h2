@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 1                               # Request one core
-#SBATCH -t 0-21:10                         # Runtime in D-HH:MM format
+#SBATCH -t 0-35:10                         # Runtime in D-HH:MM format
 #SBATCH -p medium                           # Partition to run in
 #SBATCH --mem=10GB                         # Memory total in MiB (for all cores)
 
@@ -41,22 +41,6 @@ ldsc_annotation_file_stem="/n/groups/price/ldsc/reference_files/1000G_EUR_Phase3
 
 gene_summary_file_stem=${simulation_genotype_dir}"gene_positions_chr"
 
-if false; then
-#STANDARDIZED FORM
-python3 ${calibrated_mesc_code_dir}compute_predicted_marginal_summary_statistics.py \
-	--study-names-file $study_names_file \
-	--chromosome-file ${chromosome_file} \
-	--hm3-file-stem $hm3_rsid_file_stem \
-	--ldsc-annotation-file-stem ${ldsc_annotation_file_stem} \
-	--bgen ${bgen_file_stem} \
-	--gene-summary-file-stem ${gene_summary_file_stem} \
-	--gene-summary-file-suffix ".txt" \
-	--standardize \
-	--output-dir $lasso_gene_models_dir
-
-
-python3 create_lasso_eqtl_summary_files.py $simulation_number $simulation_name_string $lasso_gene_models_dir $alpha_0
-fi
 
 # Non-Standardized FORM
 python3 ${calibrated_mesc_code_dir}compute_predicted_marginal_summary_statistics.py \
@@ -73,6 +57,28 @@ date
 
 
 python3 create_lasso_eqtl_summary_files.py $simulation_number $simulation_name_string $lasso_gene_models_dir $alpha_0
+
+
+echo "MID"
+
+
+
+
+#STANDARDIZED FORM
+python3 ${calibrated_mesc_code_dir}compute_predicted_marginal_summary_statistics.py \
+	--study-names-file $study_names_file \
+	--chromosome-file ${chromosome_file} \
+	--hm3-file-stem $hm3_rsid_file_stem \
+	--ldsc-annotation-file-stem ${ldsc_annotation_file_stem} \
+	--bgen ${bgen_file_stem} \
+	--gene-summary-file-stem ${gene_summary_file_stem} \
+	--gene-summary-file-suffix ".txt" \
+	--standardize \
+	--output-dir $lasso_gene_models_dir
+
+
+python3 create_lasso_eqtl_summary_files.py $simulation_number $simulation_name_string $lasso_gene_models_dir $alpha_0
+
 
 
 
